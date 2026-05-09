@@ -1,6 +1,7 @@
 <script lang="ts">
   import Icon from '@iconify/svelte';
   import SearchBar from '$lib/components/SearchBar.svelte';
+  import Pagination from '$lib/components/Pagination.svelte';
 
   interface Client {
     id: string;
@@ -159,7 +160,8 @@
 </script>
 
 <!-- ───────────────────────────── 메인 컨텐츠 ───────────────────────────── -->
-<div class="min-h-screen bg-base-200 px-8 py-6">
+<div class="min-h-screen bg-base-200 flex flex-col items-center px-8 py-6">
+  <div class="w-full max-w-6xl">
   <h2 class="text-2xl font-extrabold text-base-content mb-5">거래처 관리</h2>
 
   <!-- 검색 / 숨김 토글 / 등록 버튼 바 -->
@@ -193,8 +195,9 @@
   </div>
 
   <!-- 거래처 테이블 -->
+  <!-- table-sm 행 높이 ~36px × 10행 + thead ~36px = 396px -->
   <div class="bg-base-100 rounded-2xl shadow-sm border border-base-300 overflow-hidden">
-    <table class="table table-sm w-full">
+    <table class="table table-sm w-full" style="table-layout: fixed;">
       <thead class="bg-base-200 text-base-content/60">
         <tr>
           <th class="text-xs font-bold w-[22%]">거래처명</th>
@@ -250,67 +253,28 @@
             </tr>
           {/each}
         {/if}
+      <!-- 10행 미만일 때 빈 행으로 채워 높이 고정 -->
+      {#each Array.from({ length: Math.max(0, PAGE_SIZE - visibleClients.length) }) as _}
+        <tr class="pointer-events-none">
+          <td colspan="7" class="py-0" style="height: 36px;"></td>
+        </tr>
+      {/each}
       </tbody>
     </table>
   </div>
 
   <!-- 페이지네이션 -->
-  {#if totalPages > 1}
-    <div class="flex items-center justify-center gap-1 mt-4">
-      <button
-        onclick={() => (currentPage = 1)}
-        disabled={currentPage === 1}
-        class="btn btn-ghost btn-xs"
-        aria-label="처음"
-      >
-        <Icon icon="lucide:chevrons-left" class="w-3.5 h-3.5" />
-      </button>
-      <button
-        onclick={() => currentPage--}
-        disabled={currentPage === 1}
-        class="btn btn-ghost btn-xs"
-        aria-label="이전"
-      >
-        <Icon icon="lucide:chevron-left" class="w-3.5 h-3.5" />
-      </button>
+  <div class="mt-4">
+    <Pagination
+      {currentPage}
+      {totalPages}
+      totalItems={filteredClients.length}
+      pageSize={PAGE_SIZE}
+      onpage={(p) => (currentPage = p)}
+    />
+  </div>
 
-      {#each Array.from({ length: totalPages }, (_, i) => i + 1) as page (page)}
-        {@const nearCurrent = Math.abs(page - currentPage) <= 2}
-        {@const isEdge = page === 1 || page === totalPages}
-        {@const showDotsBefore = page === currentPage - 3 && currentPage - 3 > 1}
-        {@const showDotsAfter  = page === currentPage + 3 && currentPage + 3 < totalPages}
-        {#if nearCurrent || isEdge}
-          <button
-            onclick={() => (currentPage = page)}
-            class="btn btn-xs min-w-[2rem] {page === currentPage ? 'btn-primary' : 'btn-ghost'}"
-          >{page}</button>
-        {:else if showDotsBefore || showDotsAfter}
-          <span class="px-1 text-base-content/30 text-xs select-none">…</span>
-        {/if}
-      {/each}
-
-      <button
-        onclick={() => currentPage++}
-        disabled={currentPage === totalPages}
-        class="btn btn-ghost btn-xs"
-        aria-label="다음"
-      >
-        <Icon icon="lucide:chevron-right" class="w-3.5 h-3.5" />
-      </button>
-      <button
-        onclick={() => (currentPage = totalPages)}
-        disabled={currentPage === totalPages}
-        class="btn btn-ghost btn-xs"
-        aria-label="마지막"
-      >
-        <Icon icon="lucide:chevrons-right" class="w-3.5 h-3.5" />
-      </button>
-
-      <span class="text-xs text-base-content/40 ml-2">
-        {filteredClients.length}개 중 {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredClients.length)}
-      </span>
-    </div>
-  {/if}
+  </div>
 </div>
 
 <!-- ───────────────────────── 거래처 등록/수정 모달 ───────────────────────── -->
