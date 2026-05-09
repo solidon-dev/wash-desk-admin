@@ -185,10 +185,10 @@
     </label>
 
     <!-- 등록 버튼 (항상 오른쪽 끝) -->
-    <button onclick={openAdd} class="btn btn-primary btn-sm gap-2 whitespace-nowrap ml-auto">
+    <button onclick={openAdd} class="btn btn-primary btn-sm gap-2 whitespace-nowrap ml-auto sm:w-auto w-full">
       <Icon icon="lucide:plus" class="w-4 h-4" />
       <span class="hidden sm:inline">거래처 등록</span>
-      <span class="sm:hidden">등록</span>
+      <span class="sm:hidden">거래처 등록</span>
     </button>
   </div>
 
@@ -198,13 +198,21 @@
     <table class="table table-sm w-full" style="table-layout: fixed;">
       <thead class="bg-base-200 text-base-content/60">
         <tr>
-          <th class="text-xs font-bold">거래처명</th>
+          <!-- 기본(~lg): 거래처명 + 연락처 + 액션 = 3컬럼 -->
+          <!-- lg~xl: + 담당자 + 등록일 = 5컬럼 -->
+          <!-- xl~:   + 사업자번호 + 이메일 = 7컬럼 -->
+          <th class="text-xs font-bold
+            w-[62%] sm:w-[55%] lg:w-[35%] xl:w-[22%]">거래처명</th>
           <th class="text-xs font-bold hidden xl:table-cell w-[16%]">사업자번호</th>
-          <th class="text-xs font-bold hidden lg:table-cell w-[12%]">담당자</th>
-          <th class="text-xs font-bold w-[16%]">연락처</th>
-          <th class="text-xs font-bold hidden xl:table-cell w-[20%]">이메일</th>
-          <th class="text-xs font-bold hidden lg:table-cell w-[9%] whitespace-nowrap">등록일</th>
-          <th class="text-xs font-bold text-center whitespace-nowrap w-[5%]">액션</th>
+          <th class="text-xs font-bold hidden lg:table-cell
+            lg:w-[14%] xl:w-[12%]">담당자</th>
+          <th class="text-xs font-bold
+            w-[28%] sm:w-[35%] lg:w-[28%] xl:w-[16%]">연락처</th>
+          <th class="text-xs font-bold hidden xl:table-cell w-[18%]">이메일</th>
+          <th class="text-xs font-bold hidden lg:table-cell whitespace-nowrap
+            lg:w-[12%] xl:w-[9%]">등록일</th>
+          <th class="text-xs font-bold text-center whitespace-nowrap
+            w-[10%] lg:w-[11%] xl:w-[7%]">액션</th>
         </tr>
       </thead>
       <tbody>
