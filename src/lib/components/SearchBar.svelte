@@ -148,9 +148,9 @@
             {i === activeIdx ? 'bg-primary/10 text-primary' : 'hover:bg-base-200'}"
         >
           <Icon icon="lucide:search" class="w-3.5 h-3.5 shrink-0 text-base-content/30" />
-          <span class="font-semibold">{item.label}</span>
+          <span class="font-semibold truncate shrink-0 max-w-[55%]">{item.label}</span>
           {#if item.sub}
-            <span class="text-base-content/40 text-xs ml-1">{item.sub}</span>
+            <span class="text-base-content/40 text-xs truncate min-w-0">{item.sub}</span>
           {/if}
         </li>
       {/each}
