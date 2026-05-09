@@ -10,39 +10,47 @@
 
   let { placeholder = '검색...', items, onselect, class: className = '' }: Props = $props();
 
-  let query      = $state('');
-  let activeIdx  = $state(-1);
-  let open       = $state(false);
-  let inputEl    = $state<HTMLInputElement | null>(null);
+  let query     = $state('');
+  let activeIdx = $state(-1);
+  let open      = $state(false);
+  let inputEl   = $state<HTMLInputElement | null>(null);
+  // confirm() 직후 effect가 다시 open시키지 못하도록 guard
+  let justConfirmed = false;
 
   const suggestions = $derived(
     query.trim() === ''
       ? []
-      : items.filter(
-          (it) =>
-            it.label.toLowerCase().includes(query.trim().toLowerCase()) ||
-            (it.sub ?? '').toLowerCase().includes(query.trim().toLowerCase())
-        ).slice(0, 8)
+      : items
+          .filter(
+            (it) =>
+              it.label.toLowerCase().includes(query.trim().toLowerCase()) ||
+              (it.sub ?? '').toLowerCase().includes(query.trim().toLowerCase())
+          )
+          .slice(0, 8)
   );
 
+  // query가 바뀌면 인덱스 리셋 + 드롭다운 열기
+  // (단, confirm 직후에는 건너뜀)
   $effect(() => {
-    // 쿼리 바뀌면 선택 인덱스 초기화
-    query;
+    const q = query; // 의존성 등록
+    if (justConfirmed) return;
     activeIdx = -1;
-    open = query.trim() !== '' && suggestions.length > 0;
+    open = q.trim() !== '' && suggestions.length > 0;
   });
 
   function handleKeydown(e: KeyboardEvent) {
+    if (e.key === 'Escape') {
+      open = false;
+      activeIdx = -1;
+      return;
+    }
     if (!open || suggestions.length === 0) {
-      if (e.key === 'Enter' && query.trim()) {
-        // 미리보기 없이 엔터 → 첫번째 매칭으로 선택
-        if (suggestions.length > 0) {
-          confirm(suggestions[0].id);
-        }
+      if (e.key === 'Enter' && suggestions.length > 0) {
+        e.preventDefault();
+        confirm(suggestions[0].id);
       }
       return;
     }
-
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       activeIdx = Math.min(activeIdx + 1, suggestions.length - 1);
@@ -51,35 +59,34 @@
       activeIdx = Math.max(activeIdx - 1, -1);
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (activeIdx >= 0) {
-        confirm(suggestions[activeIdx].id);
-      } else if (suggestions.length > 0) {
-        confirm(suggestions[0].id);
-      }
-    } else if (e.key === 'Escape') {
-      open = false;
-      activeIdx = -1;
+      confirm(activeIdx >= 0 ? suggestions[activeIdx].id : suggestions[0].id);
     }
   }
 
   function confirm(id: string) {
     const found = items.find((it) => it.id === id);
-    if (found) query = found.label;
+    // guard 세우고 query 변경 → effect가 open을 켜지 못하도록
+    justConfirmed = true;
     open = false;
     activeIdx = -1;
+    if (found) query = found.label;
     onselect(id);
+    // 다음 마이크로태스크에서 guard 해제
+    Promise.resolve().then(() => { justConfirmed = false; });
   }
 
   function handleBlur() {
-    // 클릭 이벤트가 먼저 처리될 수 있도록 약간 지연
-    setTimeout(() => { open = false; }, 150);
+    // 리스트 항목 클릭이 먼저 처리되도록 한 프레임 대기
+    setTimeout(() => { open = false; }, 100);
   }
 
   function clearQuery() {
+    justConfirmed = true;
     query = '';
     open = false;
     activeIdx = -1;
     onselect('');
+    Promise.resolve().then(() => { justConfirmed = false; });
     inputEl?.focus();
   }
 </script>
@@ -94,7 +101,7 @@
       bind:value={query}
       onkeydown={handleKeydown}
       onblur={handleBlur}
-      onfocus={() => { if (suggestions.length > 0) open = true; }}
+      onfocus={() => { if (!justConfirmed && suggestions.length > 0) open = true; }}
       autocomplete="off"
       class="grow text-sm bg-transparent outline-none"
     />

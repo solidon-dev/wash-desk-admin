@@ -160,8 +160,7 @@
 </script>
 
 <!-- ───────────────────────────── 메인 컨텐츠 ───────────────────────────── -->
-<div class="min-h-screen bg-base-200 flex flex-col items-center px-8 py-6">
-  <div class="w-full max-w-6xl">
+<div class="min-h-full bg-base-200 px-8 py-10">
   <h2 class="text-2xl font-extrabold text-base-content mb-5">거래처 관리</h2>
 
   <!-- 검색 / 숨김 토글 / 등록 버튼 바 -->
@@ -253,12 +252,6 @@
             </tr>
           {/each}
         {/if}
-      <!-- 10행 미만일 때 빈 행으로 채워 높이 고정 -->
-      {#each Array.from({ length: Math.max(0, PAGE_SIZE - visibleClients.length) }) as _}
-        <tr class="pointer-events-none">
-          <td colspan="7" class="py-0" style="height: 36px;"></td>
-        </tr>
-      {/each}
       </tbody>
     </table>
   </div>
@@ -272,8 +265,6 @@
       pageSize={PAGE_SIZE}
       onpage={(p) => (currentPage = p)}
     />
-  </div>
-
   </div>
 </div>
 
