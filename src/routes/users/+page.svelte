@@ -2,6 +2,7 @@
   import Icon from '@iconify/svelte';
   import SearchBar from '$lib/components/SearchBar.svelte';
   import Pagination from '$lib/components/Pagination.svelte';
+  import TableCard from '$lib/components/TableCard.svelte';
 
   type Role = 'master' | 'admin' | 'manager';
 
@@ -56,10 +57,7 @@
   let currentPage = $state(1);
 
   const filteredUsers = $derived(
-    users.filter((u) => {
-      if (selectedId) return u.id === selectedId;
-      return true;
-    })
+    users.filter((u) => selectedId ? u.id === selectedId : true)
   );
 
   $effect(() => { selectedId; currentPage = 1; });
@@ -70,45 +68,55 @@
   function formatDate(iso: string) { return iso.slice(0, 10); }
 
   // ── 등록/수정 모달 ──
-  let showModal   = $state(false);
-  let editingUser = $state<User | null>(null);
+  let showModal        = $state(false);
+  let editingUser      = $state<User | null>(null);
+  let formName         = $state('');
+  let formUsername     = $state('');
+  let formPassword     = $state('');
+  let formPasswordConf = $state('');
+  let formRole         = $state<Role>('manager');
+  let formEmail        = $state('');
+  let formPhone        = $state('');
+  let showPassword     = $state(false);
+  let showPasswordConf = $state(false);
 
-  let formName     = $state('');
-  let formUsername = $state('');
-  let formPassword = $state('');
-  let formRole     = $state<Role>('manager');
-  let formEmail    = $state('');
-  let formPhone    = $state('');
-  let showPassword = $state(false);
+  const passwordMismatch = $derived(
+    formPasswordConf.length > 0 && formPassword !== formPasswordConf
+  );
 
   function openAdd() {
-    editingUser  = null;
-    formName     = '';
-    formUsername = '';
-    formPassword = '';
-    formRole     = 'manager';
-    formEmail    = '';
-    formPhone    = '';
-    showPassword = false;
-    showModal    = true;
+    editingUser      = null;
+    formName         = '';
+    formUsername     = '';
+    formPassword     = '';
+    formPasswordConf = '';
+    formRole         = 'manager';
+    formEmail        = '';
+    formPhone        = '';
+    showPassword     = false;
+    showPasswordConf = false;
+    showModal        = true;
   }
 
   function openEdit(user: User) {
-    editingUser  = user;
-    formName     = user.name;
-    formUsername = user.username;
-    formPassword = user.password;
-    formRole     = user.role;
-    formEmail    = user.email    ?? '';
-    formPhone    = user.phone    ?? '';
-    showPassword = false;
-    showModal    = true;
+    editingUser      = user;
+    formName         = user.name;
+    formUsername     = user.username;
+    formPassword     = user.password;
+    formPasswordConf = user.password;
+    formRole         = user.role;
+    formEmail        = user.email ?? '';
+    formPhone        = user.phone ?? '';
+    showPassword     = false;
+    showPasswordConf = false;
+    showModal        = true;
   }
 
   function closeModal() { showModal = false; }
 
   function handleSave() {
     if (!formName.trim() || !formUsername.trim() || !formPassword.trim()) return;
+    if (passwordMismatch) return;
     const payload = {
       name:     formName.trim(),
       username: formUsername.trim(),
@@ -158,7 +166,6 @@
       onselect={(id) => (selectedId = id)}
       class="w-64 sm:w-72"
     />
-
     <button onclick={openAdd} class="btn btn-primary btn-sm gap-2 whitespace-nowrap ml-auto sm:w-auto w-full">
       <Icon icon="lucide:plus" class="w-4 h-4" />
       사용자 등록
@@ -166,54 +173,64 @@
   </div>
 
   <!-- 사용자 테이블 -->
-  <div class="bg-base-100 rounded-2xl shadow-sm border border-base-300 overflow-hidden">
+  <TableCard>
     <table class="table table-sm w-full" style="table-layout: fixed;">
       <thead class="bg-base-200 text-base-content/60">
         <tr>
-          <th class="text-xs font-bold
-            w-[55%] sm:w-[45%] lg:w-[28%] xl:w-[22%]">이름</th>
-          <th class="text-xs font-bold hidden lg:table-cell
-            lg:w-[18%] xl:w-[16%]">아이디</th>
-          <th class="text-xs font-bold hidden lg:table-cell
-            lg:w-[12%] xl:w-[10%]">역할</th>
-          <th class="text-xs font-bold hidden xl:table-cell w-[18%]">이메일</th>
-          <th class="text-xs font-bold hidden xl:table-cell w-[14%]">연락처</th>
-          <th class="text-xs font-bold hidden lg:table-cell whitespace-nowrap
-            lg:w-[10%] xl:w-[8%]">등록일</th>
-          <th class="text-xs font-bold text-center whitespace-nowrap
-            w-[45%] sm:w-[55%] lg:w-[22%] xl:w-[12%]">상태 / 액션</th>
+          <!-- 이름+역할 묶음 -->
+          <th class="text-xs font-bold w-[60%] sm:w-[50%] lg:w-[30%] xl:w-[24%]">이름 / 역할</th>
+          <!-- 아이디+이메일+연락처 묶음 -->
+          <th class="text-xs font-bold hidden lg:table-cell lg:w-[40%] xl:w-[50%]">아이디 / 이메일 · 연락처</th>
+          <th class="text-xs font-bold hidden lg:table-cell whitespace-nowrap lg:w-[10%] xl:w-[8%]">등록일</th>
+          <th class="text-xs font-bold text-center whitespace-nowrap w-[40%] sm:w-[50%] lg:w-[20%] xl:w-[18%]">상태 / 액션</th>
         </tr>
       </thead>
       <tbody>
         {#if filteredUsers.length === 0}
           <tr>
-            <td colspan="7" class="py-16 text-center text-base-content/40 text-sm">
+            <td colspan="4" class="py-16 text-center text-base-content/40 text-sm">
               검색 결과가 없습니다.
             </td>
           </tr>
         {:else}
           {#each visibleUsers as user (user.id)}
             <tr class="hover:bg-base-200 transition-colors {!user.isActive ? 'opacity-50' : ''}">
-              <td class="font-semibold text-base-content">
-                <span>{user.name}</span>
-                <!-- lg 미만: 아이디·역할·등록일 인라인 -->
+
+              <!-- 이름 + 역할 -->
+              <td>
+                <div class="flex items-center gap-2">
+                  <span class="font-semibold text-base-content">{user.name}</span>
+                  <span class="badge badge-sm font-bold {roleBadge[user.role]}">{roleLabel[user.role]}</span>
+                </div>
+                <!-- lg 미만: 아이디·연락처·등록일 인라인 -->
                 <div class="lg:hidden mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
-                  <span class="text-xs text-base-content/50">{user.username}</span>
-                  <span class="text-xs font-bold {roleBadge[user.role] === 'badge-error' ? 'text-error' : roleBadge[user.role] === 'badge-primary' ? 'text-primary' : 'text-base-content/40'}">{roleLabel[user.role]}</span>
+                  <span class="text-xs text-base-content/50 font-mono">{user.username}</span>
+                  {#if user.email}<span class="text-xs text-base-content/40">{user.email}</span>{/if}
                   <span class="text-xs text-base-content/30">{formatDate(user.createdAt)}</span>
                 </div>
               </td>
-              <td class="text-base-content/70 text-sm hidden lg:table-cell">{user.username}</td>
+
+              <!-- 아이디 + 이메일·연락처 묶음 -->
               <td class="hidden lg:table-cell">
-                <span class="badge badge-sm font-bold {roleBadge[user.role]}">
-                  {roleLabel[user.role]}
-                </span>
+                <span class="text-sm font-mono text-base-content/80">{user.username}</span>
+                <div class="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
+                  {#if user.email}
+                    <span class="text-xs text-base-content/50">{user.email}</span>
+                  {/if}
+                  {#if user.phone}
+                    <span class="text-xs text-base-content/40">{user.phone}</span>
+                  {/if}
+                </div>
               </td>
-              <td class="text-base-content/60 text-xs hidden xl:table-cell">{user.email ?? '—'}</td>
-              <td class="text-base-content/70 text-sm hidden xl:table-cell">{user.phone ?? '—'}</td>
-              <td class="text-base-content/50 text-xs whitespace-nowrap hidden lg:table-cell">{formatDate(user.createdAt)}</td>
+
+              <!-- 등록일 -->
+              <td class="text-base-content/50 text-xs whitespace-nowrap hidden lg:table-cell">
+                {formatDate(user.createdAt)}
+              </td>
+
+              <!-- 액션 -->
               <td>
-                <div class="flex items-center justify-center gap-1">
+                <div class="flex items-center justify-center">
                   <button
                     onclick={() => openEdit(user)}
                     class="btn btn-ghost btn-xs text-primary font-semibold"
@@ -225,7 +242,7 @@
         {/if}
       </tbody>
     </table>
-  </div>
+  </TableCard>
 
   <!-- 페이지네이션 -->
   <div class="mt-4">
@@ -245,15 +262,15 @@
     class="modal modal-open"
     onmousedown={(e) => { if (e.target === e.currentTarget) closeModal(); }}
   >
-    <div class="modal-box w-full max-w-lg rounded-2xl p-6 flex flex-col" style="max-height: 560px;">
+    <div class="modal-box w-full max-w-lg rounded-2xl p-6 flex flex-col" style="max-height: 600px;">
+
       <!-- 헤더 -->
       <div class="flex items-center justify-between mb-5 shrink-0">
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2 flex-wrap">
           <h3 class="text-lg font-extrabold text-base-content">
             {editingUser ? '사용자 수정' : '사용자 등록'}
           </h3>
           {#if editingUser}
-            <!-- 활성/비활성 토글 -->
             <button
               type="button"
               onclick={() => { toggleActive(editingUser!.id); editingUser = { ...editingUser!, isActive: !editingUser!.isActive }; }}
@@ -262,7 +279,6 @@
               <Icon icon={editingUser.isActive ? 'lucide:user-x' : 'lucide:user-check'} class="w-3.5 h-3.5" />
               {editingUser.isActive ? '비활성화' : '활성화'}
             </button>
-            <!-- 삭제 버튼 -->
             <button
               type="button"
               onclick={() => openDelete(editingUser!.id)}
@@ -305,7 +321,7 @@
             </div>
             <div>
               <p class="label-text text-xs font-bold text-base-content/60 mb-2 mt-1">역할 *</p>
-              <div class="flex gap-2">
+              <div class="flex gap-1.5">
                 {#each (['master', 'admin', 'manager'] as Role[]) as r}
                   <button
                     type="button"
@@ -317,28 +333,50 @@
             </div>
           </div>
 
-          <!-- 비밀번호 -->
-          <div>
-            <label for="uPassword" class="label pb-1">
-              <span class="label-text text-xs font-bold text-base-content/60">비밀번호 *</span>
-            </label>
-            <div class="relative">
-              <input
-                id="uPassword"
-                type={showPassword ? 'text' : 'password'}
-                bind:value={formPassword}
-                placeholder="비밀번호 입력"
-                class="input input-bordered w-full text-sm pr-10"
-                required
-              />
-              <button
-                type="button"
-                onclick={() => (showPassword = !showPassword)}
-                class="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/40 hover:text-base-content/70 transition-colors"
-                aria-label="비밀번호 표시"
-              >
-                <Icon icon={showPassword ? 'lucide:eye-off' : 'lucide:eye'} class="w-4 h-4" />
-              </button>
+          <!-- 비밀번호 + 비밀번호 확인 (2열) -->
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label for="uPassword" class="label pb-1">
+                <span class="label-text text-xs font-bold text-base-content/60">비밀번호 *</span>
+              </label>
+              <div class="relative">
+                <input
+                  id="uPassword"
+                  type={showPassword ? 'text' : 'password'}
+                  bind:value={formPassword}
+                  placeholder="비밀번호 입력"
+                  class="input input-bordered w-full text-sm pr-9"
+                  required
+                />
+                <button type="button" onclick={() => (showPassword = !showPassword)}
+                  class="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/40 hover:text-base-content/70 transition-colors">
+                  <Icon icon={showPassword ? 'lucide:eye-off' : 'lucide:eye'} class="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+            <div>
+              <label for="uPasswordConf" class="label pb-1">
+                <span class="label-text text-xs font-bold text-base-content/60">
+                  비밀번호 확인 *
+                  {#if passwordMismatch}
+                    <span class="text-error ml-1">불일치</span>
+                  {/if}
+                </span>
+              </label>
+              <div class="relative">
+                <input
+                  id="uPasswordConf"
+                  type={showPasswordConf ? 'text' : 'password'}
+                  bind:value={formPasswordConf}
+                  placeholder="다시 입력"
+                  class="input input-bordered w-full text-sm pr-9 {passwordMismatch ? 'input-error' : ''}"
+                  required
+                />
+                <button type="button" onclick={() => (showPasswordConf = !showPasswordConf)}
+                  class="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/40 hover:text-base-content/70 transition-colors">
+                  <Icon icon={showPasswordConf ? 'lucide:eye-off' : 'lucide:eye'} class="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -364,7 +402,7 @@
         <!-- 액션 버튼 -->
         <div class="modal-action mt-5 pt-4 border-t border-base-200 shrink-0">
           <button type="button" onclick={closeModal} class="btn btn-ghost font-bold">취소</button>
-          <button type="submit" class="btn btn-primary font-bold">
+          <button type="submit" disabled={passwordMismatch} class="btn btn-primary font-bold disabled:opacity-50">
             {editingUser ? '저장' : '등록'}
           </button>
         </div>

@@ -36,6 +36,10 @@
     if (justConfirmed) return;
     activeIdx = -1;
     open = q.trim() !== '' && suggestions.length > 0;
+    // 타이핑했는데 일치 결과가 0개면 선택 해제
+    if (q.trim() !== '' && suggestions.length === 0) {
+      onselect('');
+    }
   });
 
   function handleKeydown(e: KeyboardEvent) {
@@ -89,6 +93,11 @@
     Promise.resolve().then(() => { justConfirmed = false; });
     inputEl?.focus();
   }
+
+  // onselect('') 외부 호출 시 query 클리어 (selectedId 외부에서 리셋될 때)
+  export function reset() {
+    clearQuery();
+  }
 </script>
 
 <div class="relative {className}">
@@ -110,7 +119,7 @@
         type="button"
         onmousedown={(e) => e.preventDefault()}
         onclick={clearQuery}
-        class="text-base-content/30 hover:text-base-content/60 transition-colors"
+        class="text-error/60 hover:text-error transition-colors"
         aria-label="검색 초기화"
       >
         <Icon icon="lucide:x" class="w-3.5 h-3.5" />

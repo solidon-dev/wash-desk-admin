@@ -2,6 +2,7 @@
   import Icon from '@iconify/svelte';
   import SearchBar from '$lib/components/SearchBar.svelte';
   import Pagination from '$lib/components/Pagination.svelte';
+  import TableCard from '$lib/components/TableCard.svelte';
 
   interface Client {
     id: string;
@@ -194,7 +195,7 @@
 
   <!-- 거래처 테이블 -->
   <!-- table-sm 행 높이 ~36px × 10행 + thead ~36px = 396px -->
-  <div class="bg-base-100 rounded-2xl shadow-sm border border-base-300 overflow-hidden">
+  <TableCard>
     <table class="table table-sm w-full" style="table-layout: fixed;">
       <thead class="bg-base-200 text-base-content/60">
         <tr>
@@ -258,7 +259,7 @@
         {/if}
       </tbody>
     </table>
-  </div>
+  </TableCard>
 
   <!-- 페이지네이션 -->
   <div class="mt-4">
