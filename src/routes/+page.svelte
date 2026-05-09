@@ -14,12 +14,31 @@
   }
 
   let clients = $state<Client[]>([
-    { id: 'client-001', name: '그랜드호텔',     businessNo: '123-45-67890', email: 'grand@hotel.com',   managerName: '이담당', managerPhone: '010-1234-5678', hidden: false, createdAt: '2024-01-10' },
-    { id: 'client-002', name: '오션뷰펜션',     businessNo: '234-56-78901', email: 'ocean@pension.com', managerName: '최담당', managerPhone: '010-2345-6789', hidden: false, createdAt: '2024-02-01' },
-    { id: 'client-003', name: '제주리조트',     businessNo: '345-67-89012', email: 'jeju@resort.com',   managerName: '강담당', managerPhone: '010-3456-7890', hidden: false, createdAt: '2024-03-15' },
-    { id: 'client-004', name: '힐사이드호텔',   businessNo: '456-78-90123', email: 'hill@hotel.com',    managerName: '임담당', managerPhone: '010-4567-8901', hidden: false, createdAt: '2024-04-01' },
-    { id: 'client-005', name: '선셋펜션',       businessNo: '567-89-01234', email: 'sunset@pension.com',managerName: '오담당', managerPhone: '010-5678-9012', hidden: false, createdAt: '2024-05-20' },
-    { id: 'client-006', name: '블루라군리조트', businessNo: '678-90-12345', email: 'blue@resort.com',   managerName: '신담당', managerPhone: '010-6789-0123', hidden: true,  createdAt: '2024-06-10' },
+    { id: 'client-001', name: '그랜드호텔',       businessNo: '123-45-67890', email: 'grand@hotel.com',       managerName: '이담당', managerPhone: '010-1234-5678', hidden: false, createdAt: '2024-01-10' },
+    { id: 'client-002', name: '오션뷰펜션',       businessNo: '234-56-78901', email: 'ocean@pension.com',     managerName: '최담당', managerPhone: '010-2345-6789', hidden: false, createdAt: '2024-02-01' },
+    { id: 'client-003', name: '제주리조트',       businessNo: '345-67-89012', email: 'jeju@resort.com',       managerName: '강담당', managerPhone: '010-3456-7890', hidden: false, createdAt: '2024-03-15' },
+    { id: 'client-004', name: '힐사이드호텔',     businessNo: '456-78-90123', email: 'hill@hotel.com',        managerName: '임담당', managerPhone: '010-4567-8901', hidden: false, createdAt: '2024-04-01' },
+    { id: 'client-005', name: '선셋펜션',         businessNo: '567-89-01234', email: 'sunset@pension.com',    managerName: '오담당', managerPhone: '010-5678-9012', hidden: false, createdAt: '2024-05-20' },
+    { id: 'client-006', name: '블루라군리조트',   businessNo: '678-90-12345', email: 'blue@resort.com',       managerName: '신담당', managerPhone: '010-6789-0123', hidden: true,  createdAt: '2024-06-10' },
+    { id: 'client-007', name: '스카이파크호텔',   businessNo: '789-01-23456', email: 'sky@hotel.com',         managerName: '권담당', managerPhone: '010-7890-1234', hidden: false, createdAt: '2024-07-03' },
+    { id: 'client-008', name: '솔밭펜션',         businessNo: '890-12-34567', email: 'sol@pension.com',       managerName: '배담당', managerPhone: '010-8901-2345', hidden: false, createdAt: '2024-07-15' },
+    { id: 'client-009', name: '해운대리조트',     businessNo: '901-23-45678', email: 'haeundae@resort.com',   managerName: '조담당', managerPhone: '010-9012-3456', hidden: false, createdAt: '2024-08-01' },
+    { id: 'client-010', name: '경복궁호텔',       businessNo: '012-34-56789', email: 'gyeong@hotel.com',      managerName: '전담당', managerPhone: '010-0123-4567', hidden: false, createdAt: '2024-08-20' },
+    { id: 'client-011', name: '나무아래펜션',     businessNo: '111-22-33333', email: 'tree@pension.com',      managerName: '고담당', managerPhone: '010-1111-2222', hidden: false, createdAt: '2024-09-05' },
+    { id: 'client-012', name: '한라산리조트',     businessNo: '222-33-44444', email: 'halla@resort.com',      managerName: '문담당', managerPhone: '010-2222-3333', hidden: false, createdAt: '2024-09-18' },
+    { id: 'client-013', name: '롯데시티호텔',     businessNo: '333-44-55555', email: 'lotte@hotel.com',       managerName: '양담당', managerPhone: '010-3333-4444', hidden: false, createdAt: '2024-10-02' },
+    { id: 'client-014', name: '바다내음펜션',     businessNo: '444-55-66666', email: 'sea@pension.com',       managerName: '손담당', managerPhone: '010-4444-5555', hidden: false, createdAt: '2024-10-14' },
+    { id: 'client-015', name: '설악워터피아',     businessNo: '555-66-77777', email: 'seorak@resort.com',     managerName: '백담당', managerPhone: '010-5555-6666', hidden: false, createdAt: '2024-11-01' },
+    { id: 'client-016', name: '노보텔앰배서더',   businessNo: '666-77-88888', email: 'novotel@hotel.com',     managerName: '허담당', managerPhone: '010-6666-7777', hidden: false, createdAt: '2024-11-11' },
+    { id: 'client-017', name: '산들바람펜션',     businessNo: '777-88-99999', email: 'wind@pension.com',      managerName: '남담당', managerPhone: '010-7777-8888', hidden: true,  createdAt: '2024-11-25' },
+    { id: 'client-018', name: '비발디파크',       businessNo: '888-99-00000', email: 'vivaldi@resort.com',    managerName: '심담당', managerPhone: '010-8888-9999', hidden: false, createdAt: '2024-12-01' },
+    { id: 'client-019', name: '파라다이스호텔',   businessNo: '999-00-11111', email: 'paradise@hotel.com',    managerName: '류담당', managerPhone: '010-9999-0000', hidden: false, createdAt: '2024-12-10' },
+    { id: 'client-020', name: '초록숲펜션',       businessNo: '101-11-22222', email: 'forest@pension.com',    managerName: '구담당', managerPhone: '010-1010-2020', hidden: false, createdAt: '2024-12-20' },
+    { id: 'client-021', name: '워커힐호텔',       businessNo: '202-22-33333', email: 'walkerhill@hotel.com',  managerName: '하담당', managerPhone: '010-2020-3030', hidden: false, createdAt: '2025-01-05' },
+    { id: 'client-022', name: '동해안리조트',     businessNo: '303-33-44444', email: 'east@resort.com',       managerName: '주담당', managerPhone: '010-3030-4040', hidden: false, createdAt: '2025-01-15' },
+    { id: 'client-023', name: '소나무펜션',       businessNo: '404-44-55555', email: 'pine@pension.com',      managerName: '두담당', managerPhone: '010-4040-5050', hidden: false, createdAt: '2025-02-01' },
+    { id: 'client-024', name: '인터컨티넨탈',     businessNo: '505-55-66666', email: 'intercont@hotel.com',   managerName: '마담당', managerPhone: '010-5050-6060', hidden: false, createdAt: '2025-02-14' },
+    { id: 'client-025', name: '남해금산리조트',   businessNo: '606-66-77777', email: 'namhae@resort.com',     managerName: '바담당', managerPhone: '010-6060-7070', hidden: false, createdAt: '2025-03-01' },
   ]);
 
   // 숨김 포함 여부 토글
@@ -28,6 +47,10 @@
   // 검색 선택된 거래처 ID ('' 이면 전체)
   let selectedId = $state('');
 
+  // 페이지네이션
+  const PAGE_SIZE = 10;
+  let currentPage = $state(1);
+
   // 검색바에 넘길 아이템 목록 (숨김 제외)
   const searchItems = $derived(
     clients
@@ -35,13 +58,26 @@
       .map((c) => ({ id: c.id, label: c.name, sub: c.businessNo }))
   );
 
-  // 테이블에 표시할 목록
-  const visibleClients = $derived(
+  // 필터 적용된 전체 목록
+  const filteredClients = $derived(
     clients.filter((c) => {
       if (!showHidden && c.hidden) return false;
       if (selectedId) return c.id === selectedId;
       return true;
     })
+  );
+
+  // 선택/필터 바뀌면 1페이지로
+  $effect(() => {
+    selectedId; showHidden;
+    currentPage = 1;
+  });
+
+  const totalPages = $derived(Math.max(1, Math.ceil(filteredClients.length / PAGE_SIZE)));
+
+  // 현재 페이지에 표시할 목록
+  const visibleClients = $derived(
+    filteredClients.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
   );
 
   function formatDate(iso: string) {
@@ -162,16 +198,16 @@
       <thead class="bg-base-200 text-base-content/60">
         <tr>
           <th class="text-xs font-bold w-[22%]">거래처명</th>
-          <th class="text-xs font-bold w-[18%]">사업자번호</th>
-          <th class="text-xs font-bold w-[16%]">담당자</th>
-          <th class="text-xs font-bold w-[18%]">연락처</th>
+          <th class="text-xs font-bold w-[16%]">사업자번호</th>
+          <th class="text-xs font-bold w-[12%]">담당자</th>
+          <th class="text-xs font-bold w-[16%]">연락처</th>
           <th class="text-xs font-bold w-[20%]">이메일</th>
-          <th class="text-xs font-bold w-[10%]">등록일</th>
-          <th class="text-xs font-bold w-[6%] text-center">액션</th>
+          <th class="text-xs font-bold w-[9%] whitespace-nowrap">등록일</th>
+          <th class="text-xs font-bold w-[5%] text-center whitespace-nowrap">액션</th>
         </tr>
       </thead>
       <tbody>
-        {#if visibleClients.length === 0}
+        {#if filteredClients.length === 0}
           <tr>
             <td colspan="7" class="py-16 text-center text-base-content/40 text-sm">
               {selectedId ? '선택된 거래처가 없습니다.' : '등록된 거래처가 없습니다.'}
@@ -186,11 +222,11 @@
                   <span class="badge badge-ghost badge-xs ml-1">숨김</span>
                 {/if}
               </td>
-              <td class="text-base-content/70">{client.businessNo ?? '—'}</td>
-              <td class="text-base-content/70">{client.managerName ?? '—'}</td>
-              <td class="text-base-content/70">{client.managerPhone ?? '—'}</td>
+              <td class="text-base-content/70 text-sm">{client.businessNo ?? '—'}</td>
+              <td class="text-base-content/70 text-sm">{client.managerName ?? '—'}</td>
+              <td class="text-base-content/70 text-sm">{client.managerPhone ?? '—'}</td>
               <td class="text-base-content/60 text-xs">{client.email ?? '—'}</td>
-              <td class="text-base-content/50 text-xs">{formatDate(client.createdAt)}</td>
+              <td class="text-base-content/50 text-xs whitespace-nowrap">{formatDate(client.createdAt)}</td>
               <td>
                 <div class="flex items-center justify-center gap-1">
                   {#if client.hidden}
@@ -217,6 +253,64 @@
       </tbody>
     </table>
   </div>
+
+  <!-- 페이지네이션 -->
+  {#if totalPages > 1}
+    <div class="flex items-center justify-center gap-1 mt-4">
+      <button
+        onclick={() => (currentPage = 1)}
+        disabled={currentPage === 1}
+        class="btn btn-ghost btn-xs"
+        aria-label="처음"
+      >
+        <Icon icon="lucide:chevrons-left" class="w-3.5 h-3.5" />
+      </button>
+      <button
+        onclick={() => currentPage--}
+        disabled={currentPage === 1}
+        class="btn btn-ghost btn-xs"
+        aria-label="이전"
+      >
+        <Icon icon="lucide:chevron-left" class="w-3.5 h-3.5" />
+      </button>
+
+      {#each Array.from({ length: totalPages }, (_, i) => i + 1) as page (page)}
+        {@const nearCurrent = Math.abs(page - currentPage) <= 2}
+        {@const isEdge = page === 1 || page === totalPages}
+        {@const showDotsBefore = page === currentPage - 3 && currentPage - 3 > 1}
+        {@const showDotsAfter  = page === currentPage + 3 && currentPage + 3 < totalPages}
+        {#if nearCurrent || isEdge}
+          <button
+            onclick={() => (currentPage = page)}
+            class="btn btn-xs min-w-[2rem] {page === currentPage ? 'btn-primary' : 'btn-ghost'}"
+          >{page}</button>
+        {:else if showDotsBefore || showDotsAfter}
+          <span class="px-1 text-base-content/30 text-xs select-none">…</span>
+        {/if}
+      {/each}
+
+      <button
+        onclick={() => currentPage++}
+        disabled={currentPage === totalPages}
+        class="btn btn-ghost btn-xs"
+        aria-label="다음"
+      >
+        <Icon icon="lucide:chevron-right" class="w-3.5 h-3.5" />
+      </button>
+      <button
+        onclick={() => (currentPage = totalPages)}
+        disabled={currentPage === totalPages}
+        class="btn btn-ghost btn-xs"
+        aria-label="마지막"
+      >
+        <Icon icon="lucide:chevrons-right" class="w-3.5 h-3.5" />
+      </button>
+
+      <span class="text-xs text-base-content/40 ml-2">
+        {filteredClients.length}개 중 {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredClients.length)}
+      </span>
+    </div>
+  {/if}
 </div>
 
 <!-- ───────────────────────── 거래처 등록/수정 모달 ───────────────────────── -->
