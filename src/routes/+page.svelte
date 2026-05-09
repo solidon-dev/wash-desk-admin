@@ -164,14 +164,14 @@
   <h2 class="text-2xl font-extrabold text-base-content mb-5">거래처 관리</h2>
 
   <!-- 검색 / 숨김 토글 / 등록 버튼 바 -->
-  <div class="flex items-center gap-3 mb-5">
+  <div class="flex flex-wrap items-center gap-3 mb-5">
 
     <!-- 검색바 컴포넌트 -->
     <SearchBar
       placeholder="거래처명, 사업자번호 검색..."
       items={searchItems}
       onselect={(id) => (selectedId = id)}
-      class="w-72"
+      class="w-64 sm:w-72"
     />
 
     <!-- 숨김 목록 포함 토글 -->
@@ -184,12 +184,11 @@
       숨김 포함
     </label>
 
-    <div class="flex-1"></div>
-
-    <!-- 거래처 등록 버튼 -->
-    <button onclick={openAdd} class="btn btn-primary btn-sm gap-2 whitespace-nowrap">
+    <!-- 등록 버튼 (항상 오른쪽 끝) -->
+    <button onclick={openAdd} class="btn btn-primary btn-sm gap-2 whitespace-nowrap ml-auto">
       <Icon icon="lucide:plus" class="w-4 h-4" />
-      거래처 등록
+      <span class="hidden sm:inline">거래처 등록</span>
+      <span class="sm:hidden">등록</span>
     </button>
   </div>
 
