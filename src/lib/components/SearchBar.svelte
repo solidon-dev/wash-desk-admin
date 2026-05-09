@@ -32,13 +32,17 @@
   // query가 바뀌면 인덱스 리셋 + 드롭다운 열기
   // (단, confirm 직후에는 건너뜀)
   $effect(() => {
-    const q = query; // 의존성 등록
+    const q = query;
     if (justConfirmed) return;
     activeIdx = -1;
-    open = q.trim() !== '' && suggestions.length > 0;
-    // 타이핑했는데 일치 결과가 0개면 선택 해제
-    if (q.trim() !== '' && suggestions.length === 0) {
+    if (q.trim() === '') {
+      open = false;
       onselect('');
+    } else if (suggestions.length === 0) {
+      open = false;
+      onselect('');
+    } else {
+      open = true;
     }
   });
 
