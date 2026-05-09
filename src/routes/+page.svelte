@@ -199,13 +199,13 @@
     <table class="table table-sm w-full" style="table-layout: fixed;">
       <thead class="bg-base-200 text-base-content/60">
         <tr>
-          <th class="text-xs font-bold w-[22%]">거래처명</th>
-          <th class="text-xs font-bold w-[16%]">사업자번호</th>
-          <th class="text-xs font-bold w-[12%]">담당자</th>
+          <th class="text-xs font-bold">거래처명</th>
+          <th class="text-xs font-bold hidden xl:table-cell w-[16%]">사업자번호</th>
+          <th class="text-xs font-bold hidden lg:table-cell w-[12%]">담당자</th>
           <th class="text-xs font-bold w-[16%]">연락처</th>
-          <th class="text-xs font-bold w-[20%]">이메일</th>
-          <th class="text-xs font-bold w-[9%] whitespace-nowrap">등록일</th>
-          <th class="text-xs font-bold w-[5%] text-center whitespace-nowrap">액션</th>
+          <th class="text-xs font-bold hidden xl:table-cell w-[20%]">이메일</th>
+          <th class="text-xs font-bold hidden lg:table-cell w-[9%] whitespace-nowrap">등록일</th>
+          <th class="text-xs font-bold text-center whitespace-nowrap w-[5%]">액션</th>
         </tr>
       </thead>
       <tbody>
@@ -219,16 +219,23 @@
           {#each visibleClients as client (client.id)}
             <tr class="hover:bg-base-200 transition-colors {client.hidden ? 'opacity-40' : ''}">
               <td class="font-semibold text-base-content">
-                {client.name}
+                <span>{client.name}</span>
                 {#if client.hidden}
                   <span class="badge badge-ghost badge-xs ml-1">숨김</span>
                 {/if}
+                <!-- lg 미만: 담당자·등록일 인라인 표시 -->
+                <div class="lg:hidden mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
+                  {#if client.managerPhone}
+                    <span class="text-xs text-base-content/50">{client.managerPhone}</span>
+                  {/if}
+                  <span class="text-xs text-base-content/30">{formatDate(client.createdAt)}</span>
+                </div>
               </td>
-              <td class="text-base-content/70 text-sm">{client.businessNo ?? '—'}</td>
-              <td class="text-base-content/70 text-sm">{client.managerName ?? '—'}</td>
+              <td class="text-base-content/70 text-sm hidden xl:table-cell">{client.businessNo ?? '—'}</td>
+              <td class="text-base-content/70 text-sm hidden lg:table-cell">{client.managerName ?? '—'}</td>
               <td class="text-base-content/70 text-sm">{client.managerPhone ?? '—'}</td>
-              <td class="text-base-content/60 text-xs">{client.email ?? '—'}</td>
-              <td class="text-base-content/50 text-xs whitespace-nowrap">{formatDate(client.createdAt)}</td>
+              <td class="text-base-content/60 text-xs hidden xl:table-cell">{client.email ?? '—'}</td>
+              <td class="text-base-content/50 text-xs whitespace-nowrap hidden lg:table-cell">{formatDate(client.createdAt)}</td>
               <td>
                 <div class="flex items-center justify-center">
                   <button
