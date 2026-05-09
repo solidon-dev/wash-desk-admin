@@ -230,23 +230,13 @@
               <td class="text-base-content/60 text-xs">{client.email ?? '—'}</td>
               <td class="text-base-content/50 text-xs whitespace-nowrap">{formatDate(client.createdAt)}</td>
               <td>
-                <div class="flex items-center justify-center gap-1">
-                  {#if client.hidden}
-                    <button
-                      onclick={() => restoreClient(client.id)}
-                      class="btn btn-ghost btn-xs text-success font-semibold"
-                    >복원</button>
-                  {:else}
-                    <button
-                      onclick={() => openEdit(client)}
-                      class="btn btn-ghost btn-xs text-primary font-semibold"
-                    >수정</button>
-                    <div class="divider divider-horizontal mx-0 h-4"></div>
-                    <button
-                      onclick={() => openHide(client.id)}
-                      class="btn btn-ghost btn-xs text-warning font-semibold"
-                    >숨기기</button>
-                  {/if}
+                <div class="flex items-center justify-center">
+                  <button
+                    onclick={() => openEdit(client)}
+                    class="btn btn-ghost btn-xs text-primary font-semibold"
+                  >
+                    {client.hidden ? '복원·수정' : '수정'}
+                  </button>
                 </div>
               </td>
             </tr>
@@ -277,9 +267,32 @@
     <div class="modal-box w-full max-w-lg rounded-2xl p-6 flex flex-col" style="max-height: 520px;">
       <!-- 모달 헤더 -->
       <div class="flex items-center justify-between mb-5 shrink-0">
-        <h3 class="text-lg font-extrabold text-base-content">
-          {editingClient ? '거래처 수정' : '거래처 등록'}
-        </h3>
+        <div class="flex items-center gap-3">
+          <h3 class="text-lg font-extrabold text-base-content">
+            {editingClient ? '거래처 수정' : '거래처 등록'}
+          </h3>
+          {#if editingClient}
+            {#if editingClient.hidden}
+              <button
+                type="button"
+                onclick={() => { restoreClient(editingClient!.id); closeModal(); }}
+                class="btn btn-xs btn-success gap-1 font-bold"
+              >
+                <Icon icon="lucide:eye" class="w-3.5 h-3.5" />
+                복원
+              </button>
+            {:else}
+              <button
+                type="button"
+                onclick={() => { openHide(editingClient!.id); closeModal(); }}
+                class="btn btn-xs btn-warning gap-1 font-bold"
+              >
+                <Icon icon="lucide:eye-off" class="w-3.5 h-3.5" />
+                숨기기
+              </button>
+            {/if}
+          {/if}
+        </div>
         <button
           onclick={closeModal}
           aria-label="닫기"
