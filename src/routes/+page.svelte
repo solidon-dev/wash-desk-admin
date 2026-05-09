@@ -206,13 +206,13 @@
           <th class="text-xs font-bold hidden xl:table-cell w-[16%]">사업자번호</th>
           <th class="text-xs font-bold hidden lg:table-cell
             lg:w-[14%] xl:w-[12%]">담당자</th>
-          <th class="text-xs font-bold
-            w-[28%] sm:w-[35%] lg:w-[28%] xl:w-[16%]">연락처</th>
+          <th class="text-xs font-bold hidden lg:table-cell
+            lg:w-[28%] xl:w-[16%]">연락처</th>
           <th class="text-xs font-bold hidden xl:table-cell w-[18%]">이메일</th>
           <th class="text-xs font-bold hidden lg:table-cell whitespace-nowrap
             lg:w-[12%] xl:w-[9%]">등록일</th>
           <th class="text-xs font-bold text-center whitespace-nowrap
-            w-[10%] lg:w-[11%] xl:w-[7%]">액션</th>
+            w-[38%] sm:w-[45%] lg:w-[11%] xl:w-[7%]">액션</th>
         </tr>
       </thead>
       <tbody>
@@ -240,7 +240,7 @@
               </td>
               <td class="text-base-content/70 text-sm hidden xl:table-cell">{client.businessNo ?? '—'}</td>
               <td class="text-base-content/70 text-sm hidden lg:table-cell">{client.managerName ?? '—'}</td>
-              <td class="text-base-content/70 text-sm">{client.managerPhone ?? '—'}</td>
+              <td class="text-base-content/70 text-sm hidden lg:table-cell">{client.managerPhone ?? '—'}</td>
               <td class="text-base-content/60 text-xs hidden xl:table-cell">{client.email ?? '—'}</td>
               <td class="text-base-content/50 text-xs whitespace-nowrap hidden lg:table-cell">{formatDate(client.createdAt)}</td>
               <td>
