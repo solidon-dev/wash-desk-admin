@@ -18,6 +18,7 @@
 
 	afterNavigate(() => {
 		window.scrollTo({ top: 0 });
+		sidebarOpen = false; // 페이지 이동 시 모바일 사이드바 닫기
 	});
 
 	const navItems = [
@@ -44,21 +45,39 @@
 	let selectedFactoryId = $state('factory-001');
 	const unreadMemoCount = 2;
 
-	let factoryOpen = $state(false);
+	let factoryOpen  = $state(false);
+	let sidebarOpen  = $state(false);
 
 	const selectedFactory = $derived(
 		factories.find(f => f.id === selectedFactoryId && !f.isHidden)
 			?? factories.find(f => !f.isHidden)
 			?? factories[0]
 	);
+
+	const currentNav = $derived(navItems.find(n => isActive(n)));
 </script>
 
 <svelte:head><link rel="icon" href="/favicon.svg" /></svelte:head>
 
 <div class="flex h-screen overflow-hidden">
-	<!-- 사이드바 -->
-	<aside class="bg-base-200 flex w-56 shrink-0 flex-col border-r border-base-300">
 
+	<!-- ── 사이드바 (lg 이상 항상 표시 / lg 미만 오버레이) ── -->
+
+	<!-- 모바일 오버레이 배경 -->
+	{#if sidebarOpen}
+		<div
+			class="fixed inset-0 z-30 bg-black/40 lg:hidden"
+			role="presentation"
+			onclick={() => (sidebarOpen = false)}
+		></div>
+	{/if}
+
+	<aside
+		class="bg-base-200 flex w-56 shrink-0 flex-col border-r border-base-300
+			lg:relative lg:translate-x-0 lg:flex
+			fixed inset-y-0 left-0 z-40 transition-transform duration-300
+			{sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}"
+	>
 		<!-- 공장 셀렉터 -->
 		<div class="border-base-300 relative shrink-0 border-b px-3 py-3">
 			<button
@@ -76,13 +95,11 @@
 			</button>
 
 			{#if factoryOpen}
-				<!-- 외부 클릭 닫기 오버레이 -->
 				<div
 					class="fixed inset-0 z-10"
 					role="presentation"
 					onclick={() => (factoryOpen = false)}
 				></div>
-				<!-- 드롭다운 목록 -->
 				<div class="border-base-300 bg-base-100 absolute left-3 right-3 top-full z-20 mt-1 overflow-hidden rounded-xl border shadow-2xl">
 					{#each factories.filter(f => !f.isHidden) as factory (factory.id)}
 						<button
@@ -129,8 +146,47 @@
 		</nav>
 	</aside>
 
-	<!-- 우측 콘텐츠 -->
-	<main class="bg-base-200 flex-1 overflow-y-auto">
-		{@render children()}
-	</main>
+	<!-- ── 우측 영역 ── -->
+	<div class="flex flex-1 flex-col overflow-hidden">
+
+		<!-- 모바일 topbar (lg 미만에서만) -->
+		<header class="bg-base-200 border-b border-base-300 flex items-center gap-3 px-4 py-3 lg:hidden shrink-0">
+			<button
+				onclick={() => (sidebarOpen = !sidebarOpen)}
+				class="btn btn-ghost btn-sm btn-square"
+				aria-label="메뉴 열기"
+			>
+				<Icon icon="lucide:menu" class="h-5 w-5" />
+			</button>
+
+			<!-- 공장 아이콘 + 현재 페이지명 -->
+			<div class="flex items-center gap-2 min-w-0">
+				<div class="bg-primary flex h-6 w-6 shrink-0 items-center justify-center rounded-md">
+					<Icon icon="lucide:factory" class="text-primary-content h-3.5 w-3.5" />
+				</div>
+				<span class="text-xs font-bold text-base-content/50 truncate">{selectedFactory?.name ?? ''}</span>
+				<span class="text-base-content/30 text-xs">/</span>
+				<span class="text-sm font-bold text-base-content truncate">{currentNav?.label ?? ''}</span>
+			</div>
+
+			<div class="flex-1"></div>
+
+			<!-- 미읽음 메모 배지 -->
+			{#if unreadMemoCount > 0}
+				<button
+					onclick={() => void goto('/memos')}
+					class="btn btn-ghost btn-sm btn-square relative"
+					aria-label="메모 확인"
+				>
+					<Icon icon="lucide:message-square" class="h-5 w-5" />
+					<span class="badge badge-error badge-xs absolute -top-0.5 -right-0.5 font-bold">{unreadMemoCount}</span>
+				</button>
+			{/if}
+		</header>
+
+		<!-- 콘텐츠 -->
+		<main class="bg-base-200 flex-1 overflow-y-auto">
+			{@render children()}
+		</main>
+	</div>
 </div>
