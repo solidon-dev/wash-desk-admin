@@ -1,51 +1,74 @@
 <script lang="ts">
   import Icon from '@iconify/svelte';
+  import SearchBar from '$lib/components/SearchBar.svelte';
+  import Pagination from '$lib/components/Pagination.svelte';
+  import TableCard from '$lib/components/TableCard.svelte';
 
   interface Factory {
     id: string;
     name: string;
     address?: string;
     phone?: string;
-    memo?: string;
     isHidden: boolean;
     createdAt: string;
   }
 
   let factories = $state<Factory[]>([
-    { id: 'factory-001', name: '본사 세탁공장', address: '서울시 강남구', phone: '02-1234-5678', memo: '', isHidden: false, createdAt: '2024-01-01' },
-    { id: 'factory-002', name: '부산 세탁공장', address: '부산시 해운대구', phone: '051-9876-5432', memo: '', isHidden: false, createdAt: '2024-01-01' },
-    { id: 'factory-003', name: '제주 세탁공장', address: '제주시 노형동', phone: '064-111-2222', memo: '', isHidden: false, createdAt: '2024-03-01' },
+    { id: 'factory-001', name: '본사 세탁공장',   address: '서울시 강남구 테헤란로 123',  phone: '02-1234-5678',  isHidden: false, createdAt: '2024-01-01' },
+    { id: 'factory-002', name: '부산 세탁공장',   address: '부산시 해운대구 해운대로 56',  phone: '051-9876-5432', isHidden: false, createdAt: '2024-01-01' },
+    { id: 'factory-003', name: '제주 세탁공장',   address: '제주시 노형동 첨단로 17',      phone: '064-111-2222',  isHidden: false, createdAt: '2024-03-01' },
+    { id: 'factory-004', name: '대구 세탁공장',   address: '대구시 달서구 성서로 88',      phone: '053-333-4444',  isHidden: false, createdAt: '2024-05-01' },
+    { id: 'factory-005', name: '광주 세탁공장',   address: '광주시 서구 상무대로 45',      phone: '062-555-6666',  isHidden: true,  createdAt: '2024-06-15' },
+    { id: 'factory-006', name: '인천 세탁공장',   address: '인천시 남동구 논현로 200',     phone: '032-777-8888',  isHidden: false, createdAt: '2024-08-01' },
+    { id: 'factory-007', name: '대전 세탁공장',   address: '대전시 유성구 대학로 99',      phone: '042-999-0000',  isHidden: false, createdAt: '2024-09-10' },
+    { id: 'factory-008', name: '울산 세탁공장',   address: '울산시 남구 삼산로 34',        phone: '052-111-3333',  isHidden: true,  createdAt: '2024-10-01' },
+    { id: 'factory-009', name: '수원 세탁공장',   address: '경기도 수원시 팔달구 중부대로', phone: '031-222-4444',  isHidden: false, createdAt: '2024-11-01' },
+    { id: 'factory-010', name: '청주 세탁공장',   address: '충북 청주시 상당구 상당로 10',  phone: '043-444-5555',  isHidden: false, createdAt: '2024-12-01' },
+    { id: 'factory-011', name: '전주 세탁공장',   address: '전북 전주시 완산구 기린대로 7', phone: '063-666-7777',  isHidden: false, createdAt: '2025-01-05' },
+    { id: 'factory-012', name: '창원 세탁공장',   address: '경남 창원시 성산구 공단로 50',  phone: '055-888-9999',  isHidden: false, createdAt: '2025-02-01' },
   ]);
-  let selectedFactoryId = $state('factory-001');
 
-  let searchQuery    = $state('');
-  let showHidden     = $state(false);
+  // ── 검색 ──
+  let selectedId = $state('');
+  let showHidden = $state(false);
+
+  const searchItems = $derived(
+    factories
+      .filter((f) => !f.isHidden)
+      .map((f) => ({ id: f.id, label: f.name, sub: f.address }))
+  );
+
+  // ── 페이지네이션 ──
+  const PAGE_SIZE = 10;
+  let currentPage = $state(1);
 
   const filteredFactories = $derived(
-    factories.filter(f => {
+    factories.filter((f) => {
       if (!showHidden && f.isHidden) return false;
-      const q = searchQuery.trim().toLowerCase();
-      return !q
-        || f.name.toLowerCase().includes(q)
-        || (f.address ?? '').toLowerCase().includes(q)
-        || (f.phone   ?? '').toLowerCase().includes(q);
+      if (selectedId) return f.id === selectedId;
+      return true;
     })
   );
 
-  // ── 모달 ──────────────────────────────────────────────────────
-  let showModal       = $state(false);
-  let editingFactory  = $state<Factory | null>(null);
-  let formName        = $state('');
-  let formAddress     = $state('');
-  let formPhone       = $state('');
-  let formMemo        = $state('');
+  $effect(() => { selectedId; showHidden; currentPage = 1; });
+
+  const totalPages       = $derived(Math.max(1, Math.ceil(filteredFactories.length / PAGE_SIZE)));
+  const visibleFactories = $derived(filteredFactories.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE));
+
+  function formatDate(iso: string) { return iso.slice(0, 10); }
+
+  // ── 등록/수정 모달 ──
+  let showModal      = $state(false);
+  let editingFactory = $state<Factory | null>(null);
+  let formName       = $state('');
+  let formAddress    = $state('');
+  let formPhone      = $state('');
 
   function openAdd() {
     editingFactory = null;
     formName    = '';
     formAddress = '';
     formPhone   = '';
-    formMemo    = '';
     showModal   = true;
   }
 
@@ -54,7 +77,6 @@
     formName    = f.name;
     formAddress = f.address ?? '';
     formPhone   = f.phone   ?? '';
-    formMemo    = f.memo    ?? '';
     showModal   = true;
   }
 
@@ -66,289 +88,248 @@
       name:    formName.trim(),
       address: formAddress.trim() || undefined,
       phone:   formPhone.trim()   || undefined,
-      memo:    formMemo.trim()    || undefined,
     };
     if (editingFactory) {
-      const idx = factories.findIndex(f => f.id === editingFactory!.id);
-      if (idx !== -1) Object.assign(factories[idx], payload);
+      const idx = factories.findIndex((f) => f.id === editingFactory!.id);
+      if (idx !== -1) factories[idx] = { ...factories[idx], ...payload };
     } else {
       factories.push({ ...payload, id: crypto.randomUUID(), isHidden: false, createdAt: new Date().toISOString().slice(0, 10) });
     }
     closeModal();
   }
 
-  // ── 숨기기 확인 ───────────────────────────────────────────────
+  // ── 숨기기 확인 ──
   let hideTargetId = $state<string | null>(null);
-  const hideTarget = $derived(
-    hideTargetId ? factories.find(f => f.id === hideTargetId) : null
-  );
-  function confirmToggleHidden() {
+  function openHide(id: string) { hideTargetId = id; }
+  function confirmHide() {
     if (hideTargetId) {
-      const f = factories.find(f => f.id === hideTargetId);
-      if (f) f.isHidden = !f.isHidden;
+      const idx = factories.findIndex((f) => f.id === hideTargetId);
+      if (idx !== -1) factories[idx].isHidden = true;
+      if (selectedId === hideTargetId) selectedId = '';
     }
     hideTargetId = null;
   }
+  function cancelHide() { hideTargetId = null; }
 
-  function formatDate(iso: string) { return iso.slice(0, 10); }
+  function restoreFactory(id: string) {
+    const idx = factories.findIndex((f) => f.id === id);
+    if (idx !== -1) factories[idx].isHidden = false;
+  }
 </script>
 
-<div class="min-h-screen bg-base-200 px-8 py-6">
+<!-- ───────────────────────────── 메인 컨텐츠 ───────────────────────────── -->
+<div class="min-h-full bg-base-200 px-8 py-10">
+  <h2 class="text-2xl font-extrabold text-base-content mb-5">세탁공장 관리</h2>
 
-  <!-- 헤더 -->
-  <div class="mb-5 flex items-center gap-3">
-    <div>
-      <h2 class="text-2xl font-extrabold">세탁공장 관리</h2>
-      <p class="mt-0.5 text-sm text-base-content/50">운영 중인 세탁 사업장을 관리합니다</p>
-    </div>
-    <div class="flex-1"></div>
+  <!-- 검색 / 숨김 토글 / 등록 버튼 바 -->
+  <div class="flex flex-wrap items-center gap-3 mb-5">
+    <SearchBar
+      placeholder="공장명, 주소 검색..."
+      items={searchItems}
+      onselect={(id) => (selectedId = id)}
+      class="w-64 sm:w-72"
+    />
 
-    <!-- 숨긴 공장 토글 -->
-    <button
-      onclick={() => (showHidden = !showHidden)}
-      class="btn btn-sm gap-1.5 {showHidden ? 'btn-warning' : 'btn-ghost border border-base-300'}"
-    >
-      <Icon icon={showHidden ? 'lucide:eye' : 'lucide:eye-off'} class="h-4 w-4" />
-      {showHidden ? '숨김 공장 표시 중' : '숨김 공장 보기'}
-    </button>
-
-    <!-- 검색 -->
-    <label class="input input-bordered flex items-center gap-2 w-64">
-      <Icon icon="lucide:search" class="h-4 w-4 text-base-content/40 shrink-0" />
-      <input
-        type="text"
-        placeholder="공장명, 주소, 전화번호..."
-        bind:value={searchQuery}
-        class="grow text-sm"
-      />
+    <label class="flex items-center gap-2 cursor-pointer select-none text-sm text-base-content/60 font-semibold">
+      <input type="checkbox" bind:checked={showHidden} class="checkbox checkbox-sm" />
+      숨김 포함
     </label>
 
-    <!-- 공장 추가 버튼 -->
-    <button
-      onclick={openAdd}
-      class="btn btn-primary btn-sm gap-2 whitespace-nowrap"
-    >
-      <Icon icon="lucide:plus" class="h-4 w-4" />
-      공장 추가
+    <button onclick={openAdd} class="btn btn-primary btn-sm gap-2 whitespace-nowrap ml-auto sm:w-auto w-full">
+      <Icon icon="lucide:plus" class="w-4 h-4" />
+      공장 등록
     </button>
   </div>
 
-  <!-- 테이블 카드 -->
-  <div class="card card-bordered bg-base-100 shadow-sm overflow-hidden">
-    <div class="overflow-x-auto">
-      <table class="table table-sm w-full">
-        <thead>
+  <!-- 공장 테이블 -->
+  <TableCard>
+    <table class="table table-sm w-full" style="table-layout: fixed;">
+      <thead class="bg-base-200 text-base-content/60">
+        <tr>
+          <th class="text-xs font-bold w-[50%] sm:w-[40%] lg:w-[24%] xl:w-[20%]">공장명</th>
+          <th class="text-xs font-bold hidden lg:table-cell lg:w-[38%] xl:w-[36%]">주소</th>
+          <th class="text-xs font-bold hidden lg:table-cell lg:w-[18%] xl:w-[16%]">전화번호</th>
+          <th class="text-xs font-bold hidden lg:table-cell whitespace-nowrap lg:w-[10%] xl:w-[8%]">등록일</th>
+          <th class="text-xs font-bold hidden xl:table-cell w-[8%]">상태</th>
+          <th class="text-xs font-bold text-center whitespace-nowrap w-[50%] sm:w-[60%] lg:w-[10%] xl:w-[12%]">액션</th>
+        </tr>
+      </thead>
+      <tbody>
+        {#if filteredFactories.length === 0}
           <tr>
-            <th class="w-8">#</th>
-            <th>공장명</th>
-            <th class="w-52">주소</th>
-            <th class="w-36">전화번호</th>
-            <th>메모</th>
-            <th class="w-28">등록일</th>
-            <th class="w-20">상태</th>
-            <th class="w-24 text-center">관리</th>
+            <td colspan="6" class="py-16 text-center text-base-content/40 text-sm">
+              {selectedId ? '선택된 공장이 없습니다.' : '등록된 공장이 없습니다.'}
+            </td>
           </tr>
-        </thead>
-        <tbody>
-          {#if filteredFactories.length === 0}
-            <tr>
-              <td colspan="8" class="py-16 text-center text-sm text-base-content/40">
-                {searchQuery ? '검색 결과가 없습니다.' : '등록된 공장이 없습니다.'}
+        {:else}
+          {#each visibleFactories as factory (factory.id)}
+            <tr class="hover:bg-base-200 transition-colors {factory.isHidden ? 'opacity-40' : ''}">
+
+              <!-- 공장명 -->
+              <td class="font-semibold text-base-content">
+                <span>{factory.name}</span>
+                {#if factory.isHidden}
+                  <span class="badge badge-ghost badge-xs ml-1">숨김</span>
+                {/if}
+                <!-- lg 미만 인라인 -->
+                <div class="lg:hidden mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
+                  {#if factory.phone}<span class="text-xs text-base-content/50">{factory.phone}</span>{/if}
+                  {#if factory.address}<span class="text-xs text-base-content/40">{factory.address}</span>{/if}
+                  <span class="text-xs text-base-content/30">{formatDate(factory.createdAt)}</span>
+                </div>
+              </td>
+
+              <!-- 주소 -->
+              <td class="text-base-content/70 text-sm hidden lg:table-cell">{factory.address ?? '—'}</td>
+
+              <!-- 전화번호 -->
+              <td class="text-base-content/70 text-sm hidden lg:table-cell">{factory.phone ?? '—'}</td>
+
+              <!-- 등록일 -->
+              <td class="text-base-content/50 text-xs whitespace-nowrap hidden lg:table-cell">{formatDate(factory.createdAt)}</td>
+
+              <!-- 상태 -->
+              <td class="hidden xl:table-cell">
+                {#if factory.isHidden}
+                  <span class="badge badge-ghost badge-sm font-bold">숨김</span>
+                {:else}
+                  <span class="badge badge-success badge-sm font-bold">운영중</span>
+                {/if}
+              </td>
+
+              <!-- 액션 -->
+              <td>
+                <div class="flex items-center justify-center">
+                  <button
+                    onclick={() => openEdit(factory)}
+                    class="btn btn-ghost btn-xs text-primary font-semibold"
+                  >수정</button>
+                </div>
               </td>
             </tr>
-          {:else}
-            {#each filteredFactories as factory, i (factory.id)}
-              <tr class="hover {factory.isHidden ? 'opacity-50' : ''}">
-                <td class="text-xs text-base-content/40 font-mono">{i + 1}</td>
-                <td>
-                  <div class="flex items-center gap-2">
-                    <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                      <Icon icon="lucide:factory" class="h-4 w-4 text-primary" />
-                    </div>
-                    <span class="font-semibold">{factory.name}</span>
-                    {#if factory.id === selectedFactoryId}
-                      <span class="badge badge-primary badge-sm">현재 선택</span>
-                    {/if}
-                  </div>
-                </td>
-                <td class="text-base-content/70">{factory.address ?? '—'}</td>
-                <td class="text-base-content/70">{factory.phone ?? '—'}</td>
-                <td class="text-base-content/50 text-xs">{factory.memo || '—'}</td>
-                <td class="text-xs text-base-content/50">{formatDate(factory.createdAt)}</td>
-                <td>
-                  {#if factory.isHidden}
-                    <span class="badge badge-warning badge-sm font-bold">숨김</span>
-                  {:else}
-                    <span class="badge badge-success badge-sm font-bold">운영 중</span>
-                  {/if}
-                </td>
-                <td>
-                  <div class="flex items-center justify-center gap-2">
-                    <button
-                      onclick={() => openEdit(factory)}
-                      class="btn btn-ghost btn-xs text-primary"
-                    >수정</button>
-                    <div class="divider divider-horizontal mx-0 h-4"></div>
-                    <button
-                      onclick={() => (hideTargetId = factory.id)}
-                      class="btn btn-ghost btn-xs {factory.isHidden ? 'text-success' : 'text-warning'}"
-                    >
-                      {factory.isHidden ? '복원' : '숨기기'}
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            {/each}
-          {/if}
-        </tbody>
-      </table>
-    </div>
-  </div>
+          {/each}
+        {/if}
+      </tbody>
+    </table>
+  </TableCard>
 
-  <!-- 하단 카운트 -->
-  <p class="mt-3 text-xs text-base-content/40">
-    전체 {factories.length}개
-    {#if factories.some(f => f.isHidden)}
-      · 숨김 {factories.filter(f => f.isHidden).length}개
-    {/if}
-  </p>
+  <!-- 페이지네이션 -->
+  <div class="mt-4">
+    <Pagination
+      {currentPage}
+      {totalPages}
+      totalItems={filteredFactories.length}
+      pageSize={PAGE_SIZE}
+      onpage={(p) => (currentPage = p)}
+    />
+  </div>
 </div>
 
-<!-- ── 추가 / 수정 모달 ──────────────────────────────────────────── -->
+<!-- ───────────────────────── 공장 등록/수정 모달 ───────────────────────── -->
 {#if showModal}
   <dialog
     class="modal modal-open"
-    onclose={closeModal}
+    onmousedown={(e) => { if (e.target === e.currentTarget) closeModal(); }}
   >
-    <div class="modal-box w-full max-w-lg">
-      <!-- 모달 헤더 -->
-      <div class="mb-6 flex items-center justify-between">
-        <h3 class="text-lg font-extrabold">
-          {editingFactory ? '공장 수정' : '공장 추가'}
-        </h3>
-        <button
-          onclick={closeModal}
-          aria-label="닫기"
-          class="btn btn-ghost btn-sm btn-circle"
-        >
-          <Icon icon="lucide:x" class="h-5 w-5" />
+    <div class="modal-box w-full max-w-lg rounded-2xl p-6 flex flex-col" style="max-height: 480px;">
+
+      <!-- 헤더 -->
+      <div class="flex items-center justify-between mb-5 shrink-0">
+        <div class="flex items-center gap-3">
+          <h3 class="text-lg font-extrabold text-base-content">
+            {editingFactory ? '공장 수정' : '공장 등록'}
+          </h3>
+          {#if editingFactory}
+            {#if editingFactory.isHidden}
+              <button
+                type="button"
+                onclick={() => { restoreFactory(editingFactory!.id); editingFactory = { ...editingFactory!, isHidden: false }; }}
+                class="btn btn-xs btn-success gap-1 font-bold"
+              >
+                <Icon icon="lucide:eye" class="w-3.5 h-3.5" />
+                복원
+              </button>
+            {:else}
+              <button
+                type="button"
+                onclick={() => { openHide(editingFactory!.id); closeModal(); }}
+                class="btn btn-xs btn-warning gap-1 font-bold"
+              >
+                <Icon icon="lucide:eye-off" class="w-3.5 h-3.5" />
+                숨기기
+              </button>
+            {/if}
+          {/if}
+        </div>
+        <button onclick={closeModal} aria-label="닫기" class="btn btn-ghost btn-sm btn-circle">
+          <Icon icon="lucide:x" class="w-5 h-5" />
         </button>
       </div>
 
-      <form onsubmit={(e) => { e.preventDefault(); handleSave(); }}>
-        <div class="grid grid-cols-2 gap-x-4 gap-y-4">
+      <!-- 폼 -->
+      <form
+        onsubmit={(e) => { e.preventDefault(); handleSave(); }}
+        class="flex flex-col flex-1 overflow-hidden"
+      >
+        <div class="flex flex-col gap-4 overflow-y-auto flex-1 pr-1">
 
           <!-- 공장명 -->
-          <div class="col-span-2 form-control">
-            <label class="label" for="fName">
-              <span class="label-text text-xs font-bold">공장명 <span class="text-error">*</span></span>
+          <div>
+            <label for="fName" class="label pb-1">
+              <span class="label-text text-xs font-bold text-base-content/60">공장명 *</span>
             </label>
-            <input
-              id="fName"
-              type="text"
-              bind:value={formName}
-              placeholder="예) 본사 세탁공장"
-              required
-              class="input input-bordered w-full"
-            />
+            <input id="fName" type="text" bind:value={formName} placeholder="예) 본사 세탁공장"
+              class="input input-bordered w-full text-sm" required />
           </div>
 
           <!-- 주소 -->
-          <div class="col-span-2 form-control">
-            <label class="label" for="fAddr">
-              <span class="label-text text-xs font-bold">주소</span>
+          <div>
+            <label for="fAddress" class="label pb-1">
+              <span class="label-text text-xs font-bold text-base-content/60">주소</span>
             </label>
-            <input
-              id="fAddr"
-              type="text"
-              bind:value={formAddress}
-              placeholder="예) 서울시 강남구 테헤란로 123"
-              class="input input-bordered w-full"
-            />
+            <input id="fAddress" type="text" bind:value={formAddress} placeholder="예) 서울시 강남구 테헤란로 123"
+              class="input input-bordered w-full text-sm" />
           </div>
 
           <!-- 전화번호 -->
-          <div class="form-control">
-            <label class="label" for="fPhone">
-              <span class="label-text text-xs font-bold">전화번호</span>
+          <div>
+            <label for="fPhone" class="label pb-1">
+              <span class="label-text text-xs font-bold text-base-content/60">전화번호</span>
             </label>
-            <input
-              id="fPhone"
-              type="text"
-              bind:value={formPhone}
-              placeholder="02-0000-0000"
-              class="input input-bordered w-full"
-            />
-          </div>
-
-          <!-- 메모 -->
-          <div class="col-span-2 form-control">
-            <label class="label" for="fMemo">
-              <span class="label-text text-xs font-bold">메모</span>
-            </label>
-            <textarea
-              id="fMemo"
-              bind:value={formMemo}
-              rows="3"
-              placeholder="특이사항을 입력하세요"
-              class="textarea textarea-bordered w-full resize-none"
-            ></textarea>
+            <input id="fPhone" type="text" bind:value={formPhone} placeholder="02-0000-0000"
+              class="input input-bordered w-full text-sm" />
           </div>
         </div>
 
-        <div class="modal-action border-t border-base-200 pt-4 mt-6">
-          <button
-            type="button"
-            onclick={closeModal}
-            class="btn btn-ghost"
-          >취소</button>
-          <button
-            type="submit"
-            class="btn btn-primary"
-            disabled={!formName.trim()}
-          >
-            {editingFactory ? '저장' : '추가'}
+        <!-- 액션 버튼 -->
+        <div class="modal-action mt-5 pt-4 border-t border-base-200 shrink-0">
+          <button type="button" onclick={closeModal} class="btn btn-ghost font-bold">취소</button>
+          <button type="submit" class="btn btn-primary font-bold">
+            {editingFactory ? '저장' : '등록'}
           </button>
         </div>
       </form>
     </div>
-    <form method="dialog" class="modal-backdrop">
-      <button onclick={closeModal}>close</button>
-    </form>
   </dialog>
 {/if}
 
-<!-- ── 숨기기 / 복원 확인 모달 ────────────────────────────────────── -->
-{#if hideTargetId && hideTarget}
-  <dialog class="modal modal-open">
-    <div class="modal-box w-full max-w-sm">
-      {#if hideTarget.isHidden}
-        <h3 class="mb-2 text-base font-extrabold">공장 복원</h3>
-        <p class="mb-6 text-sm text-base-content/70">
-          <span class="font-bold text-primary">{hideTarget.name}</span>을(를) 다시 운영 중 상태로 복원할까요?
-        </p>
-      {:else}
-        <h3 class="mb-2 text-base font-extrabold">공장 숨기기</h3>
-        <p class="mb-1 text-sm text-base-content/70">
-          <span class="font-bold text-warning">{hideTarget.name}</span>을(를) 숨깁니다.
-        </p>
-        <p class="mb-6 text-xs text-base-content/40">숨긴 공장은 셀렉터에서 표시되지 않습니다. 언제든 복원할 수 있습니다.</p>
-      {/if}
+<!-- ───────────────────────────── 숨기기 확인 모달 ───────────────────────────── -->
+{#if hideTargetId}
+  {@const target = factories.find((f) => f.id === hideTargetId)}
+  <dialog
+    class="modal modal-open"
+    onmousedown={(e) => { if (e.target === e.currentTarget) cancelHide(); }}
+  >
+    <div class="modal-box w-full max-w-sm rounded-2xl p-6">
+      <h3 class="text-base font-extrabold text-base-content mb-2">공장 숨기기</h3>
+      <p class="text-sm text-base-content/70 mb-6">
+        <span class="font-bold text-warning">{target?.name}</span> 공장을 숨기시겠습니까?<br />
+        <span class="text-xs text-base-content/40">숨긴 공장은 셀렉터에 표시되지 않으며, 언제든 복원할 수 있습니다.</span>
+      </p>
       <div class="modal-action">
-        <button
-          onclick={() => (hideTargetId = null)}
-          class="btn btn-ghost"
-        >취소</button>
-        <button
-          onclick={confirmToggleHidden}
-          class="btn {hideTarget.isHidden ? 'btn-primary' : 'btn-warning'}"
-        >
-          {hideTarget.isHidden ? '복원' : '숨기기'}
-        </button>
+        <button onclick={cancelHide} class="btn btn-ghost font-bold">취소</button>
+        <button onclick={confirmHide} class="btn btn-warning font-bold">숨기기</button>
       </div>
     </div>
-    <form method="dialog" class="modal-backdrop">
-      <button onclick={() => (hideTargetId = null)}>close</button>
-    </form>
   </dialog>
 {/if}
