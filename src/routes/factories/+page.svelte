@@ -149,15 +149,14 @@
           <th class="text-xs font-bold w-[50%] sm:w-[40%] lg:w-[24%] xl:w-[20%]">공장명</th>
           <th class="text-xs font-bold hidden lg:table-cell lg:w-[38%] xl:w-[36%]">주소</th>
           <th class="text-xs font-bold hidden lg:table-cell lg:w-[18%] xl:w-[16%]">전화번호</th>
-          <th class="text-xs font-bold hidden lg:table-cell whitespace-nowrap lg:w-[10%] xl:w-[8%]">등록일</th>
-          <th class="text-xs font-bold hidden xl:table-cell w-[8%]">상태</th>
-          <th class="text-xs font-bold text-center whitespace-nowrap w-[50%] sm:w-[60%] lg:w-[10%] xl:w-[12%]">액션</th>
+          <th class="text-xs font-bold hidden lg:table-cell whitespace-nowrap lg:w-[10%] xl:w-[10%]">등록일</th>
+          <th class="text-xs font-bold text-center whitespace-nowrap w-[50%] sm:w-[60%] lg:w-[10%] xl:w-[14%]">액션</th>
         </tr>
       </thead>
       <tbody>
         {#if filteredFactories.length === 0}
           <tr>
-            <td colspan="6" class="py-16 text-center text-base-content/40 text-sm">
+            <td colspan="5" class="py-16 text-center text-base-content/40 text-sm">
               {selectedId ? '선택된 공장이 없습니다.' : '등록된 공장이 없습니다.'}
             </td>
           </tr>
@@ -187,15 +186,6 @@
 
               <!-- 등록일 -->
               <td class="text-base-content/50 text-xs whitespace-nowrap hidden lg:table-cell">{formatDate(factory.createdAt)}</td>
-
-              <!-- 상태 -->
-              <td class="hidden xl:table-cell">
-                {#if factory.isHidden}
-                  <span class="badge badge-ghost badge-sm font-bold">숨김</span>
-                {:else}
-                  <span class="badge badge-success badge-sm font-bold">운영중</span>
-                {/if}
-              </td>
 
               <!-- 액션 -->
               <td>
