@@ -178,17 +178,20 @@
       <thead class="bg-base-200 text-base-content/60">
         <tr>
           <!-- 이름+역할 묶음 -->
-          <th class="text-xs font-bold w-[60%] sm:w-[50%] lg:w-[30%] xl:w-[24%]">이름 / 역할</th>
-          <!-- 아이디+이메일+연락처 묶음 -->
-          <th class="text-xs font-bold hidden lg:table-cell lg:w-[40%] xl:w-[50%]">아이디 / 이메일 · 연락처</th>
+          <th class="text-xs font-bold w-[35%] sm:w-[30%] lg:w-[18%] xl:w-[16%]">이름</th>
+          <th class="text-xs font-bold hidden lg:table-cell lg:w-[10%] xl:w-[8%]">역할</th>
+          <!-- 아이디+이메일+연락처 -->
+          <th class="text-xs font-bold hidden lg:table-cell lg:w-[16%] xl:w-[14%]">아이디</th>
+          <th class="text-xs font-bold hidden xl:table-cell w-[18%]">이메일</th>
+          <th class="text-xs font-bold hidden xl:table-cell w-[14%]">연락처</th>
           <th class="text-xs font-bold hidden lg:table-cell whitespace-nowrap lg:w-[10%] xl:w-[8%]">등록일</th>
-          <th class="text-xs font-bold text-center whitespace-nowrap w-[40%] sm:w-[50%] lg:w-[20%] xl:w-[18%]">상태 / 액션</th>
+          <th class="text-xs font-bold text-center whitespace-nowrap w-[65%] sm:w-[70%] lg:w-[36%] xl:w-[22%]">액션</th>
         </tr>
       </thead>
       <tbody>
         {#if filteredUsers.length === 0}
           <tr>
-            <td colspan="4" class="py-16 text-center text-base-content/40 text-sm">
+            <td colspan="7" class="py-16 text-center text-base-content/40 text-sm">
               검색 결과가 없습니다.
             </td>
           </tr>
@@ -196,37 +199,34 @@
           {#each visibleUsers as user (user.id)}
             <tr class="hover:bg-base-200 transition-colors {!user.isActive ? 'opacity-50' : ''}">
 
-              <!-- 이름 + 역할 -->
-              <td>
-                <div class="flex items-center gap-2">
-                  <span class="font-semibold text-base-content">{user.name}</span>
-                  <span class="badge badge-sm font-bold {roleBadge[user.role]}">{roleLabel[user.role]}</span>
-                </div>
-                <!-- lg 미만: 아이디·연락처·등록일 인라인 -->
+              <!-- 이름 -->
+              <td class="font-semibold text-base-content">
+                <span>{user.name}</span>
+                <!-- lg 미만: 역할·아이디·등록일 인라인 -->
                 <div class="lg:hidden mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
+                  <span class="badge badge-xs font-bold {roleBadge[user.role]}">{roleLabel[user.role]}</span>
                   <span class="text-xs text-base-content/50 font-mono">{user.username}</span>
                   {#if user.email}<span class="text-xs text-base-content/40">{user.email}</span>{/if}
                   <span class="text-xs text-base-content/30">{formatDate(user.createdAt)}</span>
                 </div>
               </td>
 
-              <!-- 아이디 + 이메일·연락처 묶음 -->
+              <!-- 역할 -->
               <td class="hidden lg:table-cell">
-                <span class="text-sm font-mono text-base-content/80">{user.username}</span>
-                <div class="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
-                  {#if user.email}
-                    <span class="text-xs text-base-content/50">{user.email}</span>
-                  {/if}
-                  {#if user.phone}
-                    <span class="text-xs text-base-content/40">{user.phone}</span>
-                  {/if}
-                </div>
+                <span class="badge badge-sm font-bold {roleBadge[user.role]}">{roleLabel[user.role]}</span>
               </td>
 
+              <!-- 아이디 -->
+              <td class="text-base-content/70 text-sm font-mono hidden lg:table-cell">{user.username}</td>
+
+              <!-- 이메일 -->
+              <td class="text-base-content/60 text-xs hidden xl:table-cell">{user.email ?? '—'}</td>
+
+              <!-- 연락처 -->
+              <td class="text-base-content/70 text-sm hidden xl:table-cell">{user.phone ?? '—'}</td>
+
               <!-- 등록일 -->
-              <td class="text-base-content/50 text-xs whitespace-nowrap hidden lg:table-cell">
-                {formatDate(user.createdAt)}
-              </td>
+              <td class="text-base-content/50 text-xs whitespace-nowrap hidden lg:table-cell">{formatDate(user.createdAt)}</td>
 
               <!-- 액션 -->
               <td>
