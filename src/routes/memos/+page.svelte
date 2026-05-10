@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { memoStore, clients } from '$lib/memoStore';
+  import { memoStore, clients } from '$lib/memoStore.svelte';
 
   // ── 필터 상태 ────────────────────────────────────────────────
   let statusFilter = $state<'all' | 'unread' | 'read'>('all');

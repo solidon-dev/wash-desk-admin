@@ -1,6 +1,6 @@
 <script lang="ts">
   import { page } from '$app/state';
-  import { memoStore, clients } from '$lib/memoStore';
+  import { memoStore, clients } from '$lib/memoStore.svelte';
 
   // ── 현재 메모 ID ─────────────────────────────────────────────
   const memoId = $derived(page.params.id);
