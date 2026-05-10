@@ -34,7 +34,7 @@
   );
 
   // ── 페이지네이션 ─────────────────────────────────────────────
-  const PAGE_SIZE = 5;
+  const PAGE_SIZE = 10;
   let currentPage = $state(1);
   $effect(() => { filteredMemos; currentPage = 1; });
 
