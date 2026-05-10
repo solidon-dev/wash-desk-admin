@@ -36,14 +36,29 @@
     { id: 'client-006', name: '블루라군리조트', type: 'resort' },
   ].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
 
-  // ── 세탁물 품목 (로컬) ────────────────────────────────────────
+  // ── 세탁물 품목 (로컈) ────────────────────────────────────────
   let laundryItems = $state([
-    { id: 'item-001', clientId: 'client-001', category: 'towel',   name: '대형타올',    alias: undefined as string | undefined, nameCn: undefined as string | undefined, nameEn: undefined as string | undefined, counts: { received: 0, washing: 20, completed: 150, stock: 80,  shipped: 500 }, updatedAt: '2025-01-17' },
-    { id: 'item-002', clientId: 'client-001', category: 'sheet',   name: '싱글시트',    alias: undefined as string | undefined, nameCn: undefined as string | undefined, nameEn: undefined as string | undefined, counts: { received: 0, washing: 10, completed:  80, stock: 40,  shipped: 300 }, updatedAt: '2025-01-17' },
-    { id: 'item-003', clientId: 'client-001', category: 'uniform', name: '직원유니폼',  alias: undefined as string | undefined, nameCn: undefined as string | undefined, nameEn: undefined as string | undefined, counts: { received: 0, washing:  5, completed:  30, stock: 20,  shipped: 100 }, updatedAt: '2025-01-17' },
-    { id: 'item-004', clientId: 'client-002', category: 'towel',   name: '소형타올',    alias: undefined as string | undefined, nameCn: undefined as string | undefined, nameEn: undefined as string | undefined, counts: { received: 0, washing: 15, completed:  90, stock: 50,  shipped: 200 }, updatedAt: '2025-01-16' },
-    { id: 'item-005', clientId: 'client-002', category: 'sheet',   name: '더블시트',    alias: undefined as string | undefined, nameCn: undefined as string | undefined, nameEn: undefined as string | undefined, counts: { received: 0, washing:  8, completed:  60, stock: 30,  shipped: 150 }, updatedAt: '2025-01-16' },
-    { id: 'item-006', clientId: 'client-003', category: 'towel',   name: '바스타올',    alias: undefined as string | undefined, nameCn: undefined as string | undefined, nameEn: undefined as string | undefined, counts: { received: 0, washing: 25, completed: 200, stock: 100, shipped: 800 }, updatedAt: '2025-01-15' },
+    // 그랜드호텔 (client-001) – 타월/시트/유니폼
+    { id: 'item-001', clientId: 'client-001', category: 'towel',   name: '대형타월',      alias: 'BT' as string | undefined,   nameCn: '大浴巾' as string | undefined, nameEn: 'Bath Towel' as string | undefined,      counts: { received: 0, washing: 20, completed: 150, stock: 80,  shipped: 500 }, updatedAt: '2025-01-17' },
+    { id: 'item-002', clientId: 'client-001', category: 'towel',   name: '중형타웘',      alias: 'HT' as string | undefined,   nameCn: '浴巾'   as string | undefined, nameEn: 'Hand Towel' as string | undefined,      counts: { received: 0, washing: 10, completed:  90, stock: 45,  shipped: 300 }, updatedAt: '2025-01-17' },
+    { id: 'item-003', clientId: 'client-001', category: 'towel',   name: '소형타월',      alias: 'FT' as string | undefined,   nameCn: '小浴巾' as string | undefined, nameEn: 'Face Towel' as string | undefined,      counts: { received: 0, washing:  5, completed:  40, stock: 20,  shipped: 120 }, updatedAt: '2025-01-17' },
+    { id: 'item-004', clientId: 'client-001', category: 'sheet',   name: '싱글시트',      alias: 'SS' as string | undefined,   nameCn: '单人床单' as string | undefined, nameEn: 'Single Sheet' as string | undefined,   counts: { received: 0, washing: 10, completed:  80, stock: 40,  shipped: 300 }, updatedAt: '2025-01-17' },
+    { id: 'item-005', clientId: 'client-001', category: 'sheet',   name: '더블시트',      alias: 'DS' as string | undefined,   nameCn: '双人床单' as string | undefined, nameEn: 'Double Sheet' as string | undefined,   counts: { received: 0, washing:  8, completed:  60, stock: 30,  shipped: 200 }, updatedAt: '2025-01-17' },
+    { id: 'item-006', clientId: 'client-001', category: 'sheet',   name: '필로케이스',    alias: 'PC' as string | undefined,   nameCn: '枕头套' as string | undefined,   nameEn: 'Pillow Case' as string | undefined,     counts: { received: 0, washing:  6, completed:  50, stock: 25,  shipped: 180 }, updatedAt: '2025-01-17' },
+    { id: 'item-007', clientId: 'client-001', category: 'sheet',   name: '더블커버',      alias: undefined,                    nameCn: '被套'   as string | undefined, nameEn: 'Duvet Cover' as string | undefined,     counts: { received: 0, washing:  4, completed:  30, stock: 15,  shipped: 100 }, updatedAt: '2025-01-17' },
+    { id: 'item-008', clientId: 'client-001', category: 'uniform', name: '스태프유니폼',  alias: undefined,                    nameCn: '员工制服' as string | undefined, nameEn: 'Staff Uniform' as string | undefined,  counts: { received: 0, washing:  5, completed:  30, stock: 20,  shipped: 100 }, updatedAt: '2025-01-17' },
+    { id: 'item-009', clientId: 'client-001', category: 'uniform', name: '주방복',            alias: undefined,                    nameCn: '厨师服' as string | undefined, nameEn: 'Chef Uniform' as string | undefined,    counts: { received: 0, washing:  3, completed:  20, stock: 10,  shipped:  60 }, updatedAt: '2025-01-17' },
+    { id: 'item-010', clientId: 'client-001', category: 'uniform', name: '컴비네이션',    alias: undefined,                    nameCn: undefined,                          nameEn: 'Combination' as string | undefined,     counts: { received: 0, washing:  2, completed:  10, stock:  5,  shipped:  30 }, updatedAt: '2025-01-17' },
+    // 오션뷰펜션 (client-002)
+    { id: 'item-011', clientId: 'client-002', category: 'towel',   name: '소형타월',      alias: undefined as string | undefined, nameCn: undefined as string | undefined, nameEn: undefined as string | undefined, counts: { received: 0, washing: 15, completed:  90, stock: 50,  shipped: 200 }, updatedAt: '2025-01-16' },
+    { id: 'item-012', clientId: 'client-002', category: 'towel',   name: '대형타월',      alias: undefined as string | undefined, nameCn: undefined as string | undefined, nameEn: undefined as string | undefined, counts: { received: 0, washing:  8, completed:  60, stock: 30,  shipped: 150 }, updatedAt: '2025-01-16' },
+    { id: 'item-013', clientId: 'client-002', category: 'sheet',   name: '더블시트',      alias: undefined as string | undefined, nameCn: undefined as string | undefined, nameEn: undefined as string | undefined, counts: { received: 0, washing:  5, completed:  40, stock: 20,  shipped: 100 }, updatedAt: '2025-01-16' },
+    // 제주리조트 (client-003)
+    { id: 'item-014', clientId: 'client-003', category: 'towel',   name: '바스타월',      alias: undefined as string | undefined, nameCn: undefined as string | undefined, nameEn: undefined as string | undefined, counts: { received: 0, washing: 25, completed: 200, stock: 100, shipped: 800 }, updatedAt: '2025-01-15' },
+    { id: 'item-015', clientId: 'client-003', category: 'towel',   name: '핸드타월',      alias: undefined as string | undefined, nameCn: undefined as string | undefined, nameEn: undefined as string | undefined, counts: { received: 0, washing: 12, completed:  80, stock: 40,  shipped: 300 }, updatedAt: '2025-01-15' },
+    { id: 'item-016', clientId: 'client-003', category: 'sheet',   name: '킹사이즈시트',  alias: undefined as string | undefined, nameCn: undefined as string | undefined, nameEn: undefined as string | undefined, counts: { received: 0, washing:  6, completed:  50, stock: 25,  shipped: 150 }, updatedAt: '2025-01-15' },
+    { id: 'item-017', clientId: 'client-003', category: 'sheet',   name: '퀸사이즈시트',  alias: undefined as string | undefined, nameCn: undefined as string | undefined, nameEn: undefined as string | undefined, counts: { received: 0, washing:  4, completed:  30, stock: 15,  shipped: 100 }, updatedAt: '2025-01-15' },
+    { id: 'item-018', clientId: 'client-003', category: 'uniform', name: '가운',              alias: undefined as string | undefined, nameCn: undefined as string | undefined, nameEn: 'Gown' as string | undefined, counts: { received: 0, washing:  8, completed:  60, stock: 30,  shipped: 200 }, updatedAt: '2025-01-15' },
   ]);
 
   // ── 가격 정보 (로컬) ──────────────────────────────────────────
@@ -330,6 +345,23 @@
     newCatInput      = '';
   }
 
+  // ── 카테고리 삭제 확인 모달 ───────────────────────────────────
+  let deleteCatTarget = $state<string | null>(null);
+
+  function requestRemoveCategory(cat: string) {
+    deleteCatTarget = cat;
+  }
+
+  function confirmRemoveCategory() {
+    if (!deleteCatTarget) return;
+    removeCategory(deleteCatTarget);
+    deleteCatTarget = null;
+  }
+
+  function cancelRemoveCategory() {
+    deleteCatTarget = null;
+  }
+
   function removeCategory(cat: string) {
     const wasSelected = effectiveCat === cat;
     if (selectedClientId) {
@@ -352,7 +384,7 @@
   );
 
   // ── 엑셀 그리드 상태 ──────────────────────────────────────────
-  // col: 0=한국어, 1=별칭, 2=중국어, 3=영어, 4=가격적용시기, 5=단가
+  // col: 0=품목명, 1=단가, 2=별칭, 3=중국어, 4=영어, 5=가격적용시기
   type GridCol = 0 | 1 | 2 | 3 | 4 | 5;
 
   function todayYMD(): string {
@@ -460,6 +492,7 @@
     cnDrafts       = {};
     enDrafts       = {};
     priceDrafts    = {};
+    dateDrafts     = {};
     showDateModal  = false;
     dateModalRow   = null;
     dateModalValue = '';
@@ -487,6 +520,24 @@
     }
   }
 
+  // 가격적용시기 draft (item.id → 입력 문자열)
+  let dateDrafts = $state<Record<string, string>>({});
+
+  // YYYYMMDD → YYYY-MM-DD 변환 (자동 대시 삽입)
+  function formatDateInput(raw: string): string {
+    const digits = raw.replace(/[^0-9]/g, '').slice(0, 8);
+    if (digits.length <= 4) return digits;
+    if (digits.length <= 6) return `${digits.slice(0,4)}-${digits.slice(4)}`;
+    return `${digits.slice(0,4)}-${digits.slice(4,6)}-${digits.slice(6)}`;
+  }
+
+  // YYYY-MM-DD 형식 유효성 검증
+  function isValidDate(str: string): boolean {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(str)) return false;
+    const d = new Date(str);
+    return !isNaN(d.getTime());
+  }
+
   function onCellFocus(row: number, col: GridCol) {
     activeRow = row;
     // 드래프트 초기화
@@ -495,20 +546,26 @@
       if (col === 0 && nameDrafts[item.id] === undefined) {
         nameDrafts[item.id] = item.name;
       }
-      if (col === 3 && aliasDrafts[item.id] === undefined) {
-        aliasDrafts[item.id] = item.alias ?? '';
-      }
-      if (col === 4 && cnDrafts[item.id] === undefined) {
-        cnDrafts[item.id] = item.nameCn ?? '';
-      }
-      if (col === 5 && enDrafts[item.id] === undefined) {
-        enDrafts[item.id] = item.nameEn ?? '';
-      }
-      if (col === 2 && priceDrafts[item.id] === undefined) {
+      if (col === 1 && priceDrafts[item.id] === undefined) {
         const p = selectedClientId && effectiveCat
           ? getUnitPrice(selectedClientId, effectiveCat, item.name)
           : 0;
         priceDrafts[item.id] = p > 0 ? String(p) : '';
+      }
+      if (col === 2 && aliasDrafts[item.id] === undefined) {
+        aliasDrafts[item.id] = item.alias ?? '';
+      }
+      if (col === 3 && cnDrafts[item.id] === undefined) {
+        cnDrafts[item.id] = item.nameCn ?? '';
+      }
+      if (col === 4 && enDrafts[item.id] === undefined) {
+        enDrafts[item.id] = item.nameEn ?? '';
+      }
+      if (col === 5 && dateDrafts[item.id] === undefined) {
+        const d = selectedClientId && effectiveCat
+          ? getPriceEffectiveDate(selectedClientId, effectiveCat, item.name)
+          : undefined;
+        dateDrafts[item.id] = d ?? '';
       }
     }
   }
@@ -578,60 +635,34 @@
     delete priceDrafts[itemId];
   }
 
+  function commitDate(itemId: string, itemName: string) {
+    const draft = dateDrafts[itemId];
+    if (draft === undefined) return;
+    if (!selectedClientId || !effectiveCat) return;
+    const val = draft.trim();
+    if (!val || isValidDate(val)) {
+      setPriceEffectiveDate(selectedClientId, effectiveCat, itemName, val || null);
+    }
+    // 유효하지 않으면 원복
+    delete dateDrafts[itemId];
+  }
+
   function commitCell(row: number, col: GridCol) {
-    if (row >= currentItems.length) return; // new row — committed on Enter
+    if (row >= currentItems.length) return;
     const item = currentItems[row];
     if (col === 0) commitName(item.id, item.name);
-    else if (col === 2) commitPrice(item.id, item.name);
-    else if (col === 3) commitAlias(item.id);
-    else if (col === 4) commitCn(item.id);
-    else if (col === 5) commitEn(item.id);
-    // col 1 (date) handled via modal
+    else if (col === 1) commitPrice(item.id, item.name);
+    else if (col === 2) commitAlias(item.id);
+    else if (col === 3) commitCn(item.id);
+    else if (col === 4) commitEn(item.id);
+    else if (col === 5) commitDate(item.id, item.name);
   }
 
   function handleCellKeydown(e: KeyboardEvent, row: number, col: GridCol) {
     const newRowIdx = getNewRowIndex();
     const isNewRow  = row === newRowIdx;
 
-    // col 1 (date button) special: Enter opens modal, other keys navigate
-    if (col === 1) {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        if (row < currentItems.length) {
-          dateModalRow = row;
-          const item = currentItems[row];
-          const curDate = selectedClientId && effectiveCat
-            ? getPriceEffectiveDate(selectedClientId, effectiveCat, item.name)
-            : null;
-          dateModalValue = curDate ?? '';
-          showDateModal = true;
-        }
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        if (row > 0) moveFocus(row - 1, col);
-      } else if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        moveFocus(row + 1, col);
-      } else if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        moveFocus(row, 0);
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        moveFocus(row, 2);
-      } else if (e.key === 'Tab' && !e.shiftKey) {
-        e.preventDefault();
-        moveFocus(row, 2);
-      } else if (e.key === 'Tab' && e.shiftKey) {
-        e.preventDefault();
-        moveFocus(row, 0);
-      } else if (e.key === 'Escape') {
-        (e.target as HTMLElement).blur();
-        activeRow = null;
-      }
-      return;
-    }
-
-    // Regular navigation for cols 0-3, 5
+    // Regular navigation for all cols
     switch (e.key) {
       case 'ArrowUp':
         e.preventDefault();
@@ -699,6 +730,7 @@
           delete cnDrafts[item.id];
           delete enDrafts[item.id];
           delete priceDrafts[item.id];
+          delete dateDrafts[item.id];
         } else {
           newName      = '';
           newAlias     = '';
@@ -805,12 +837,6 @@
     return getPriceEffectiveDate(selectedClientId, effectiveCat, item.name) ?? '';
   }
 
-  function formatDate(isoOrYmd: string): string {
-    if (!isoOrYmd) return '—';
-    // Handle both ISO (2025-01-15T...) and YMD (2025-01-15)
-    const datePart = isoOrYmd.split('T')[0];
-    return datePart;
-  }
 
 
 
@@ -967,42 +993,61 @@
   </dialog>
 {/if}
 
-<!-- ── 메인 레이아웃 ──────────────────────────────────────────── -->
+<!-- ── 카테고리 삭제 확인 모달 ─────────────────────────────── -->
+{#if deleteCatTarget}
+  {@const catItemCount = selectedClientId ? laundryItems.filter(i => i.clientId === selectedClientId && i.category === deleteCatTarget).length : 0}
+  <dialog open aria-modal="true" class="modal modal-open" onkeydown={(e) => e.key === 'Escape' && cancelRemoveCategory()}>
+    <div class="modal-box w-full max-w-sm rounded-2xl p-6">
+      <h3 class="text-base font-extrabold mb-2">카테고리 삭제</h3>
+      <p class="text-sm text-base-content/70 mb-1">
+        <span class="font-bold text-error">{catLabel(deleteCatTarget)}</span> 카테고리를 삭제합니다.
+      </p>
+      {#if catItemCount > 0}
+        <p class="text-sm text-base-content/60 mb-6">해당 카테고리에 등록된 품목 <strong>{catItemCount}개</strong>도 함께 삭제됩니다.</p>
+      {:else}
+        <p class="text-sm text-base-content/60 mb-6">등록된 품목이 없습니다.</p>
+      {/if}
+      <div class="modal-action">
+        <button onclick={cancelRemoveCategory} class="btn btn-ghost font-bold">취소</button>
+        <button onclick={confirmRemoveCategory} class="btn btn-error font-bold">삭제</button>
+      </div>
+    </div>
+    <div class="modal-backdrop" role="button" tabindex="-1" onclick={cancelRemoveCategory} onkeydown={(e) => e.key === 'Escape' && cancelRemoveCategory()}></div>
+  </dialog>
+{/if}
+
+<!-- ── 메인 레이아웃 ────────────────────────────────── -->
 <div class="h-full flex flex-col overflow-hidden bg-base-200">
 
   <!-- 헤더 -->
-  <header class="shrink-0 border-b-2 border-base-300 bg-base-100 px-8 py-4">
-    <div class="flex items-center justify-between gap-4">
-      <!-- 거래처 선택 버튼 -->
-      <button
-        onclick={openClientModal}
-        class="btn btn-ghost btn-sm flex items-center gap-2.5 text-left"
-      >
-        {#if selectedClient}
-          <span
-            class="badge badge-sm font-bold {typeBadge[selectedClient.type] ?? 'bg-base-200 text-base-content'}"
-          >
-            {typeLabel[selectedClient.type] ?? selectedClient.type}
-          </span>
-          <span class="text-sm font-semibold">{selectedClient.name}</span>
-        {:else}
-          <span class="opacity-40">거래처 선택</span>
-        {/if}
-        <Icon icon="lucide:chevron-down" class="h-3.5 w-3.5 opacity-50" />
-      </button>
-
-      <h2 class="flex-1 text-center text-xl font-extrabold tracking-tight">상품 관리</h2>
-
-      <!-- 복사 버튼 -->
-      <button
-        onclick={openCopyModal}
-        disabled={!selectedClientId}
-        class="btn btn-outline btn-sm flex items-center gap-1.5"
-        title="다른 거래처에서 품목 복사"
-      >
-        <Icon icon="lucide:copy" class="h-4 w-4" />
-        복사
-      </button>
+  <header class="shrink-0 border-b-2 border-base-300 bg-base-100 px-8 py-5">
+    <div class="flex items-center gap-4">
+      <h2 class="text-2xl font-extrabold tracking-tight">상품 관리</h2>
+      <div class="ml-auto flex items-center gap-2">
+        <!-- 거래처 선택 버튼 -->
+        <button
+          onclick={openClientModal}
+          class="btn btn-ghost btn-sm flex items-center gap-1.5"
+        >
+          <Icon icon="lucide:building-2" class="h-4 w-4 opacity-50" />
+          {#if selectedClient}
+            <span class="font-semibold">{selectedClient.name}</span>
+          {:else}
+            <span class="opacity-40">거래처 선택</span>
+          {/if}
+          <Icon icon="lucide:chevron-down" class="h-3.5 w-3.5 opacity-50" />
+        </button>
+        <!-- 복사 버튼 -->
+        <button
+          onclick={openCopyModal}
+          disabled={!selectedClientId}
+          class="btn btn-outline btn-sm flex items-center gap-1.5"
+          title="다른 거래처 품목 복사"
+        >
+          <Icon icon="lucide:copy" class="h-4 w-4" />
+          품목 복사
+        </button>
+      </div>
     </div>
   </header>
 
@@ -1045,12 +1090,12 @@
             <li class="group relative">
               <button
                 onclick={() => (selectedCategory = cat)}
-                class="{isActive ? 'active font-bold' : 'font-medium'}"
+                class="w-full {isActive ? 'active font-bold' : 'font-medium'}"
               >
                 <span class="min-w-0 flex-1 truncate">{catLabel(cat)}</span>
               </button>
               <button
-                onclick={() => removeCategory(cat)}
+                onclick={() => requestRemoveCategory(cat)}
                 class="btn btn-ghost btn-xs btn-circle absolute right-1 top-1/2 -translate-y-1/2 hidden text-error group-hover:flex"
                 title="카테고리 삭제"
               >
@@ -1102,11 +1147,11 @@
               <tr class="border-b-2 border-base-300 bg-base-200">
                 <th class="w-8 px-2 py-2.5 text-center text-[11px] font-bold uppercase tracking-wide opacity-60 select-none">#</th>
                 <th class="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wide opacity-60 min-w-[120px]">품목명</th>
-                <th class="w-40 px-3 py-2.5 text-center text-[11px] font-bold uppercase tracking-wide opacity-60">가격적용시기</th>
-                <th class="w-32 px-3 py-2.5 text-right text-[11px] font-bold uppercase tracking-wide opacity-60">단가 (원)</th>
+                <th class="w-28 px-3 py-2.5 text-right text-[11px] font-bold uppercase tracking-wide opacity-60">단가 (원)</th>
                 <th class="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wide opacity-60 min-w-[100px]">별칭</th>
-                <th class="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wide opacity-60 min-w-[120px]">중국어</th>
-                <th class="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wide opacity-60 min-w-[120px]">영어</th>
+                <th class="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wide opacity-60 min-w-[110px]">중국어</th>
+                <th class="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wide opacity-60 min-w-[110px]">영어</th>
+                <th class="w-36 px-3 py-2.5 text-center text-[11px] font-bold uppercase tracking-wide opacity-60">가격적용시기</th>
                 <th class="w-8 px-2 py-2.5"></th>
               </tr>
             </thead>
@@ -1174,40 +1219,17 @@
                     />
                   </td>
 
-                  <!-- 가격적용시기 (날짜 버튼) -->
-                  <td class="w-40 p-0">
-                    <button
-                      id="cell-{i}-1"
-                      type="button"
-                      onclick={() => {
-                        dateModalRow = i;
-                        const curDate = selectedClientId && effectiveCat
-                          ? getPriceEffectiveDate(selectedClientId, effectiveCat, item.name)
-                          : null;
-                        dateModalValue = curDate ?? '';
-                        showDateModal = true;
-                      }}
-                      onkeydown={(e) => handleCellKeydown(e, i, 1)}
-                      onfocus={() => { activeRow = i; }}
-                      onblur={() => { if (activeRow === i) activeRow = null; }}
-                      class="w-full px-3 py-2.5 text-center border-2 border-transparent rounded outline-none focus:border-primary focus:bg-primary/5 focus:shadow-sm transition-all duration-75 hover:bg-base-200/50 font-mono text-sm"
-                      title="클릭 또는 Enter로 날짜 설정"
-                    >
-                      {formatDate(getDisplayPriceDate(item))}
-                    </button>
-                  </td>
-
                   <!-- 단가 셀 -->
-                  <td class="p-0 w-32">
+                  <td class="p-0 w-28">
                     <input
-                      id="cell-{i}-2"
+                      id="cell-{i}-1"
                       type="text"
                       inputmode="numeric"
                       value={getDisplayPrice(item)}
                       oninput={(e) => { priceDrafts[item.id] = e.currentTarget.value; }}
-                      onfocus={() => onCellFocus(i, 2)}
+                      onfocus={() => onCellFocus(i, 1)}
                       onblur={() => commitPrice(item.id, item.name)}
-                      onkeydown={(e) => handleCellKeydown(e, i, 2)}
+                      onkeydown={(e) => handleCellKeydown(e, i, 1)}
                       placeholder="—"
                       class="w-full px-3 py-2.5 text-right bg-transparent border-2 border-transparent rounded outline-none focus:border-primary focus:bg-base-100 focus:shadow-sm placeholder:opacity-20 transition-all duration-75"
                     />
@@ -1216,45 +1238,64 @@
                   <!-- 별칭 셀 -->
                   <td class="p-0 min-w-[100px]">
                     <input
-                      id="cell-{i}-3"
+                      id="cell-{i}-2"
                       type="text"
                       value={getDisplayAlias(item)}
                       oninput={(e) => { aliasDrafts[item.id] = e.currentTarget.value; }}
-                      onfocus={() => onCellFocus(i, 3)}
+                      onfocus={() => onCellFocus(i, 2)}
                       onblur={() => commitAlias(item.id)}
-                      onkeydown={(e) => handleCellKeydown(e, i, 3)}
+                      onkeydown={(e) => handleCellKeydown(e, i, 2)}
                       placeholder="—"
                       class="w-full px-3 py-2.5 bg-transparent border-2 border-transparent rounded outline-none focus:border-primary focus:bg-base-100 focus:shadow-sm placeholder:opacity-20 transition-all duration-75"
                     />
                   </td>
 
                   <!-- 중국어 셀 -->
-                  <td class="p-0 min-w-[120px]">
+                  <td class="p-0 min-w-[110px]">
                     <input
-                      id="cell-{i}-4"
+                      id="cell-{i}-3"
                       type="text"
                       value={getDisplayCn(item)}
                       oninput={(e) => { cnDrafts[item.id] = e.currentTarget.value; }}
-                      onfocus={() => onCellFocus(i, 4)}
+                      onfocus={() => onCellFocus(i, 3)}
                       onblur={() => commitCn(item.id)}
-                      onkeydown={(e) => handleCellKeydown(e, i, 4)}
+                      onkeydown={(e) => handleCellKeydown(e, i, 3)}
                       placeholder="—"
                       class="w-full px-3 py-2.5 bg-transparent border-2 border-transparent rounded outline-none focus:border-primary focus:bg-base-100 focus:shadow-sm placeholder:opacity-20 transition-all duration-75"
                     />
                   </td>
 
                   <!-- 영어 셀 -->
-                  <td class="p-0 min-w-[120px]">
+                  <td class="p-0 min-w-[110px]">
                     <input
-                      id="cell-{i}-5"
+                      id="cell-{i}-4"
                       type="text"
                       value={getDisplayEn(item)}
                       oninput={(e) => { enDrafts[item.id] = e.currentTarget.value; }}
-                      onfocus={() => onCellFocus(i, 5)}
+                      onfocus={() => onCellFocus(i, 4)}
                       onblur={() => commitEn(item.id)}
-                      onkeydown={(e) => handleCellKeydown(e, i, 5)}
+                      onkeydown={(e) => handleCellKeydown(e, i, 4)}
                       placeholder="—"
                       class="w-full px-3 py-2.5 bg-transparent border-2 border-transparent rounded outline-none focus:border-primary focus:bg-base-100 focus:shadow-sm placeholder:opacity-20 transition-all duration-75"
+                    />
+                  </td>
+
+                  <!-- 가격적용시기 셀 (인라인 텍스트 입력) -->
+                  <td class="p-0 w-36">
+                    <input
+                      id="cell-{i}-5"
+                      type="text"
+                      inputmode="numeric"
+                      value={dateDrafts[item.id] ?? getDisplayPriceDate(item)}
+                      oninput={(e) => {
+                        dateDrafts[item.id] = formatDateInput(e.currentTarget.value);
+                        e.currentTarget.value = dateDrafts[item.id];
+                      }}
+                      onfocus={() => onCellFocus(i, 5)}
+                      onblur={() => commitDate(item.id, item.name)}
+                      onkeydown={(e) => handleCellKeydown(e, i, 5)}
+                      placeholder="YYYY-MM-DD"
+                      class={`w-full px-3 py-2.5 text-center font-mono text-sm bg-transparent border-2 rounded outline-none transition-all duration-75 placeholder:opacity-20 ${(!dateDrafts[item.id] && !getDisplayPriceDate(item)) || isValidDate(dateDrafts[item.id] ?? getDisplayPriceDate(item)) ? 'border-transparent focus:border-primary focus:bg-base-100 focus:shadow-sm' : 'border-error/50 bg-error/5 text-error'}`}
                     />
                   </td>
 
@@ -1296,36 +1337,16 @@
                   />
                 </td>
 
-                <!-- 새 행 가격적용시기 -->
-                <td class="w-40 p-0">
+                <!-- 새 단가 -->
+                <td class="p-0 w-28">
                   <input
                     id="cell-{newRowIdx}-1"
-                    type="date"
-                    bind:value={newPriceDate}
-                    onfocus={() => { activeRow = newRowIdx; }}
-                    onblur={() => { if (activeRow === newRowIdx) activeRow = null; }}
-                    onkeydown={(e) => {
-                      if (e.key === 'Enter') { e.preventDefault(); addItemAndContinue(); }
-                      else if (e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); moveFocus(newRowIdx, 2); }
-                      else if (e.key === 'Tab' && e.shiftKey) { e.preventDefault(); moveFocus(newRowIdx, 0); }
-                      else if (e.key === 'ArrowRight') { e.preventDefault(); moveFocus(newRowIdx, 2); }
-                      else if (e.key === 'ArrowLeft') { e.preventDefault(); moveFocus(newRowIdx, 0); }
-                      else if (e.key === 'Escape') { newPriceDate = todayYMD(); (e.target as HTMLElement).blur(); activeRow = null; }
-                    }}
-                    class="w-full px-3 py-2.5 text-center bg-transparent border-2 border-transparent rounded outline-none focus:border-success focus:bg-base-100 focus:shadow-sm transition-all duration-75 font-mono text-sm"
-                  />
-                </td>
-
-                <!-- 새 단가 -->
-                <td class="p-0 w-32">
-                  <input
-                    id="cell-{newRowIdx}-2"
                     type="text"
                     inputmode="numeric"
                     bind:value={newPrice}
                     onfocus={() => { activeRow = newRowIdx; }}
                     onblur={() => { if (activeRow === newRowIdx) activeRow = null; }}
-                    onkeydown={(e) => handleCellKeydown(e, newRowIdx, 2)}
+                    onkeydown={(e) => handleCellKeydown(e, newRowIdx, 1)}
                     placeholder="단가"
                     class="w-full px-3 py-2.5 text-right bg-transparent border-2 border-transparent rounded outline-none focus:border-success focus:bg-base-100 focus:shadow-sm placeholder:opacity-30 transition-all duration-75"
                   />
@@ -1334,9 +1355,23 @@
                 <!-- 새 행 별칭 -->
                 <td class="p-0 min-w-[100px]">
                   <input
-                    id="cell-{newRowIdx}-3"
+                    id="cell-{newRowIdx}-2"
                     type="text"
                     bind:value={newAlias}
+                    onfocus={() => { activeRow = newRowIdx; }}
+                    onblur={() => { if (activeRow === newRowIdx) activeRow = null; }}
+                    onkeydown={(e) => handleCellKeydown(e, newRowIdx, 2)}
+                    placeholder="—"
+                    class="w-full px-3 py-2.5 bg-transparent border-2 border-transparent rounded outline-none focus:border-success focus:bg-base-100 focus:shadow-sm placeholder:opacity-30 transition-all duration-75"
+                  />
+                </td>
+
+                <!-- 새 행 중국어 -->
+                <td class="p-0 min-w-[110px]">
+                  <input
+                    id="cell-{newRowIdx}-3"
+                    type="text"
+                    bind:value={newCn}
                     onfocus={() => { activeRow = newRowIdx; }}
                     onblur={() => { if (activeRow === newRowIdx) activeRow = null; }}
                     onkeydown={(e) => handleCellKeydown(e, newRowIdx, 3)}
@@ -1345,12 +1380,12 @@
                   />
                 </td>
 
-                <!-- 새 행 중국어 -->
-                <td class="p-0 min-w-[120px]">
+                <!-- 새 행 영어 -->
+                <td class="p-0 min-w-[110px]">
                   <input
                     id="cell-{newRowIdx}-4"
                     type="text"
-                    bind:value={newCn}
+                    bind:value={newEn}
                     onfocus={() => { activeRow = newRowIdx; }}
                     onblur={() => { if (activeRow === newRowIdx) activeRow = null; }}
                     onkeydown={(e) => handleCellKeydown(e, newRowIdx, 4)}
@@ -1359,17 +1394,22 @@
                   />
                 </td>
 
-                <!-- 새 행 영어 -->
-                <td class="p-0 min-w-[120px]">
+                <!-- 새 행 가격적용시기 -->
+                <td class="p-0 w-36">
                   <input
                     id="cell-{newRowIdx}-5"
                     type="text"
-                    bind:value={newEn}
+                    inputmode="numeric"
+                    value={newPriceDate}
+                    oninput={(e) => {
+                      newPriceDate = formatDateInput(e.currentTarget.value);
+                      e.currentTarget.value = newPriceDate;
+                    }}
                     onfocus={() => { activeRow = newRowIdx; }}
                     onblur={() => { if (activeRow === newRowIdx) activeRow = null; }}
                     onkeydown={(e) => handleCellKeydown(e, newRowIdx, 5)}
-                    placeholder="—"
-                    class="w-full px-3 py-2.5 bg-transparent border-2 border-transparent rounded outline-none focus:border-success focus:bg-base-100 focus:shadow-sm placeholder:opacity-30 transition-all duration-75"
+                    placeholder="YYYY-MM-DD"
+                    class="w-full px-3 py-2.5 text-center font-mono text-sm bg-transparent border-2 border-transparent rounded outline-none focus:border-success focus:bg-base-100 focus:shadow-sm placeholder:opacity-30 transition-all duration-75"
                   />
                 </td>
 
