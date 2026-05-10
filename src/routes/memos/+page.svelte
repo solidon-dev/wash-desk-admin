@@ -1,54 +1,27 @@
 <script lang="ts">
-  interface ClientMemo {
-    id: string;
-    clientId: string;
-    content: string;
-    isRead: boolean;
-    createdAt: string;
-  }
+  import { memoStore, clients } from '$lib/memoStore';
 
-  let memos = $state<ClientMemo[]>([
-    { id: 'memo-001', clientId: 'client-001', content: '다음주 월요일 수거 시간 오전 10시로 변경 부탁드립니다.',    isRead: false, createdAt: '2025-01-15T09:30:00' },
-    { id: 'memo-002', clientId: 'client-002', content: '타올 추가 50장 필요합니다. 빠른 처리 부탁드려요.',          isRead: false, createdAt: '2025-01-16T14:20:00' },
-    { id: 'memo-003', clientId: 'client-003', content: '이번달 청구서 확인 부탁드립니다.',                          isRead: true,  createdAt: '2025-01-14T11:00:00' },
-    { id: 'memo-004', clientId: 'client-001', content: '시트 세탁 상태가 좋지 않습니다. 확인 부탁드립니다.',         isRead: false, createdAt: '2025-01-17T08:45:00' },
-  ]);
-
-  const clients = [
-    { id: 'client-001', name: '그랜드호텔'    },
-    { id: 'client-002', name: '오션뷰펜션'    },
-    { id: 'client-003', name: '제주리조트'    },
-    { id: 'client-004', name: '힐사이드호텔'  },
-    { id: 'client-005', name: '선셋펜션'      },
-    { id: 'client-006', name: '블루라군리조트' },
-  ];
-
-  const unreadMemoCount = $derived(memos.filter((m) => !m.isRead).length);
-
-  // ── 필터 상태 ─────────────────────────────────────────────────
+  // ── 필터 상태 ────────────────────────────────────────────────
   let statusFilter = $state<'all' | 'unread' | 'read'>('all');
   let clientFilter = $state<string>('all');
 
-  // ── 필터링된 메모 ─────────────────────────────────────────────
+  // ── 파생 값 ──────────────────────────────────────────────────
+  const unreadCount = $derived(memoStore.memos.filter((m) => !m.isRead).length);
+
   const filteredMemos = $derived(
-    memos.filter((m) => {
+    memoStore.memos.filter((m) => {
       const matchStatus =
-        statusFilter === 'all'
-          ? true
-          : statusFilter === 'unread'
-          ? !m.isRead
-          : m.isRead;
+        statusFilter === 'all' ? true : statusFilter === 'unread' ? !m.isRead : m.isRead;
       const matchClient = clientFilter === 'all' || m.clientId === clientFilter;
       return matchStatus && matchClient;
     })
   );
 
-  // ── 전체 읽음 처리 ────────────────────────────────────────────
-  function markAllRead() {
-    memos.filter((m) => !m.isRead).forEach((m) => { m.isRead = true; });
+  // ── 유틸 ──────────────────────────────────────────────────────
+  function getClientName(clientId: string): string {
+    return clients.find((c) => c.id === clientId)?.name ?? '알 수 없음';
   }
 
-  // ── 날짜 포맷 ─────────────────────────────────────────────────
   function formatDate(iso: string): string {
     const d = new Date(iso);
     const yyyy = d.getFullYear();
@@ -59,34 +32,26 @@
     return `${yyyy}.${mm}.${dd} ${hh}:${min}`;
   }
 
-  // ── 거래처 이름 조회 ──────────────────────────────────────────
-  function getClientName(clientId: string): string {
-    return clients.find((c) => c.id === clientId)?.name ?? '알 수 없음';
-  }
-
-  // ── 삭제 확인 ─────────────────────────────────────────────────
-  function handleDelete(memo: ClientMemo) {
-    if (confirm('이 메모를 삭제하시겠습니까?')) {
-      memos = memos.filter((m) => m.id !== memo.id);
-    }
+  function truncate(text: string, len = 30): string {
+    return text.length > len ? text.slice(0, len) + '…' : text;
   }
 </script>
 
-<div class="px-8 py-6 min-h-full bg-base-200">
+<div class="min-h-screen bg-base-200 px-8 py-6 overflow-y-auto">
 
-  <!-- ── 상단 헤더 ──────────────────────────────────────────── -->
+  <!-- ── 헤더 ──────────────────────────────────────────────── -->
   <div class="flex items-center justify-between mb-6">
     <div class="flex items-center gap-3">
       <h2 class="text-xl font-extrabold text-base-content">메모 확인</h2>
-      {#if unreadMemoCount > 0}
-        <div class="badge badge-primary font-bold">{unreadMemoCount}</div>
+      {#if unreadCount > 0}
+        <div class="badge badge-primary font-bold">{unreadCount}</div>
       {/if}
     </div>
 
     <button
       class="btn btn-primary btn-sm"
-      disabled={unreadMemoCount === 0}
-      onclick={markAllRead}
+      disabled={unreadCount === 0}
+      onclick={() => memoStore.markAllRead()}
     >
       전체 읽음 처리
     </button>
@@ -96,7 +61,7 @@
   <div class="card bg-base-100 shadow-sm mb-5">
     <div class="card-body px-5 py-4 flex flex-row flex-wrap items-center gap-4">
 
-      <!-- 상태 필터 -->
+      <!-- 상태 탭 -->
       <div class="flex items-center gap-1.5">
         <span class="text-xs font-bold text-base-content/50 mr-1">상태</span>
         {#each ([
@@ -113,13 +78,10 @@
         {/each}
       </div>
 
-      <!-- 거래처 필터 -->
+      <!-- 거래처 select -->
       <div class="flex items-center gap-2 ml-auto">
         <span class="text-xs font-bold text-base-content/50">거래처</span>
-        <select
-          class="select select-bordered select-sm"
-          bind:value={clientFilter}
-        >
+        <select class="select select-bordered select-sm" bind:value={clientFilter}>
           <option value="all">전체</option>
           {#each clients as client (client.id)}
             <option value={client.id}>{client.name}</option>
@@ -130,62 +92,68 @@
     </div>
   </div>
 
-  <!-- ── 메모 카드 그리드 ───────────────────────────────────── -->
-  {#if filteredMemos.length === 0}
-    <div class="flex flex-col items-center justify-center py-24 text-base-content/40">
-      <span class="text-5xl mb-4">💬</span>
-      <p class="text-base font-semibold">메모가 없습니다.</p>
-    </div>
-  {:else}
-    <div class="grid grid-cols-2 gap-4">
-      {#each filteredMemos as memo (memo.id)}
-        {@const clientName = getClientName(memo.clientId)}
-        <div
-          class="card shadow-sm flex flex-col transition-all
-            {memo.isRead
-              ? 'bg-base-100 opacity-75'
-              : 'bg-primary/10 border border-primary/30'}"
-        >
-          <!-- 카드 헤더 -->
-          <div class="flex items-center gap-2 px-5 pt-4 pb-2">
-            <span class="font-bold text-base-content text-sm">{clientName}</span>
-            {#if !memo.isRead}
-              <div class="badge badge-primary ml-auto text-[11px] font-extrabold tracking-wide">NEW</div>
-            {/if}
-          </div>
-
-          <!-- 내용 -->
-          <div class="px-5 py-2 flex-1">
-            <p class="text-sm text-base-content/80 leading-relaxed overflow-auto max-h-24 whitespace-pre-wrap break-words">
-              {memo.content}
-            </p>
-          </div>
-
-          <!-- 카드 푸터 -->
-          <div class="flex items-center gap-2 px-5 pb-4 pt-3 border-t border-base-200 mt-2">
-            <span class="text-xs text-base-content/40 flex-1">{formatDate(memo.createdAt)}</span>
-
-            {#if !memo.isRead}
-              <button
-                class="btn btn-primary btn-sm"
-                onclick={() => { const m = memos.find((x) => x.id === memo.id); if (m) m.isRead = true; }}
+  <!-- ── 게시판 테이블 ──────────────────────────────────────── -->
+  <div class="card bg-base-100 shadow-sm overflow-hidden">
+    {#if filteredMemos.length === 0}
+      <div class="flex flex-col items-center justify-center py-24 text-base-content/40">
+        <span class="text-5xl mb-4">💬</span>
+        <p class="text-base font-semibold">메모가 없습니다.</p>
+      </div>
+    {:else}
+      <div class="overflow-x-auto">
+        <table class="table table-zebra w-full">
+          <thead>
+            <tr class="text-base-content/60 text-sm">
+              <th class="w-14 text-center">번호</th>
+              <th class="w-32">거래처명</th>
+              <th>제목</th>
+              <th class="w-40">날짜</th>
+              <th class="w-20 text-center">읽음</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each filteredMemos as memo, i (memo.id)}
+              {@const clientName = getClientName(memo.clientId)}
+              <tr
+                class="cursor-pointer hover:bg-base-200 transition-colors
+                  {memo.isRead ? 'opacity-50' : ''}"
+                onclick={() => { window.location.href = `/memos/${memo.id}`; }}
               >
-                읽음처리
-              </button>
-            {:else}
-              <span class="text-xs text-base-content/40 font-medium px-3 py-1.5">읽음</span>
-            {/if}
+                <!-- 번호 -->
+                <td class="text-center text-sm text-base-content/50">{filteredMemos.length - i}</td>
 
-            <button
-              class="btn btn-error btn-sm btn-ghost"
-              onclick={() => handleDelete(memo)}
-            >
-              삭제
-            </button>
-          </div>
-        </div>
-      {/each}
-    </div>
-  {/if}
+                <!-- 거래처명 -->
+                <td class="text-sm {!memo.isRead ? 'font-bold text-base-content' : 'text-base-content/70'}">
+                  {clientName}
+                </td>
+
+                <!-- 제목 (내용 앞 30자) -->
+                <td class="text-sm {!memo.isRead ? 'font-bold text-base-content' : 'text-base-content/70'}">
+                  <div class="flex items-center gap-2">
+                    {truncate(memo.title || memo.content, 30)}
+                    {#if !memo.isRead}
+                      <span class="badge badge-primary badge-sm font-extrabold tracking-wide">NEW</span>
+                    {/if}
+                  </div>
+                </td>
+
+                <!-- 날짜 -->
+                <td class="text-xs text-base-content/50">{formatDate(memo.createdAt)}</td>
+
+                <!-- 읽음 여부 -->
+                <td class="text-center">
+                  {#if memo.isRead}
+                    <span class="text-xs text-base-content/40">읽음</span>
+                  {:else}
+                    <span class="inline-block w-2 h-2 rounded-full bg-primary"></span>
+                  {/if}
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+    {/if}
+  </div>
 
 </div>
