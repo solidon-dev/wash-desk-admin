@@ -863,7 +863,7 @@
     class="modal modal-open"
     onkeydown={(e) => e.key === 'Escape' && (showClientModal = false)}
   >
-    <div class="modal-box flex w-full max-w-sm flex-col overflow-hidden p-0" style="max-height: min(560px, 90vh);">
+    <div class="modal-box flex w-full max-w-2xl flex-col overflow-hidden p-0" style="max-height: min(600px, 90vh);">
       <!-- header -->
       <div class="flex shrink-0 items-center justify-between border-b border-base-200 px-5 py-4">
         <h3 class="text-base font-bold">거래처 선택</h3>
@@ -876,7 +876,7 @@
         </button>
       </div>
       <!-- search -->
-      <div class="shrink-0 px-4 py-3">
+      <div class="shrink-0 px-4 py-3 border-b border-base-200">
         <label class="input input-sm w-full flex items-center gap-2">
           <Icon icon="lucide:search" class="h-4 w-4 opacity-50" />
           <input
@@ -888,30 +888,23 @@
         </label>
       </div>
       <!-- list -->
-      <ul class="menu min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+      <div class="min-h-0 flex-1 overflow-y-auto">
         {#if filteredClients.length === 0}
-          <li class="py-10 text-center text-sm opacity-50"><span class="pointer-events-none">검색 결과 없음</span></li>
+          <p class="py-10 text-center text-sm opacity-50">검색 결과 없음</p>
         {:else}
           {#each filteredClients as client (client.id)}
-            <li>
-              <button
-                onclick={() => handleSelectClient(client.id)}
-                class="flex w-full items-center gap-3 {selectedClientId === client.id ? 'active' : ''}"
-              >
-                <span
-                  class="badge badge-sm font-bold {typeBadge[client.type] ?? 'bg-base-200 text-base-content'}"
-                >
-                  {typeLabel[client.type] ?? client.type}
-                </span>
-                <span class="min-w-0 flex-1 truncate text-sm font-medium">{client.name}</span>
-                {#if selectedClientId === client.id}
-                  <Icon icon="lucide:check" class="h-4 w-4 shrink-0 text-primary" />
-                {/if}
-              </button>
-            </li>
+            <button
+              onclick={() => handleSelectClient(client.id)}
+              class="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-base-200 {selectedClientId === client.id ? 'bg-primary/10 font-semibold text-primary' : ''}"
+            >
+              <span class="min-w-0 flex-1 truncate text-sm">{client.name}</span>
+              {#if selectedClientId === client.id}
+                <Icon icon="lucide:check" class="h-4 w-4 shrink-0 text-primary" />
+              {/if}
+            </button>
           {/each}
         {/if}
-      </ul>
+      </div>
     </div>
     <div class="modal-backdrop" role="button" tabindex="-1" onclick={() => (showClientModal = false)} onkeydown={(e) => e.key === 'Escape' && (showClientModal = false)}></div>
   </dialog>
