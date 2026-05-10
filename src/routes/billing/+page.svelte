@@ -1721,7 +1721,7 @@
 
 <!-- ═══════════════ 청구서 저장 확인 모달 ═══════════════ -->
 {#if showSaveConfirm}
-	<dialog class="modal modal-open" role="dialog" aria-modal="true">
+	<dialog class="modal modal-open" aria-modal="true">
 		<div class="modal-box w-full max-w-sm">
 			<h3 class="mb-2 text-base font-extrabold">청구서 저장</h3>
 			<p class="mb-1 text-sm">
@@ -1744,7 +1744,7 @@
 <!-- ═══════════════ 저장된 청구서 열람 모달 ═══════════════ -->
 {#if viewingInvoice}
 	{@const inv = viewingInvoice}
-	<dialog class="modal modal-open" role="dialog" aria-modal="true"
+	<dialog class="modal modal-open" aria-modal="true"
 		onkeydown={(e) => { if (e.key === 'Escape') viewingInvoiceId = null; }}>
 		<div class="modal-box max-h-[90vh] w-full max-w-2xl overflow-y-auto">
 			<div class="flex items-center justify-between mb-4">
@@ -1822,7 +1822,7 @@
 
 <!-- ═══════════════ 계약기간 모달 ═══════════════ -->
 {#if showContractModal}
-	<dialog class="modal modal-open" role="dialog" aria-modal="true">
+	<dialog class="modal modal-open" aria-modal="true">
 		<div class="modal-box w-full max-w-sm">
 			<h3 class="mb-4 text-base font-extrabold">
 				{editingContractId ? '계약기간 수정' : '계약기간 추가'}
