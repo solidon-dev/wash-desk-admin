@@ -745,17 +745,28 @@
     }
   }
 
+  // 새 행 유효성 (submit 시도 후 빨간줄 표시)
+  let newRowSubmitTried = $state(false);
+
+  $effect(() => {
+    void selectedClientId; void effectiveCat;
+    newRowSubmitTried = false;
+  });
+
+  const newRowNameOk    = $derived(newName.trim().length > 0);
+  const newRowPriceOk   = $derived(/^[0-9]+$/.test(newPrice.trim()) && parseInt(newPrice.trim(), 10) > 0);
+  const newRowDateOk    = $derived(isValidDate(newPriceDate));
+
   async function addItemAndContinue() {
+    newRowSubmitTried = true;
     const name  = newName.trim();
-    if (!name || !selectedClientId || !effectiveCat) {
-      return;
-    }
-    const price = parseInt(newPrice.replace(/[^0-9]/g, ''), 10) || 0;
+    if (!name || !selectedClientId || !effectiveCat) return;
+    if (!newRowPriceOk || !newRowDateOk) return;
+    const price = parseInt(newPrice.trim(), 10);
     const added = addLaundryItemType(selectedClientId, effectiveCat, name);
     if (added) {
-      if (price > 0) setClientItemPrice(selectedClientId, effectiveCat, name, price);
-      const priceDate = newPriceDate.trim();
-      if (priceDate) setPriceEffectiveDate(selectedClientId, effectiveCat, name, priceDate);
+      setClientItemPrice(selectedClientId, effectiveCat, name, price);
+      setPriceEffectiveDate(selectedClientId, effectiveCat, name, newPriceDate);
       const alias = newAlias.trim();
       const cn    = newCn.trim();
       const en    = newEn.trim();
@@ -768,14 +779,14 @@
       }
     }
     localCats = localCats.filter(c => c !== effectiveCat);
-    newName      = '';
-    newAlias     = '';
-    newCn        = '';
-    newEn        = '';
-    newPriceDate = todayYMD();
-    newPrice     = '';
+    newName           = '';
+    newAlias          = '';
+    newCn             = '';
+    newEn             = '';
+    newPriceDate      = todayYMD();
+    newPrice          = '';
+    newRowSubmitTried = false;
     await tick();
-    // 추가 후 새 빈 행으로 포커스
     moveFocus(getNewRowIndex(), 0);
   }
 
@@ -1079,7 +1090,7 @@
         </div>
       </div>
 
-      <ul class="menu menu-sm bg-base-100 flex-1 min-h-0 overflow-y-auto py-1 flex-nowrap">
+      <ul class="flex-1 min-h-0 overflow-y-auto py-1 flex flex-col gap-0.5 px-1">
         {#if allCategories.length === 0}
           <li class="px-4 py-8 text-center text-xs opacity-40 pointer-events-none">
             <span>카테고리를<br/>추가해주세요</span>
@@ -1090,9 +1101,9 @@
             <li class="group relative">
               <button
                 onclick={() => (selectedCategory = cat)}
-                class="w-full {isActive ? 'active font-bold' : 'font-medium'}"
+                class="w-full flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors {isActive ? 'bg-primary text-primary-content font-bold' : 'hover:bg-base-200'}"
               >
-                <span class="min-w-0 flex-1 truncate">{catLabel(cat)}</span>
+                <span class="min-w-0 flex-1 truncate text-left">{catLabel(cat)}</span>
               </button>
               <button
                 onclick={() => requestRemoveCategory(cat)}
@@ -1226,7 +1237,7 @@
                       type="text"
                       inputmode="numeric"
                       value={getDisplayPrice(item)}
-                      oninput={(e) => { priceDrafts[item.id] = e.currentTarget.value; }}
+                      oninput={(e) => { const v = e.currentTarget.value.replace(/[^0-9]/g, ''); priceDrafts[item.id] = v; e.currentTarget.value = v; }}
                       onfocus={() => onCellFocus(i, 1)}
                       onblur={() => commitPrice(item.id, item.name)}
                       onkeydown={(e) => handleCellKeydown(e, i, 1)}
@@ -1320,7 +1331,7 @@
               <tr class="border-b border-dashed border-base-300 transition-colors {isNewRowActive ? 'bg-success/5' : 'hover:bg-base-200/30'}">
                 <!-- 행 번호 (별표) -->
                 <td class="w-8 px-2 py-0 text-center text-[11px] opacity-20 select-none">
-                  ✦
+                  ✶
                 </td>
 
                 <!-- 새 품목명 -->
@@ -1333,22 +1344,29 @@
                     onblur={() => { if (activeRow === newRowIdx) activeRow = null; }}
                     onkeydown={(e) => handleCellKeydown(e, newRowIdx, 0)}
                     placeholder="새 품목명..."
-                    class="w-full px-3 py-2.5 bg-transparent border-2 border-transparent rounded outline-none focus:border-success focus:bg-base-100 focus:shadow-sm placeholder:opacity-30 transition-all duration-75"
+                    class="w-full px-3 py-2.5 bg-transparent border-2 rounded outline-none transition-all duration-75 placeholder:opacity-30
+                      {newRowSubmitTried && !newRowNameOk
+                        ? 'border-error/60 bg-error/5 focus:border-error'
+                        : 'border-transparent focus:border-success focus:bg-base-100 focus:shadow-sm'}"
                   />
                 </td>
 
-                <!-- 새 단가 -->
+                <!-- 새 단가 (숫자만) -->
                 <td class="p-0 w-28">
                   <input
                     id="cell-{newRowIdx}-1"
                     type="text"
                     inputmode="numeric"
                     bind:value={newPrice}
+                    oninput={(e) => { newPrice = e.currentTarget.value.replace(/[^0-9]/g, ''); e.currentTarget.value = newPrice; }}
                     onfocus={() => { activeRow = newRowIdx; }}
                     onblur={() => { if (activeRow === newRowIdx) activeRow = null; }}
                     onkeydown={(e) => handleCellKeydown(e, newRowIdx, 1)}
                     placeholder="단가"
-                    class="w-full px-3 py-2.5 text-right bg-transparent border-2 border-transparent rounded outline-none focus:border-success focus:bg-base-100 focus:shadow-sm placeholder:opacity-30 transition-all duration-75"
+                    class="w-full px-3 py-2.5 text-right bg-transparent border-2 rounded outline-none transition-all duration-75 placeholder:opacity-30
+                      {newRowSubmitTried && !newRowPriceOk
+                        ? 'border-error/60 bg-error/5 focus:border-error'
+                        : 'border-transparent focus:border-success focus:bg-base-100 focus:shadow-sm'}"
                   />
                 </td>
 
@@ -1394,7 +1412,7 @@
                   />
                 </td>
 
-                <!-- 새 행 가격적용시기 -->
+                <!-- 새 행 가격적용시기 (실시간 대시 삽입, 실활) -->
                 <td class="p-0 w-36">
                   <input
                     id="cell-{newRowIdx}-5"
@@ -1409,7 +1427,10 @@
                     onblur={() => { if (activeRow === newRowIdx) activeRow = null; }}
                     onkeydown={(e) => handleCellKeydown(e, newRowIdx, 5)}
                     placeholder="YYYY-MM-DD"
-                    class="w-full px-3 py-2.5 text-center font-mono text-sm bg-transparent border-2 border-transparent rounded outline-none focus:border-success focus:bg-base-100 focus:shadow-sm placeholder:opacity-30 transition-all duration-75"
+                    class="w-full px-3 py-2.5 text-center font-mono text-sm bg-transparent border-2 rounded outline-none transition-all duration-75 placeholder:opacity-30
+                      {newRowSubmitTried && !newRowDateOk
+                        ? 'border-error/60 bg-error/5 focus:border-error'
+                        : 'border-transparent focus:border-success focus:bg-base-100 focus:shadow-sm'}"
                   />
                 </td>
 
