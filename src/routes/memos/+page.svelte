@@ -17,7 +17,7 @@
   );
 
   // ── 필터 ────────────────────────────────────────────────────
-  let statusFilter = $state<'all' | 'unread' | 'read'>('all');
+  let statusFilter = $state<'all' | 'unread' | 'read'>('unread');
   let clientFilter = $state<string>('all');
 
   // ── 파생값 ──────────────────────────────────────────────────
@@ -34,7 +34,7 @@
   );
 
   // ── 페이지네이션 ─────────────────────────────────────────────
-  const PAGE_SIZE = 10;
+  const PAGE_SIZE = 5;
   let currentPage = $state(1);
   $effect(() => { filteredMemos; currentPage = 1; });
 
