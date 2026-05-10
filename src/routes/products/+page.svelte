@@ -1152,16 +1152,16 @@
             <p class="text-sm opacity-40">카테고리를 추가해주세요.</p>
           </div>
         {:else}
-          <table class="border-collapse" style="table-layout:fixed; width:100%; min-width:833px;">
+          <table class="border-collapse" style="table-layout:fixed; width:100%;">
             <colgroup>
-              <col style="width:36px" />
-              <col />
-              <col style="width:110px" />
-              <col style="width:110px" />
-              <col style="width:120px" />
-              <col style="width:120px" />
-              <col style="width:140px" />
-              <col style="width:36px" />
+              <col style="width:4%" />
+              <col style="width:16%" />
+              <col style="width:13%" />
+              <col style="width:13%" />
+              <col style="width:16%" />
+              <col style="width:16%" />
+              <col style="width:18%" />
+              <col style="width:4%" />
             </colgroup>
             <!-- 컬럼 헤더 -->
             <thead class="sticky top-0 z-10">
@@ -1196,8 +1196,8 @@
                     {isDragSrc  ? 'opacity-40' : ''}
                     {isDragOver ? 'ring-2 ring-inset ring-primary bg-primary/10' : ''}"
                 >
-                  <!-- 행 번호: 더블클릭 편집 / 드래그 핸들 -->
-                  <td class="w-8 px-2 py-0 text-center select-none">
+                  <!-- 행 번호 -->
+                  <td class="h-9 border-b border-r border-base-200 px-2 text-center select-none">
                     {#if editingOrderRow === i}
                       <input
                         id="order-input-{i}"
@@ -1210,7 +1210,7 @@
                           if (e.key === 'Escape') { e.preventDefault(); cancelOrderEdit(); }
                         }}
                         onblur={() => commitOrderEdit(i)}
-                        class="w-8 text-center text-xs font-bold bg-primary/10 border border-primary rounded outline-none text-primary [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                        class="w-full text-center text-xs font-bold bg-primary/10 border border-primary rounded outline-none text-primary [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                       />
                     {:else}
                       <span
@@ -1220,14 +1220,12 @@
                         title="드래그하거나 더블클릭으로 순번 변경"
                         ondblclick={() => startOrderEdit(i)}
                         onkeydown={(e) => e.key === 'Enter' && startOrderEdit(i)}
-                      >
-                        {i + 1}
-                      </span>
+                      >{i + 1}</span>
                     {/if}
                   </td>
 
-                  <!-- 품목명 셀 -->
-                  <td class="p-0 min-w-[120px]">
+                  <!-- 품목명 -->
+                  <td class="h-9 p-0 border-b border-r border-base-200">
                     <input
                       id="cell-{i}-0"
                       type="text"
@@ -1236,12 +1234,12 @@
                       onfocus={() => onCellFocus(i, 0)}
                       onblur={() => commitName(item.id, item.name)}
                       onkeydown={(e) => handleCellKeydown(e, i, 0)}
-                      class="w-full px-3 py-2.5 bg-transparent font-medium border-2 border-transparent rounded outline-none focus:border-primary focus:bg-base-100 focus:shadow-sm transition-all duration-75"
+                      class="w-full h-full px-3 bg-transparent font-medium outline-none focus:bg-primary/5 transition-colors duration-75"
                     />
                   </td>
 
-                  <!-- 단가 셀 -->
-                  <td class="p-0 w-28">
+                  <!-- 단가 -->
+                  <td class="h-9 p-0 border-b border-r border-base-200">
                     <input
                       id="cell-{i}-1"
                       type="text"
@@ -1252,12 +1250,12 @@
                       onblur={() => commitPrice(item.id, item.name)}
                       onkeydown={(e) => handleCellKeydown(e, i, 1)}
                       placeholder="—"
-                      class="w-full px-3 py-2.5 text-right bg-transparent border-2 border-transparent rounded outline-none focus:border-primary focus:bg-base-100 focus:shadow-sm placeholder:opacity-20 transition-all duration-75"
+                      class="w-full h-full px-3 text-right bg-transparent outline-none focus:bg-primary/5 placeholder:opacity-30 transition-colors duration-75"
                     />
                   </td>
 
-                  <!-- 별칭 셀 -->
-                  <td class="p-0 min-w-[100px]">
+                  <!-- 별칭 -->
+                  <td class="h-9 p-0 border-b border-r border-base-200">
                     <input
                       id="cell-{i}-2"
                       type="text"
@@ -1267,12 +1265,12 @@
                       onblur={() => commitAlias(item.id)}
                       onkeydown={(e) => handleCellKeydown(e, i, 2)}
                       placeholder="—"
-                      class="w-full px-3 py-2.5 bg-transparent border-2 border-transparent rounded outline-none focus:border-primary focus:bg-base-100 focus:shadow-sm placeholder:opacity-20 transition-all duration-75"
+                      class="w-full h-full px-3 bg-transparent outline-none focus:bg-primary/5 placeholder:opacity-30 transition-colors duration-75"
                     />
                   </td>
 
-                  <!-- 중국어 셀 -->
-                  <td class="p-0 min-w-[110px]">
+                  <!-- 중국어 -->
+                  <td class="h-9 p-0 border-b border-r border-base-200">
                     <input
                       id="cell-{i}-3"
                       type="text"
@@ -1282,12 +1280,12 @@
                       onblur={() => commitCn(item.id)}
                       onkeydown={(e) => handleCellKeydown(e, i, 3)}
                       placeholder="—"
-                      class="w-full px-3 py-2.5 bg-transparent border-2 border-transparent rounded outline-none focus:border-primary focus:bg-base-100 focus:shadow-sm placeholder:opacity-20 transition-all duration-75"
+                      class="w-full h-full px-3 bg-transparent outline-none focus:bg-primary/5 placeholder:opacity-30 transition-colors duration-75"
                     />
                   </td>
 
-                  <!-- 영어 셀 -->
-                  <td class="p-0 min-w-[110px]">
+                  <!-- 영어 -->
+                  <td class="h-9 p-0 border-b border-r border-base-200">
                     <input
                       id="cell-{i}-4"
                       type="text"
@@ -1297,12 +1295,12 @@
                       onblur={() => commitEn(item.id)}
                       onkeydown={(e) => handleCellKeydown(e, i, 4)}
                       placeholder="—"
-                      class="w-full px-3 py-2.5 bg-transparent border-2 border-transparent rounded outline-none focus:border-primary focus:bg-base-100 focus:shadow-sm placeholder:opacity-20 transition-all duration-75"
+                      class="w-full h-full px-3 bg-transparent outline-none focus:bg-primary/5 placeholder:opacity-30 transition-colors duration-75"
                     />
                   </td>
 
-                  <!-- 가격적용시기 셀 (인라인 텍스트 입력) -->
-                  <td class="p-0 w-36">
+                  <!-- 가격적용시기 -->
+                  <td class="h-9 p-0 border-b border-r border-base-200">
                     <input
                       id="cell-{i}-5"
                       type="text"
@@ -1316,12 +1314,13 @@
                       onblur={() => commitDate(item.id, item.name)}
                       onkeydown={(e) => handleCellKeydown(e, i, 5)}
                       placeholder="YYYY-MM-DD"
-                      class={`w-full px-3 py-2.5 text-center font-mono text-sm bg-transparent border-2 rounded outline-none transition-all duration-75 placeholder:opacity-20 ${(!dateDrafts[item.id] && !getDisplayPriceDate(item)) || isValidDate(dateDrafts[item.id] ?? getDisplayPriceDate(item)) ? 'border-transparent focus:border-primary focus:bg-base-100 focus:shadow-sm' : 'border-error/50 bg-error/5 text-error'}`}
+                      class="w-full h-full px-3 text-center font-mono text-sm bg-transparent outline-none focus:bg-primary/5 placeholder:opacity-30 transition-colors duration-75
+                        {(!dateDrafts[item.id] && !getDisplayPriceDate(item)) || isValidDate(dateDrafts[item.id] ?? getDisplayPriceDate(item)) ? '' : 'bg-error/5 text-error'}"
                     />
                   </td>
 
                   <!-- 삭제 버튼 -->
-                  <td class="w-8 px-2 py-0 text-center">
+                  <td class="h-9 border-b border-base-200 px-1 text-center">
                     <button
                       onclick={() => removeItem(item.id, item.name)}
                       class="btn btn-ghost btn-xs btn-square text-error opacity-0 transition-opacity"
@@ -1338,14 +1337,10 @@
               {#if true}
               {@const newRowIdx = currentItems.length}
               {@const isNewRowActive = activeRow === newRowIdx}
-              <tr class="border-b border-dashed border-base-300 transition-colors {isNewRowActive ? 'bg-success/5' : 'hover:bg-base-200/30'}">
-                <!-- 행 번호 (별표) -->
-                <td class="w-8 px-2 py-0 text-center text-[11px] opacity-20 select-none">
-                  ✶
-                </td>
+              <tr class="transition-colors {isNewRowActive ? 'bg-success/5' : 'hover:bg-base-200/30'}">
+                <td class="h-9 border-b border-dashed border-r border-base-300 px-2 text-center text-[11px] opacity-30 select-none">✶</td>
 
-                <!-- 새 품목명 -->
-                <td class="p-0 min-w-[120px]">
+                <td class="h-9 p-0 border-b border-dashed border-r border-base-300">
                   <input
                     id="cell-{newRowIdx}-0"
                     type="text"
@@ -1354,15 +1349,12 @@
                     onblur={() => { if (activeRow === newRowIdx) activeRow = null; }}
                     onkeydown={(e) => handleCellKeydown(e, newRowIdx, 0)}
                     placeholder="새 품목명..."
-                    class="w-full px-3 py-2.5 bg-transparent border-2 rounded outline-none transition-all duration-75 placeholder:opacity-30
-                      {newRowSubmitTried && !newRowNameOk
-                        ? 'border-error/60 bg-error/5 focus:border-error'
-                        : 'border-transparent focus:border-success focus:bg-base-100 focus:shadow-sm'}"
+                    class="w-full h-full px-3 bg-transparent outline-none placeholder:opacity-30 transition-colors duration-75
+                      {newRowSubmitTried && !newRowNameOk ? 'bg-error/5 text-error placeholder:text-error' : 'focus:bg-success/5'}"
                   />
                 </td>
 
-                <!-- 새 단가 (숫자만) -->
-                <td class="p-0 w-28">
+                <td class="h-9 p-0 border-b border-dashed border-r border-base-300">
                   <input
                     id="cell-{newRowIdx}-1"
                     type="text"
@@ -1373,15 +1365,12 @@
                     onblur={() => { if (activeRow === newRowIdx) activeRow = null; }}
                     onkeydown={(e) => handleCellKeydown(e, newRowIdx, 1)}
                     placeholder="단가"
-                    class="w-full px-3 py-2.5 text-right bg-transparent border-2 rounded outline-none transition-all duration-75 placeholder:opacity-30
-                      {newRowSubmitTried && !newRowPriceOk
-                        ? 'border-error/60 bg-error/5 focus:border-error'
-                        : 'border-transparent focus:border-success focus:bg-base-100 focus:shadow-sm'}"
+                    class="w-full h-full px-3 text-right bg-transparent outline-none placeholder:opacity-30 transition-colors duration-75
+                      {newRowSubmitTried && !newRowPriceOk ? 'bg-error/5 text-error' : 'focus:bg-success/5'}"
                   />
                 </td>
 
-                <!-- 새 행 별칭 -->
-                <td class="p-0 min-w-[100px]">
+                <td class="h-9 p-0 border-b border-dashed border-r border-base-300">
                   <input
                     id="cell-{newRowIdx}-2"
                     type="text"
@@ -1390,12 +1379,11 @@
                     onblur={() => { if (activeRow === newRowIdx) activeRow = null; }}
                     onkeydown={(e) => handleCellKeydown(e, newRowIdx, 2)}
                     placeholder="—"
-                    class="w-full px-3 py-2.5 bg-transparent border-2 border-transparent rounded outline-none focus:border-success focus:bg-base-100 focus:shadow-sm placeholder:opacity-30 transition-all duration-75"
+                    class="w-full h-full px-3 bg-transparent outline-none focus:bg-success/5 placeholder:opacity-30 transition-colors duration-75"
                   />
                 </td>
 
-                <!-- 새 행 중국어 -->
-                <td class="p-0 min-w-[110px]">
+                <td class="h-9 p-0 border-b border-dashed border-r border-base-300">
                   <input
                     id="cell-{newRowIdx}-3"
                     type="text"
@@ -1404,12 +1392,11 @@
                     onblur={() => { if (activeRow === newRowIdx) activeRow = null; }}
                     onkeydown={(e) => handleCellKeydown(e, newRowIdx, 3)}
                     placeholder="—"
-                    class="w-full px-3 py-2.5 bg-transparent border-2 border-transparent rounded outline-none focus:border-success focus:bg-base-100 focus:shadow-sm placeholder:opacity-30 transition-all duration-75"
+                    class="w-full h-full px-3 bg-transparent outline-none focus:bg-success/5 placeholder:opacity-30 transition-colors duration-75"
                   />
                 </td>
 
-                <!-- 새 행 영어 -->
-                <td class="p-0 min-w-[110px]">
+                <td class="h-9 p-0 border-b border-dashed border-r border-base-300">
                   <input
                     id="cell-{newRowIdx}-4"
                     type="text"
@@ -1418,34 +1405,27 @@
                     onblur={() => { if (activeRow === newRowIdx) activeRow = null; }}
                     onkeydown={(e) => handleCellKeydown(e, newRowIdx, 4)}
                     placeholder="—"
-                    class="w-full px-3 py-2.5 bg-transparent border-2 border-transparent rounded outline-none focus:border-success focus:bg-base-100 focus:shadow-sm placeholder:opacity-30 transition-all duration-75"
+                    class="w-full h-full px-3 bg-transparent outline-none focus:bg-success/5 placeholder:opacity-30 transition-colors duration-75"
                   />
                 </td>
 
-                <!-- 새 행 가격적용시기 (실시간 대시 삽입, 실활) -->
-                <td class="p-0 w-36">
+                <td class="h-9 p-0 border-b border-dashed border-r border-base-300">
                   <input
                     id="cell-{newRowIdx}-5"
                     type="text"
                     inputmode="numeric"
                     value={newPriceDate}
-                    oninput={(e) => {
-                      newPriceDate = formatDateInput(e.currentTarget.value);
-                      e.currentTarget.value = newPriceDate;
-                    }}
+                    oninput={(e) => { newPriceDate = formatDateInput(e.currentTarget.value); e.currentTarget.value = newPriceDate; }}
                     onfocus={() => { activeRow = newRowIdx; }}
                     onblur={() => { if (activeRow === newRowIdx) activeRow = null; }}
                     onkeydown={(e) => handleCellKeydown(e, newRowIdx, 5)}
                     placeholder="YYYY-MM-DD"
-                    class="w-full px-3 py-2.5 text-center font-mono text-sm bg-transparent border-2 rounded outline-none transition-all duration-75 placeholder:opacity-30
-                      {newRowSubmitTried && !newRowDateOk
-                        ? 'border-error/60 bg-error/5 focus:border-error'
-                        : 'border-transparent focus:border-success focus:bg-base-100 focus:shadow-sm'}"
+                    class="w-full h-full px-3 text-center font-mono text-sm bg-transparent outline-none placeholder:opacity-30 transition-colors duration-75
+                      {newRowSubmitTried && !newRowDateOk ? 'bg-error/5 text-error' : 'focus:bg-success/5'}"
                   />
                 </td>
 
-                <!-- 추가 버튼 (품목명이 있을 때만) -->
-                <td class="w-8 px-2 py-0 text-center">
+                <td class="h-9 border-b border-dashed border-base-300 px-1 text-center">
                   {#if newName.trim()}
                     <button
                       onclick={() => addItemAndContinue()}
@@ -1510,16 +1490,11 @@
 {/if}
 
 <style>
-  /* 삭제 버튼: tr에 group이 없어서 table row hover 이벤트로 처리 */
   tr:hover button[title="품목 삭제"] {
     opacity: 1;
   }
-
-  thead tr th {
-    letter-spacing: 0.06em;
-  }
-
-  tbody tr {
-    border-bottom: 1px solid #e2e8f0;
+  td:has(> input:focus) {
+    outline: 2px solid hsl(var(--p) / 0.6);
+    outline-offset: -2px;
   }
 </style>
