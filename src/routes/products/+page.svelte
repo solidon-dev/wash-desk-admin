@@ -1142,7 +1142,7 @@
       </div>
 
       <!-- 테이블 -->
-      <div class="flex-1 min-h-0 overflow-y-auto">
+      <div class="flex-1 min-h-0 overflow-y-auto overflow-x-auto">
         {#if !selectedClientId}
           <div class="flex h-full items-center justify-center">
             <p class="text-sm opacity-40">거래처를 선택해주세요.</p>
@@ -1152,18 +1152,28 @@
             <p class="text-sm opacity-40">카테고리를 추가해주세요.</p>
           </div>
         {:else}
-          <table class="table table-xs w-full border-collapse">
+          <table class="border-collapse" style="table-layout:fixed; width:100%; min-width:833px;">
+            <colgroup>
+              <col style="width:36px" />
+              <col />
+              <col style="width:110px" />
+              <col style="width:110px" />
+              <col style="width:120px" />
+              <col style="width:120px" />
+              <col style="width:140px" />
+              <col style="width:36px" />
+            </colgroup>
             <!-- 컬럼 헤더 -->
             <thead class="sticky top-0 z-10">
-              <tr class="border-b-2 border-base-300 bg-base-200">
-                <th class="w-8 px-2 py-2.5 text-center text-[11px] font-bold uppercase tracking-wide opacity-60 select-none">#</th>
-                <th class="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wide opacity-60 min-w-[120px]">품목명</th>
-                <th class="w-28 px-3 py-2.5 text-right text-[11px] font-bold uppercase tracking-wide opacity-60">단가 (원)</th>
-                <th class="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wide opacity-60 min-w-[100px]">별칭</th>
-                <th class="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wide opacity-60 min-w-[110px]">중국어</th>
-                <th class="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wide opacity-60 min-w-[110px]">영어</th>
-                <th class="w-36 px-3 py-2.5 text-center text-[11px] font-bold uppercase tracking-wide opacity-60">가격적용시기</th>
-                <th class="w-8 px-2 py-2.5"></th>
+              <tr class="bg-base-200">
+                <th class="h-9 px-2 text-center text-[11px] font-bold uppercase tracking-wide opacity-60 select-none border-b-2 border-r border-base-300">#</th>
+                <th class="h-9 px-3 text-left text-[11px] font-bold uppercase tracking-wide opacity-60 border-b-2 border-r border-base-300">품목명</th>
+                <th class="h-9 px-3 text-right text-[11px] font-bold uppercase tracking-wide opacity-60 border-b-2 border-r border-base-300">단가 (원)</th>
+                <th class="h-9 px-3 text-left text-[11px] font-bold uppercase tracking-wide opacity-60 border-b-2 border-r border-base-300">별칭</th>
+                <th class="h-9 px-3 text-left text-[11px] font-bold uppercase tracking-wide opacity-60 border-b-2 border-r border-base-300">중국어</th>
+                <th class="h-9 px-3 text-left text-[11px] font-bold uppercase tracking-wide opacity-60 border-b-2 border-r border-base-300">영어</th>
+                <th class="h-9 px-3 text-center text-[11px] font-bold uppercase tracking-wide opacity-60 border-b-2 border-r border-base-300">가격적용시기</th>
+                <th class="h-9 border-b-2 border-base-300"></th>
               </tr>
             </thead>
 
