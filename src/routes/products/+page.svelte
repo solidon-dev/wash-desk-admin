@@ -483,7 +483,7 @@
   let newCn        = $state('');
   let newEn        = $state('');
   let newPriceDate = $state(todayYMD());
-  let newPrice     = $state('');
+  let newPrice     = $state('0');
 
   function resetGrid() {
     activeRow      = null;
@@ -501,11 +501,10 @@
     newCn          = '';
     newEn          = '';
     newPriceDate   = todayYMD();
-    newPrice       = '';
+    newPrice       = '0';
   }
 
   function getNewRowIndex() {
-    return currentItems.length;
   }
 
   async function moveFocus(row: number, col: GridCol) {
@@ -754,7 +753,7 @@
   });
 
   const newRowNameOk    = $derived(newName.trim().length > 0);
-  const newRowPriceOk   = $derived(/^[0-9]+$/.test(newPrice.trim()) && parseInt(newPrice.trim(), 10) > 0);
+  const newRowPriceOk   = $derived(/^[0-9]+$/.test(newPrice.trim()) && parseInt(newPrice.trim(), 10) >= 0);
   const newRowDateOk    = $derived(isValidDate(newPriceDate));
 
   async function addItemAndContinue() {
@@ -784,7 +783,7 @@
     newCn             = '';
     newEn             = '';
     newPriceDate      = todayYMD();
-    newPrice          = '';
+    newPrice          = '0';
     newRowSubmitTried = false;
     await tick();
     moveFocus(getNewRowIndex(), 0);
