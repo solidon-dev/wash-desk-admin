@@ -36,7 +36,7 @@
   // ── 페이지네이션 ─────────────────────────────────────────────
   const PAGE_SIZE = 10;
   let currentPage = $state(1);
-  $effect(() => { filteredMemos; currentPage = 1; });
+  $effect(() => { void filteredMemos; currentPage = 1; });
 
   const totalPages = $derived(Math.max(1, Math.ceil(filteredMemos.length / PAGE_SIZE)));
   const visibleMemos = $derived(

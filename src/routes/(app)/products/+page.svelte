@@ -293,6 +293,87 @@
   let selectedCategory = $state<string | null>(null);
   let localCats        = $state<string[]>([]);
   let newCatInput      = $state('');
+  // 카테고리 순번 맵 (category → order, 1-based)
+  let catOrderMap      = $state<Record<string, number>>({});
+
+  // 카테고리 DnD 상태
+  let catDragSrcIdx    = $state<number | null>(null);
+  let catDragOverIdx   = $state<number | null>(null);
+
+  // 카테고리 순번 직접 편집 상태
+  let editingCatOrderIdx  = $state<number | null>(null);
+  let catOrderInputValue  = $state('');
+
+  function startCatOrderEdit(i: number) {
+    editingCatOrderIdx = i;
+    catOrderInputValue = String(i + 1);
+    tick().then(() => {
+      const el = document.getElementById(`cat-order-input-${i}`) as HTMLInputElement | null;
+      if (el) { el.focus(); el.select(); }
+    });
+  }
+
+  function commitCatOrderEdit(i: number) {
+    const max = allCategories.length;
+    const raw = parseInt(catOrderInputValue, 10);
+    if (!isNaN(raw)) {
+      const to = Math.max(1, Math.min(raw, max)) - 1;
+      if (to !== i) reorderCategories(i, to);
+    }
+    editingCatOrderIdx = null;
+  }
+
+  function cancelCatOrderEdit() {
+    editingCatOrderIdx = null;
+  }
+
+  function reorderCategories(from: number, to: number) {
+    const cats = [...allCategories];
+    const [moved] = cats.splice(from, 1);
+    cats.splice(to, 0, moved);
+    // 순번 맵 재구성
+    const newMap: Record<string, number> = {};
+    cats.forEach((c, idx) => { newMap[c] = idx + 1; });
+    catOrderMap = newMap;
+    // localCats 순서도 맞춤
+    localCats = localCats.filter(c => cats.includes(c)).sort((a, b) => (newMap[a] ?? 999) - (newMap[b] ?? 999));
+    selectedCategory = moved;
+  }
+
+  function onCatDragStart(e: DragEvent, i: number) {
+    catDragSrcIdx = i;
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', String(i));
+    }
+  }
+
+  function onCatDragOver(e: DragEvent, i: number) {
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+    catDragOverIdx = i;
+  }
+
+  function onCatDragLeave(e: DragEvent, i: number) {
+    const related = e.relatedTarget as Node | null;
+    const row = e.currentTarget as HTMLElement;
+    if (related && row.contains(related)) return;
+    if (catDragOverIdx === i) catDragOverIdx = null;
+  }
+
+  function onCatDrop(e: DragEvent, i: number) {
+    e.preventDefault();
+    if (catDragSrcIdx !== null && catDragSrcIdx !== i) {
+      reorderCategories(catDragSrcIdx, i);
+    }
+    catDragSrcIdx  = null;
+    catDragOverIdx = null;
+  }
+
+  function onCatDragEnd() {
+    catDragSrcIdx  = null;
+    catDragOverIdx = null;
+  }
 
   const storeCats = $derived.by(() => {
     if (!selectedClientId) return [] as string[];
@@ -309,6 +390,11 @@
 
   const allCategories = $derived(
     [...storeCats, ...localCats.filter(c => !storeCats.includes(c))]
+      .sort((a, b) => {
+        const oa = catOrderMap[a] ?? 999;
+        const ob = catOrderMap[b] ?? 999;
+        return oa !== ob ? oa - ob : 0;
+      })
   );
 
   const effectiveCat = $derived(
@@ -323,6 +409,7 @@
     selectedCategory = null;
     localCats        = [];
     newCatInput      = '';
+    catOrderMap      = {};
     resetGrid();
   });
 
@@ -1082,22 +1169,68 @@
             <span>카테고리를<br/>추가해주세요</span>
           </li>
         {:else}
-          {#each allCategories as cat (cat)}
-            {@const isActive = effectiveCat === cat}
-            <li class="group relative">
-              <button
-                onclick={() => (selectedCategory = cat)}
-                class="w-full flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors {isActive ? 'bg-primary text-primary-content font-bold' : 'hover:bg-base-200'}"
-              >
-                <span class="min-w-0 flex-1 truncate text-left">{catLabel(cat)}</span>
-              </button>
-              <button
-                onclick={() => requestRemoveCategory(cat)}
-                class="btn btn-ghost btn-xs btn-circle absolute right-1 top-1/2 -translate-y-1/2 hidden text-error group-hover:flex"
-                title="카테고리 삭제"
-              >
-                ×
-              </button>
+          {#each allCategories as cat, ci (cat)}
+            {@const isActive   = effectiveCat === cat}
+            {@const isDragOver = catDragOverIdx === ci}
+            {@const isDragSrc  = catDragSrcIdx  === ci}
+            <li
+              class="group relative transition-all duration-150
+                {isDragOver ? 'ring-2 ring-primary ring-inset rounded-md' : ''}
+                {isDragSrc  ? 'opacity-40' : ''}"
+              draggable="true"
+              ondragstart={(e) => onCatDragStart(e, ci)}
+              ondragover={(e) => onCatDragOver(e, ci)}
+              ondragleave={(e) => onCatDragLeave(e, ci)}
+              ondrop={(e) => onCatDrop(e, ci)}
+              ondragend={onCatDragEnd}
+            >
+              <div class="flex items-center gap-1">
+                <!-- 순번 셀 -->
+                <div
+                  class="flex h-8 w-6 shrink-0 cursor-pointer items-center justify-center rounded text-[10px] font-bold select-none
+                    {isActive ? 'text-primary-content/60' : 'text-base-content/30 hover:text-base-content/60'}"
+                  ondblclick={() => startCatOrderEdit(ci)}
+                  title="더블클릭하면 순번을 직접 입력할 수 있어요"
+                  role="button"
+                  tabindex="-1"
+                >
+                  {#if editingCatOrderIdx === ci}
+                    <input
+                      id="cat-order-input-{ci}"
+                      type="text"
+                      inputmode="numeric"
+                      bind:value={catOrderInputValue}
+                      onblur={() => commitCatOrderEdit(ci)}
+                      onkeydown={(e) => {
+                        if (e.key === 'Enter') { e.preventDefault(); commitCatOrderEdit(ci); }
+                        else if (e.key === 'Escape') { e.preventDefault(); cancelCatOrderEdit(); }
+                      }}
+                      onclick={(e) => e.stopPropagation()}
+                      class="w-6 rounded bg-base-100 text-center text-[10px] font-bold text-base-content outline outline-1 outline-primary"
+                    />
+                  {:else}
+                    {ci + 1}
+                  {/if}
+                </div>
+
+                <!-- 카테고리 버튼 -->
+                <button
+                  onclick={() => (selectedCategory = cat)}
+                  class="flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-2 py-2 text-sm font-medium transition-colors {isActive ? 'bg-primary text-primary-content font-bold' : 'hover:bg-base-200'}"
+                >
+                  <Icon icon="lucide:grip-vertical" class="h-3.5 w-3.5 shrink-0 opacity-30 cursor-grab active:cursor-grabbing" />
+                  <span class="min-w-0 flex-1 truncate text-left">{catLabel(cat)}</span>
+                </button>
+
+                <!-- 삭제 버튼 -->
+                <button
+                  onclick={() => requestRemoveCategory(cat)}
+                  class="btn btn-ghost btn-xs btn-circle hidden text-error group-hover:flex shrink-0"
+                  title="카테고리 삭제"
+                >
+                  ×
+                </button>
+              </div>
             </li>
           {/each}
         {/if}
