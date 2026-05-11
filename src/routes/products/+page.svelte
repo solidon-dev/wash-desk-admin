@@ -651,10 +651,10 @@
     const item = currentItems[row];
     if (col === 0) commitName(item.id, item.name);
     else if (col === 1) commitPrice(item.id, item.name);
-    else if (col === 2) commitAlias(item.id);
-    else if (col === 3) commitCn(item.id);
-    else if (col === 4) commitEn(item.id);
-    else if (col === 5) commitDate(item.id, item.name);
+    else if (col === 2) commitDate(item.id, item.name);
+    else if (col === 3) commitAlias(item.id);
+    else if (col === 4) commitCn(item.id);
+    else if (col === 5) commitEn(item.id);
   }
 
   function handleCellKeydown(e: KeyboardEvent, row: number, col: GridCol) {
