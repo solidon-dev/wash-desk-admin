@@ -1,7 +1,6 @@
 <script lang="ts">
 	import './layout.css';
 	import { page } from '$app/stores';
-	import { goto } from '$app/navigation';
 	import { afterNavigate } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import Icon from '@iconify/svelte';
@@ -125,12 +124,12 @@
 			<ul class="flex w-full flex-col gap-0.5 px-2 py-2">
 				{#each navItems as nav (nav.path)}
 					<li>
-						<button
+						<a
+							href={nav.path}
 							class="flex min-h-12 w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150
 								{isActive(nav)
 									? 'bg-primary text-primary-content'
 									: 'text-base-content/60 hover:bg-base-content/5 hover:text-base-content'}"
-							onclick={() => void goto(nav.path)}
 						>
 							<Icon icon={nav.icon} class="h-5 w-5 shrink-0" />
 							<span class="flex-1 text-left">{nav.label}</span>
@@ -139,7 +138,7 @@
 									{unreadMemoCount}
 								</span>
 							{/if}
-						</button>
+						</a>
 					</li>
 				{/each}
 			</ul>
@@ -173,14 +172,14 @@
 
 			<!-- 미읽음 메모 배지 -->
 			{#if unreadMemoCount > 0}
-				<button
-					onclick={() => void goto('/memos')}
+				<a
+					href="/memos"
 					class="btn btn-ghost btn-sm btn-square relative"
 					aria-label="메모 확인"
 				>
 					<Icon icon="lucide:message-square" class="h-5 w-5" />
 					<span class="badge badge-error badge-xs absolute -top-0.5 -right-0.5 font-bold">{unreadMemoCount}</span>
-				</button>
+				</a>
 			{/if}
 		</header>
 
