@@ -1,429 +1,153 @@
 <script lang="ts">
-  import Icon from '@iconify/svelte';
-  import SearchBar from '$lib/components/SearchBar.svelte';
-  import Pagination from '$lib/components/Pagination.svelte';
-  import TableCard from '$lib/components/TableCard.svelte';
+	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
+	import Icon from '@iconify/svelte';
 
-  interface Client {
-    id: string;
-    name: string;
-    businessNo?: string;
-    email?: string;
-    managerName?: string;
-    managerPhone?: string;
-    hidden: boolean;
-    createdAt: string;
-  }
+	let username = $state('');
+	let password = $state('');
+	let errorMsg = $state('');
+	let isLoading = $state(false);
+	let showPassword = $state(false);
 
-  let clients = $state<Client[]>([
-    { id: 'client-001', name: '그랜드호텔',       businessNo: '123-45-67890', email: 'grand@hotel.com',       managerName: '이담당', managerPhone: '010-1234-5678', hidden: false, createdAt: '2024-01-10' },
-    { id: 'client-002', name: '오션뷰펜션',       businessNo: '234-56-78901', email: 'ocean@pension.com',     managerName: '최담당', managerPhone: '010-2345-6789', hidden: false, createdAt: '2024-02-01' },
-    { id: 'client-003', name: '제주리조트',       businessNo: '345-67-89012', email: 'jeju@resort.com',       managerName: '강담당', managerPhone: '010-3456-7890', hidden: false, createdAt: '2024-03-15' },
-    { id: 'client-004', name: '힐사이드호텔',     businessNo: '456-78-90123', email: 'hill@hotel.com',        managerName: '임담당', managerPhone: '010-4567-8901', hidden: false, createdAt: '2024-04-01' },
-    { id: 'client-005', name: '선셋펜션',         businessNo: '567-89-01234', email: 'sunset@pension.com',    managerName: '오담당', managerPhone: '010-5678-9012', hidden: false, createdAt: '2024-05-20' },
-    { id: 'client-006', name: '블루라군리조트',   businessNo: '678-90-12345', email: 'blue@resort.com',       managerName: '신담당', managerPhone: '010-6789-0123', hidden: true,  createdAt: '2024-06-10' },
-    { id: 'client-007', name: '스카이파크호텔',   businessNo: '789-01-23456', email: 'sky@hotel.com',         managerName: '권담당', managerPhone: '010-7890-1234', hidden: false, createdAt: '2024-07-03' },
-    { id: 'client-008', name: '솔밭펜션',         businessNo: '890-12-34567', email: 'sol@pension.com',       managerName: '배담당', managerPhone: '010-8901-2345', hidden: false, createdAt: '2024-07-15' },
-    { id: 'client-009', name: '해운대리조트',     businessNo: '901-23-45678', email: 'haeundae@resort.com',   managerName: '조담당', managerPhone: '010-9012-3456', hidden: false, createdAt: '2024-08-01' },
-    { id: 'client-010', name: '경복궁호텔',       businessNo: '012-34-56789', email: 'gyeong@hotel.com',      managerName: '전담당', managerPhone: '010-0123-4567', hidden: false, createdAt: '2024-08-20' },
-    { id: 'client-011', name: '나무아래펜션',     businessNo: '111-22-33333', email: 'tree@pension.com',      managerName: '고담당', managerPhone: '010-1111-2222', hidden: false, createdAt: '2024-09-05' },
-    { id: 'client-012', name: '한라산리조트',     businessNo: '222-33-44444', email: 'halla@resort.com',      managerName: '문담당', managerPhone: '010-2222-3333', hidden: false, createdAt: '2024-09-18' },
-    { id: 'client-013', name: '롯데시티호텔',     businessNo: '333-44-55555', email: 'lotte@hotel.com',       managerName: '양담당', managerPhone: '010-3333-4444', hidden: false, createdAt: '2024-10-02' },
-    { id: 'client-014', name: '바다내음펜션',     businessNo: '444-55-66666', email: 'sea@pension.com',       managerName: '손담당', managerPhone: '010-4444-5555', hidden: false, createdAt: '2024-10-14' },
-    { id: 'client-015', name: '설악워터피아',     businessNo: '555-66-77777', email: 'seorak@resort.com',     managerName: '백담당', managerPhone: '010-5555-6666', hidden: false, createdAt: '2024-11-01' },
-    { id: 'client-016', name: '노보텔앰배서더',   businessNo: '666-77-88888', email: 'novotel@hotel.com',     managerName: '허담당', managerPhone: '010-6666-7777', hidden: false, createdAt: '2024-11-11' },
-    { id: 'client-017', name: '산들바람펜션',     businessNo: '777-88-99999', email: 'wind@pension.com',      managerName: '남담당', managerPhone: '010-7777-8888', hidden: true,  createdAt: '2024-11-25' },
-    { id: 'client-018', name: '비발디파크',       businessNo: '888-99-00000', email: 'vivaldi@resort.com',    managerName: '심담당', managerPhone: '010-8888-9999', hidden: false, createdAt: '2024-12-01' },
-    { id: 'client-019', name: '파라다이스호텔',   businessNo: '999-00-11111', email: 'paradise@hotel.com',    managerName: '류담당', managerPhone: '010-9999-0000', hidden: false, createdAt: '2024-12-10' },
-    { id: 'client-020', name: '초록숲펜션',       businessNo: '101-11-22222', email: 'forest@pension.com',    managerName: '구담당', managerPhone: '010-1010-2020', hidden: false, createdAt: '2024-12-20' },
-    { id: 'client-021', name: '워커힐호텔',       businessNo: '202-22-33333', email: 'walkerhill@hotel.com',  managerName: '하담당', managerPhone: '010-2020-3030', hidden: false, createdAt: '2025-01-05' },
-    { id: 'client-022', name: '동해안리조트',     businessNo: '303-33-44444', email: 'east@resort.com',       managerName: '주담당', managerPhone: '010-3030-4040', hidden: false, createdAt: '2025-01-15' },
-    { id: 'client-023', name: '소나무펜션',       businessNo: '404-44-55555', email: 'pine@pension.com',      managerName: '두담당', managerPhone: '010-4040-5050', hidden: false, createdAt: '2025-02-01' },
-    { id: 'client-024', name: '인터컨티넨탈',     businessNo: '505-55-66666', email: 'intercont@hotel.com',   managerName: '마담당', managerPhone: '010-5050-6060', hidden: false, createdAt: '2025-02-14' },
-    { id: 'client-025', name: '남해금산리조트',   businessNo: '606-66-77777', email: 'namhae@resort.com',     managerName: '바담당', managerPhone: '010-6060-7070', hidden: false, createdAt: '2025-03-01' },
-  ]);
+	onMount(() => {
+		const mq = window.matchMedia('(prefers-color-scheme: dark)');
+		const apply = (dark: boolean) =>
+			document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+		apply(mq.matches);
+		mq.addEventListener('change', (e) => apply(e.matches));
 
-  // 숨김 포함 여부 토글
-  let showHidden = $state(false);
+		const token = localStorage.getItem('auth_token');
+		if (token) goto('/clients');
+	});
 
-  // 검색 선택된 거래처 ID ('' 이면 전체)
-  let selectedId = $state('');
+	async function handleLogin(e: Event) {
+		e.preventDefault();
+		errorMsg = '';
+		isLoading = true;
+		await new Promise((r) => setTimeout(r, 450));
 
-  // 페이지네이션
-  const PAGE_SIZE = 10;
-  let currentPage = $state(1);
-
-  // 검색바에 넘길 아이템 목록 (숨김 제외)
-  const searchItems = $derived(
-    clients
-      .filter((c) => !c.hidden)
-      .map((c) => ({ id: c.id, label: c.name, sub: c.businessNo }))
-  );
-
-  // 필터 적용된 전체 목록
-  const filteredClients = $derived(
-    clients.filter((c) => {
-      if (!showHidden && c.hidden) return false;
-      if (selectedId) return c.id === selectedId;
-      return true;
-    })
-  );
-
-  // 선택/필터 바뀌면 1페이지로
-  $effect(() => {
-    selectedId; showHidden;
-    currentPage = 1;
-  });
-
-  const totalPages = $derived(Math.max(1, Math.ceil(filteredClients.length / PAGE_SIZE)));
-
-  // 현재 페이지에 표시할 목록
-  const visibleClients = $derived(
-    filteredClients.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
-  );
-
-  function formatDate(iso: string) {
-    return iso.slice(0, 10);
-  }
-
-  // ──────────── 모달 ────────────
-  let showModal     = $state(false);
-  let editingClient = $state<Client | null>(null);
-  let formName         = $state('');
-  let formBusinessNo   = $state('');
-  let formEmail        = $state('');
-  let formManagerName  = $state('');
-  let formManagerPhone = $state('');
-
-  function openAdd() {
-    editingClient    = null;
-    formName         = '';
-    formBusinessNo   = '';
-    formEmail        = '';
-    formManagerName  = '';
-    formManagerPhone = '';
-    showModal        = true;
-  }
-
-  function openEdit(client: Client) {
-    editingClient    = client;
-    formName         = client.name;
-    formBusinessNo   = client.businessNo   ?? '';
-    formEmail        = client.email        ?? '';
-    formManagerName  = client.managerName  ?? '';
-    formManagerPhone = client.managerPhone ?? '';
-    showModal        = true;
-  }
-
-  function closeModal() { showModal = false; }
-
-  function handleSave() {
-    if (!formName.trim()) return;
-    const payload = {
-      name:         formName.trim(),
-      businessNo:   formBusinessNo.trim()   || undefined,
-      email:        formEmail.trim()        || undefined,
-      managerName:  formManagerName.trim()  || undefined,
-      managerPhone: formManagerPhone.trim() || undefined,
-    };
-    if (editingClient) {
-      const idx = clients.findIndex((c) => c.id === editingClient!.id);
-      if (idx !== -1) clients[idx] = { ...clients[idx], ...payload };
-    } else {
-      clients.push({
-        ...payload,
-        id: crypto.randomUUID(),
-        hidden: false,
-        createdAt: new Date().toISOString().slice(0, 10),
-      });
-    }
-    closeModal();
-  }
-
-  // ──────────── 숨기기 확인 ────────────
-  let hideTargetId = $state<string | null>(null);
-  function openHide(id: string)  { hideTargetId = id; }
-  function confirmHide() {
-    if (hideTargetId) {
-      const idx = clients.findIndex((c) => c.id === hideTargetId);
-      if (idx !== -1) clients[idx].hidden = true;
-      if (selectedId === hideTargetId) selectedId = '';
-    }
-    hideTargetId = null;
-  }
-  function cancelHide() { hideTargetId = null; }
-
-  // 숨김 복원
-  function restoreClient(id: string) {
-    const idx = clients.findIndex((c) => c.id === id);
-    if (idx !== -1) clients[idx].hidden = false;
-  }
+		if (username === 'admin' && password === 'admin1234') {
+			localStorage.setItem('auth_token', 'dummy-token');
+			goto('/clients');
+		} else {
+			errorMsg = '아이디 또는 비밀번호가 올바르지 않습니다.';
+			isLoading = false;
+		}
+	}
 </script>
 
-<!-- ───────────────────────────── 메인 컨텐츠 ───────────────────────────── -->
-<div class="min-h-full bg-base-200 px-8 py-10">
-  <h2 class="text-2xl font-extrabold text-base-content mb-5">거래처 관리</h2>
+<svelte:head>
+	<title>로그인 — WASH DESK</title>
+	<link rel="icon" href="/favicon.svg" />
+</svelte:head>
 
-  <!-- 검색 / 숨김 토글 / 등록 버튼 바 -->
-  <div class="flex flex-wrap items-center gap-3 mb-5">
+<div class="relative min-h-screen overflow-hidden bg-base-200 flex items-center justify-center px-4">
 
-    <!-- 검색바 컴포넌트 -->
-    <SearchBar
-      placeholder="거래처명, 사업자번호 검색..."
-      items={searchItems}
-      onselect={(id) => (selectedId = id)}
-      class="w-64 sm:w-72"
-    />
+	<!-- 배경 장식 원 -->
+	<div class="pointer-events-none absolute -top-32 -left-32 h-[500px] w-[500px] rounded-full bg-primary/10 blur-3xl"></div>
+	<div class="pointer-events-none absolute -bottom-40 -right-24 h-[440px] w-[440px] rounded-full bg-secondary/10 blur-3xl"></div>
 
-    <!-- 숨김 목록 포함 토글 -->
-    <label class="flex items-center gap-2 cursor-pointer select-none text-sm text-base-content/60 font-semibold">
-      <input
-        type="checkbox"
-        bind:checked={showHidden}
-        class="checkbox checkbox-sm"
-      />
-      숨김 포함
-    </label>
+	<div class="relative z-10 w-full max-w-sm">
 
-    <!-- 등록 버튼 (항상 오른쪽 끝) -->
-    <button onclick={openAdd} class="btn btn-primary btn-sm gap-2 whitespace-nowrap ml-auto sm:w-auto w-full">
-      <Icon icon="lucide:plus" class="w-4 h-4" />
-      <span class="hidden sm:inline">거래처 등록</span>
-      <span class="sm:hidden">거래처 등록</span>
-    </button>
-  </div>
+		<!-- 로고 영역 -->
+		<div class="mb-8 flex flex-col items-center gap-3">
+			<div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary shadow-lg shadow-primary/30">
+				<Icon icon="lucide:washing-machine" class="h-8 w-8 text-primary-content" />
+			</div>
+			<div class="text-center">
+				<h1 class="text-3xl font-black tracking-tight text-base-content">WASH DESK</h1>
+				<p class="mt-0.5 text-sm font-semibold text-base-content/40 tracking-widest uppercase">Admin System</p>
+			</div>
+		</div>
 
-  <!-- 거래처 테이블 -->
-  <!-- table-sm 행 높이 ~36px × 10행 + thead ~36px = 396px -->
-  <TableCard>
-    <table class="table table-sm w-full" style="table-layout: fixed;">
-      <thead class="bg-base-200 text-base-content/60">
-        <tr>
-          <!-- 기본(~lg): 거래처명 + 연락처 + 액션 = 3컬럼 -->
-          <!-- lg~xl: + 담당자 + 등록일 = 5컬럼 -->
-          <!-- xl~:   + 사업자번호 + 이메일 = 7컬럼 -->
-          <th class="text-xs font-bold
-            w-[62%] sm:w-[55%] lg:w-[35%] xl:w-[22%]">거래처명</th>
-          <th class="text-xs font-bold hidden xl:table-cell w-[16%]">사업자번호</th>
-          <th class="text-xs font-bold hidden lg:table-cell
-            lg:w-[14%] xl:w-[12%]">담당자</th>
-          <th class="text-xs font-bold hidden lg:table-cell
-            lg:w-[28%] xl:w-[16%]">연락처</th>
-          <th class="text-xs font-bold hidden xl:table-cell w-[18%]">이메일</th>
-          <th class="text-xs font-bold hidden lg:table-cell whitespace-nowrap
-            lg:w-[12%] xl:w-[9%]">등록일</th>
-          <th class="text-xs font-bold text-center whitespace-nowrap
-            w-[38%] sm:w-[45%] lg:w-[11%] xl:w-[7%]">액션</th>
-        </tr>
-      </thead>
-      <tbody>
-        {#if filteredClients.length === 0}
-          <tr>
-            <td colspan="7" class="py-16 text-center text-base-content/40 text-sm">
-              {selectedId ? '선택된 거래처가 없습니다.' : '등록된 거래처가 없습니다.'}
-            </td>
-          </tr>
-        {:else}
-          {#each visibleClients as client (client.id)}
-            <tr class="hover:bg-base-200 transition-colors {client.hidden ? 'opacity-40' : ''}">
-              <td class="font-semibold text-base-content">
-                <span>{client.name}</span>
-                {#if client.hidden}
-                  <span class="badge badge-ghost badge-xs ml-1">숨김</span>
-                {/if}
-                <!-- lg 미만: 담당자·등록일 인라인 표시 -->
-                <div class="lg:hidden mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
-                  {#if client.managerPhone}
-                    <span class="text-xs text-base-content/50">{client.managerPhone}</span>
-                  {/if}
-                  <span class="text-xs text-base-content/30">{formatDate(client.createdAt)}</span>
-                </div>
-              </td>
-              <td class="text-base-content/70 text-sm hidden xl:table-cell">{client.businessNo ?? '—'}</td>
-              <td class="text-base-content/70 text-sm hidden lg:table-cell">{client.managerName ?? '—'}</td>
-              <td class="text-base-content/70 text-sm hidden lg:table-cell">{client.managerPhone ?? '—'}</td>
-              <td class="text-base-content/60 text-xs hidden xl:table-cell">{client.email ?? '—'}</td>
-              <td class="text-base-content/50 text-xs whitespace-nowrap hidden lg:table-cell">{formatDate(client.createdAt)}</td>
-              <td>
-                <div class="flex items-center justify-center">
-                  <button
-                    onclick={() => openEdit(client)}
-                    class="btn btn-ghost btn-xs text-primary font-semibold"
-                  >
-                    {client.hidden ? '복원·수정' : '수정'}
-                  </button>
-                </div>
-              </td>
-            </tr>
-          {/each}
-        {/if}
-      </tbody>
-    </table>
-  </TableCard>
+		<!-- 로그인 카드 -->
+		<div class="card bg-base-100 shadow-2xl border border-base-300/60 rounded-3xl overflow-hidden">
 
-  <!-- 페이지네이션 -->
-  <div class="mt-4">
-    <Pagination
-      {currentPage}
-      {totalPages}
-      totalItems={filteredClients.length}
-      pageSize={PAGE_SIZE}
-      onpage={(p) => (currentPage = p)}
-    />
-  </div>
+			<!-- 카드 상단 컬러 바 -->
+			<div class="h-1 w-full bg-gradient-to-r from-primary via-secondary to-accent"></div>
+
+			<div class="card-body gap-0 px-8 py-8">
+				<h2 class="mb-6 text-lg font-extrabold text-base-content">로그인</h2>
+
+				<form onsubmit={handleLogin} class="flex flex-col gap-5">
+
+					<!-- 아이디 -->
+					<div class="form-control gap-2">
+						<label for="username" class="label py-0">
+							<span class="label-text text-xs font-bold text-base-content/50 uppercase tracking-widest">아이디</span>
+						</label>
+						<label class="input input-bordered flex items-center gap-2 focus-within:input-primary transition-all">
+							<Icon icon="lucide:user" class="h-4 w-4 shrink-0 text-base-content/30" />
+							<input
+								id="username"
+								type="text"
+								bind:value={username}
+								placeholder="아이디를 입력하세요"
+								autocomplete="username"
+								class="grow text-sm bg-transparent outline-none placeholder:text-base-content/25"
+								required
+							/>
+						</label>
+					</div>
+
+					<!-- 비밀번호 -->
+					<div class="form-control gap-2">
+						<label for="password" class="label py-0">
+							<span class="label-text text-xs font-bold text-base-content/50 uppercase tracking-widest">비밀번호</span>
+						</label>
+						<label class="input input-bordered flex items-center gap-2 focus-within:input-primary transition-all">
+							<Icon icon="lucide:lock" class="h-4 w-4 shrink-0 text-base-content/30" />
+							<input
+								id="password"
+								type={showPassword ? 'text' : 'password'}
+								bind:value={password}
+								placeholder="비밀번호를 입력하세요"
+								autocomplete="current-password"
+								class="grow text-sm bg-transparent outline-none placeholder:text-base-content/25"
+								required
+							/>
+							<button
+								type="button"
+								tabindex="-1"
+								class="text-base-content/30 hover:text-base-content/60 transition-colors"
+								onclick={() => (showPassword = !showPassword)}
+								aria-label={showPassword ? '비밀번호 숨기기' : '비밀번호 보기'}
+							>
+								<Icon icon={showPassword ? 'lucide:eye-off' : 'lucide:eye'} class="h-4 w-4" />
+							</button>
+						</label>
+					</div>
+
+					<!-- 에러 메시지 -->
+					{#if errorMsg}
+						<div class="alert alert-error gap-2 rounded-xl py-3 px-4 text-sm font-semibold">
+							<Icon icon="lucide:circle-alert" class="h-4 w-4 shrink-0" />
+							<span>{errorMsg}</span>
+						</div>
+					{/if}
+
+					<!-- 로그인 버튼 -->
+					<button
+						type="submit"
+						class="btn btn-primary w-full rounded-xl font-extrabold text-base mt-1 shadow-md shadow-primary/20 hover:shadow-primary/40 transition-shadow"
+						disabled={isLoading}
+					>
+						{#if isLoading}
+							<span class="loading loading-spinner loading-sm"></span>
+							<span>로그인 중...</span>
+						{:else}
+							<Icon icon="lucide:log-in" class="h-4 w-4" />
+							<span>로그인</span>
+						{/if}
+					</button>
+
+				</form>
+			</div>
+		</div>
+
+		<!-- 하단 카피라이트 -->
+		<p class="mt-6 text-center text-xs font-medium text-base-content/25">
+			© 2025 WASH DESK. All rights reserved.
+		</p>
+	</div>
 </div>
-
-<!-- ───────────────────────── 거래처 등록/수정 모달 ───────────────────────── -->
-{#if showModal}
-  <dialog
-    class="modal modal-open"
-    onmousedown={(e) => { if (e.target === e.currentTarget) closeModal(); }}
-  >
-    <div class="modal-box w-full max-w-lg rounded-2xl p-6 flex flex-col" style="max-height: 520px;">
-      <!-- 모달 헤더 -->
-      <div class="flex items-center justify-between mb-5 shrink-0">
-        <div class="flex items-center gap-3">
-          <h3 class="text-lg font-extrabold text-base-content">
-            {editingClient ? '거래처 수정' : '거래처 등록'}
-          </h3>
-          {#if editingClient}
-            {#if editingClient.hidden}
-              <button
-                type="button"
-                onclick={() => { restoreClient(editingClient!.id); closeModal(); }}
-                class="btn btn-xs btn-success gap-1 font-bold"
-              >
-                <Icon icon="lucide:eye" class="w-3.5 h-3.5" />
-                복원
-              </button>
-            {:else}
-              <button
-                type="button"
-                onclick={() => { openHide(editingClient!.id); closeModal(); }}
-                class="btn btn-xs btn-warning gap-1 font-bold"
-              >
-                <Icon icon="lucide:eye-off" class="w-3.5 h-3.5" />
-                숨기기
-              </button>
-            {/if}
-          {/if}
-        </div>
-        <button
-          onclick={closeModal}
-          aria-label="닫기"
-          class="btn btn-ghost btn-sm btn-circle"
-        >
-          <Icon icon="lucide:x" class="w-5 h-5" />
-        </button>
-      </div>
-
-      <!-- 폼 (스크롤 영역) -->
-      <form
-        onsubmit={(e) => { e.preventDefault(); handleSave(); }}
-        class="flex flex-col flex-1 overflow-hidden"
-      >
-        <div class="flex flex-col gap-4 overflow-y-auto flex-1 pr-1">
-
-          <!-- 거래처명 -->
-          <div>
-            <label for="cName" class="label pb-1">
-              <span class="label-text text-xs font-bold text-base-content/60">거래처명 *</span>
-            </label>
-            <input
-              id="cName"
-              type="text"
-              bind:value={formName}
-              placeholder="예) 그랜드 호텔"
-              class="input input-bordered w-full text-sm"
-            />
-          </div>
-
-          <!-- 사업자번호 -->
-          <div>
-            <label for="cBizNo" class="label pb-1">
-              <span class="label-text text-xs font-bold text-base-content/60">사업자번호</span>
-            </label>
-            <input
-              id="cBizNo"
-              type="text"
-              bind:value={formBusinessNo}
-              placeholder="000-00-00000"
-              class="input input-bordered w-full text-sm"
-            />
-          </div>
-
-          <!-- 거래처 이메일 -->
-          <div>
-            <label for="cEmail" class="label pb-1">
-              <span class="label-text text-xs font-bold text-base-content/60">거래처 이메일</span>
-            </label>
-            <input
-              id="cEmail"
-              type="email"
-              bind:value={formEmail}
-              placeholder="info@hotel.com"
-              class="input input-bordered w-full text-sm"
-            />
-          </div>
-
-          <!-- 담당자명 + 연락처 (2열) -->
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label for="cMgrName" class="label pb-1">
-                <span class="label-text text-xs font-bold text-base-content/60">담당자명</span>
-              </label>
-              <input
-                id="cMgrName"
-                type="text"
-                bind:value={formManagerName}
-                placeholder="홍길동"
-                class="input input-bordered w-full text-sm"
-              />
-            </div>
-            <div>
-              <label for="cMgrPhone" class="label pb-1">
-                <span class="label-text text-xs font-bold text-base-content/60">담당자 연락처</span>
-              </label>
-              <input
-                id="cMgrPhone"
-                type="text"
-                bind:value={formManagerPhone}
-                placeholder="010-0000-0000"
-                class="input input-bordered w-full text-sm"
-              />
-            </div>
-          </div>
-        </div>
-
-        <!-- 모달 액션 버튼 -->
-        <div class="modal-action mt-5 pt-4 border-t border-base-200 shrink-0">
-          <button type="button" onclick={closeModal} class="btn btn-ghost font-bold">취소</button>
-          <button type="submit" class="btn btn-primary font-bold">
-            {editingClient ? '저장' : '등록'}
-          </button>
-        </div>
-      </form>
-    </div>
-  </dialog>
-{/if}
-
-<!-- ───────────────────────────── 숨기기 확인 모달 ───────────────────────────── -->
-{#if hideTargetId}
-  {@const target = clients.find((c) => c.id === hideTargetId)}
-  <dialog
-    class="modal modal-open"
-    onmousedown={(e) => { if (e.target === e.currentTarget) cancelHide(); }}
-  >
-    <div class="modal-box w-full max-w-sm rounded-2xl p-6">
-      <h3 class="text-base font-extrabold text-base-content mb-2">거래처 숨기기</h3>
-      <p class="text-sm text-base-content/70 mb-6">
-        <span class="font-bold text-warning">{target?.name}</span> 거래처를 숨기시겠습니까?<br />
-        <span class="text-xs text-base-content/40">숨긴 거래처는 목록에서 보이지 않으며, 언제든 복원할 수 있습니다.</span>
-      </p>
-      <div class="modal-action">
-        <button onclick={cancelHide} class="btn btn-ghost font-bold">취소</button>
-        <button onclick={confirmHide} class="btn btn-warning font-bold">숨기기</button>
-      </div>
-    </div>
-  </dialog>
-{/if}
