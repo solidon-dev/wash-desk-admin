@@ -1214,8 +1214,8 @@
                     <input
                       id="cell-{i}-0"
                       type="text"
+                      autocomplete="off"
                       value={getDisplayName(item)}
-                      oninput={(e) => { nameDrafts[item.id] = e.currentTarget.value; }}
                       onfocus={() => onCellFocus(i, 0)}
                       onblur={() => commitName(item.id, item.name)}
                       onkeydown={(e) => handleCellKeydown(e, i, 0)}
@@ -1228,6 +1228,7 @@
                     <input
                       id="cell-{i}-1"
                       type="text"
+                      autocomplete="off"
                       inputmode="numeric"
                       value={getDisplayPrice(item)}
                       oninput={(e) => { const v = e.currentTarget.value.replace(/[^0-9]/g, ''); priceDrafts[item.id] = v; e.currentTarget.value = v; }}
@@ -1244,6 +1245,7 @@
                     <input
                       id="cell-{i}-2"
                       type="text"
+                      autocomplete="off"
                       inputmode="numeric"
                       value={dateDrafts[item.id] ?? getDisplayPriceDate(item)}
                       oninput={(e) => {
@@ -1264,6 +1266,7 @@
                     <input
                       id="cell-{i}-3"
                       type="text"
+                      autocomplete="off"
                       value={getDisplayAlias(item)}
                       oninput={(e) => { aliasDrafts[item.id] = e.currentTarget.value; }}
                       onfocus={() => onCellFocus(i, 3)}
@@ -1279,6 +1282,7 @@
                     <input
                       id="cell-{i}-4"
                       type="text"
+                      autocomplete="off"
                       value={getDisplayCn(item)}
                       oninput={(e) => { cnDrafts[item.id] = e.currentTarget.value; }}
                       onfocus={() => onCellFocus(i, 4)}
@@ -1294,6 +1298,7 @@
                     <input
                       id="cell-{i}-5"
                       type="text"
+                      autocomplete="off"
                       value={getDisplayEn(item)}
                       oninput={(e) => { enDrafts[item.id] = e.currentTarget.value; }}
                       onfocus={() => onCellFocus(i, 5)}
@@ -1323,12 +1328,14 @@
               {@const newRowIdx = currentItems.length}
               {@const isNewRowActive = activeRow === newRowIdx}
               <tr class="transition-colors {isNewRowActive ? 'bg-success/5' : 'hover:bg-base-200/30'}">
-                <td class="h-9 border-b border-dashed border-r border-base-300 px-2 text-center text-[11px] opacity-30 select-none">✶</td>
+                <td class="h-9 border-b border-dashed border-r border-base-300 px-2 text-center text-[11px] opacity-30 select-none">✾</td>
 
+                <!-- 품목명 (col 0) -->
                 <td class="h-9 p-0 border-b border-dashed border-r border-base-300">
                   <input
                     id="cell-{newRowIdx}-0"
                     type="text"
+                    autocomplete="off"
                     bind:value={newName}
                     onfocus={() => { activeRow = newRowIdx; }}
                     onblur={() => { if (activeRow === newRowIdx) activeRow = null; }}
@@ -1344,6 +1351,7 @@
                   <input
                     id="cell-{newRowIdx}-1"
                     type="text"
+                    autocomplete="off"
                     inputmode="numeric"
                     bind:value={newPrice}
                     oninput={(e) => { newPrice = e.currentTarget.value.replace(/[^0-9]/g, ''); e.currentTarget.value = newPrice; }}
@@ -1361,6 +1369,7 @@
                   <input
                     id="cell-{newRowIdx}-2"
                     type="text"
+                    autocomplete="off"
                     inputmode="numeric"
                     value={newPriceDate}
                     oninput={(e) => { newPriceDate = formatDateInput(e.currentTarget.value); e.currentTarget.value = newPriceDate; }}
@@ -1378,6 +1387,7 @@
                   <input
                     id="cell-{newRowIdx}-3"
                     type="text"
+                    autocomplete="off"
                     bind:value={newAlias}
                     onfocus={() => { activeRow = newRowIdx; }}
                     onblur={() => { if (activeRow === newRowIdx) activeRow = null; }}
@@ -1392,6 +1402,7 @@
                   <input
                     id="cell-{newRowIdx}-4"
                     type="text"
+                    autocomplete="off"
                     bind:value={newCn}
                     onfocus={() => { activeRow = newRowIdx; }}
                     onblur={() => { if (activeRow === newRowIdx) activeRow = null; }}
@@ -1406,6 +1417,7 @@
                   <input
                     id="cell-{newRowIdx}-5"
                     type="text"
+                    autocomplete="off"
                     bind:value={newEn}
                     onfocus={() => { activeRow = newRowIdx; }}
                     onblur={() => { if (activeRow === newRowIdx) activeRow = null; }}
