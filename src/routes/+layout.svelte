@@ -122,7 +122,7 @@
 
 		<!-- 네비게이션 메뉴 -->
 		<nav class="flex-1 overflow-y-auto">
-			<ul class="menu menu-lg w-full gap-0.5 px-2 py-2">
+			<ul class="flex w-full flex-col gap-0.5 px-2 py-2">
 				{#each navItems as nav (nav.path)}
 					<li>
 						<button
