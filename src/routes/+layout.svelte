@@ -128,8 +128,8 @@
 						<button
 							class="flex min-h-12 w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150
 								{isActive(nav)
-									? 'bg-base-content/10 text-base-content active'
-									: 'text-base-content/50 hover:bg-base-content/5 hover:text-base-content'}"
+									? 'bg-primary text-primary-content'
+									: 'text-base-content/60 hover:bg-base-content/5 hover:text-base-content'}"
 							onclick={() => void goto(nav.path)}
 						>
 							<Icon icon={nav.icon} class="h-5 w-5 shrink-0" />
