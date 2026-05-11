@@ -1,6 +1,6 @@
 <script lang="ts">
 	import './layout.css';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { afterNavigate } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import Icon from '@iconify/svelte';
@@ -31,7 +31,7 @@
 	];
 
 	function isActive(nav: { path: string; exact: boolean }): boolean {
-		const pathname = $page.url.pathname;
+		const pathname = page.url.pathname;
 		if (nav.exact) return pathname === nav.path;
 		return pathname === nav.path || pathname.startsWith(nav.path + '/');
 	}
