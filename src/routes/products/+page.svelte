@@ -384,7 +384,7 @@
   );
 
   // ── 엑셀 그리드 상태 ──────────────────────────────────────────
-  // col: 0=품목명, 1=단가, 2=별칭, 3=중국어, 4=영어, 5=가격적용시기
+  // col: 0=품목명, 1=단가, 2=가격적용시기, 3=별칭, 4=중국어, 5=영어
   type GridCol = 0 | 1 | 2 | 3 | 4 | 5;
 
   function todayYMD(): string {
@@ -1154,10 +1154,10 @@
                 <th class="h-9 px-2 text-center text-[11px] font-bold uppercase tracking-wide opacity-60 select-none border-b-2 border-r border-base-300">#</th>
                 <th class="h-9 px-3 text-left text-[11px] font-bold uppercase tracking-wide opacity-60 border-b-2 border-r border-base-300">품목명</th>
                 <th class="h-9 px-3 text-right text-[11px] font-bold uppercase tracking-wide opacity-60 border-b-2 border-r border-base-300">단가 (원)</th>
+                <th class="h-9 px-3 text-center text-[11px] font-bold uppercase tracking-wide opacity-60 border-b-2 border-r border-base-300">가격적용시기</th>
                 <th class="h-9 px-3 text-left text-[11px] font-bold uppercase tracking-wide opacity-60 border-b-2 border-r border-base-300">별칭</th>
                 <th class="h-9 px-3 text-left text-[11px] font-bold uppercase tracking-wide opacity-60 border-b-2 border-r border-base-300">중국어</th>
                 <th class="h-9 px-3 text-left text-[11px] font-bold uppercase tracking-wide opacity-60 border-b-2 border-r border-base-300">영어</th>
-                <th class="h-9 px-3 text-center text-[11px] font-bold uppercase tracking-wide opacity-60 border-b-2 border-r border-base-300">가격적용시기</th>
                 <th class="h-9 border-b-2 border-base-300"></th>
               </tr>
             </thead>
@@ -1239,16 +1239,36 @@
                     />
                   </td>
 
-                  <!-- 별칭 -->
+                  <!-- 가격적용시기 -->
                   <td class="h-9 p-0 border-b border-r border-base-200">
                     <input
                       id="cell-{i}-2"
                       type="text"
+                      inputmode="numeric"
+                      value={dateDrafts[item.id] ?? getDisplayPriceDate(item)}
+                      oninput={(e) => {
+                        dateDrafts[item.id] = formatDateInput(e.currentTarget.value);
+                        e.currentTarget.value = dateDrafts[item.id];
+                      }}
+                      onfocus={() => onCellFocus(i, 2)}
+                      onblur={() => commitDate(item.id, item.name)}
+                      onkeydown={(e) => handleCellKeydown(e, i, 2)}
+                      placeholder="YYYY-MM-DD"
+                      class="w-full h-full px-3 text-center font-mono text-sm bg-transparent outline-none focus:bg-primary/5 placeholder:opacity-30 transition-colors duration-75
+                        {(!dateDrafts[item.id] && !getDisplayPriceDate(item)) || isValidDate(dateDrafts[item.id] ?? getDisplayPriceDate(item)) ? '' : 'bg-error/5 text-error'}"
+                    />
+                  </td>
+
+                  <!-- 별칭 -->
+                  <td class="h-9 p-0 border-b border-r border-base-200">
+                    <input
+                      id="cell-{i}-3"
+                      type="text"
                       value={getDisplayAlias(item)}
                       oninput={(e) => { aliasDrafts[item.id] = e.currentTarget.value; }}
-                      onfocus={() => onCellFocus(i, 2)}
+                      onfocus={() => onCellFocus(i, 3)}
                       onblur={() => commitAlias(item.id)}
-                      onkeydown={(e) => handleCellKeydown(e, i, 2)}
+                      onkeydown={(e) => handleCellKeydown(e, i, 3)}
                       placeholder="—"
                       class="w-full h-full px-3 bg-transparent outline-none focus:bg-primary/5 placeholder:opacity-30 transition-colors duration-75"
                     />
@@ -1257,13 +1277,13 @@
                   <!-- 중국어 -->
                   <td class="h-9 p-0 border-b border-r border-base-200">
                     <input
-                      id="cell-{i}-3"
+                      id="cell-{i}-4"
                       type="text"
                       value={getDisplayCn(item)}
                       oninput={(e) => { cnDrafts[item.id] = e.currentTarget.value; }}
-                      onfocus={() => onCellFocus(i, 3)}
+                      onfocus={() => onCellFocus(i, 4)}
                       onblur={() => commitCn(item.id)}
-                      onkeydown={(e) => handleCellKeydown(e, i, 3)}
+                      onkeydown={(e) => handleCellKeydown(e, i, 4)}
                       placeholder="—"
                       class="w-full h-full px-3 bg-transparent outline-none focus:bg-primary/5 placeholder:opacity-30 transition-colors duration-75"
                     />
@@ -1272,35 +1292,15 @@
                   <!-- 영어 -->
                   <td class="h-9 p-0 border-b border-r border-base-200">
                     <input
-                      id="cell-{i}-4"
+                      id="cell-{i}-5"
                       type="text"
                       value={getDisplayEn(item)}
                       oninput={(e) => { enDrafts[item.id] = e.currentTarget.value; }}
-                      onfocus={() => onCellFocus(i, 4)}
+                      onfocus={() => onCellFocus(i, 5)}
                       onblur={() => commitEn(item.id)}
-                      onkeydown={(e) => handleCellKeydown(e, i, 4)}
+                      onkeydown={(e) => handleCellKeydown(e, i, 5)}
                       placeholder="—"
                       class="w-full h-full px-3 bg-transparent outline-none focus:bg-primary/5 placeholder:opacity-30 transition-colors duration-75"
-                    />
-                  </td>
-
-                  <!-- 가격적용시기 -->
-                  <td class="h-9 p-0 border-b border-r border-base-200">
-                    <input
-                      id="cell-{i}-5"
-                      type="text"
-                      inputmode="numeric"
-                      value={dateDrafts[item.id] ?? getDisplayPriceDate(item)}
-                      oninput={(e) => {
-                        dateDrafts[item.id] = formatDateInput(e.currentTarget.value);
-                        e.currentTarget.value = dateDrafts[item.id];
-                      }}
-                      onfocus={() => onCellFocus(i, 5)}
-                      onblur={() => commitDate(item.id, item.name)}
-                      onkeydown={(e) => handleCellKeydown(e, i, 5)}
-                      placeholder="YYYY-MM-DD"
-                      class="w-full h-full px-3 text-center font-mono text-sm bg-transparent outline-none focus:bg-primary/5 placeholder:opacity-30 transition-colors duration-75
-                        {(!dateDrafts[item.id] && !getDisplayPriceDate(item)) || isValidDate(dateDrafts[item.id] ?? getDisplayPriceDate(item)) ? '' : 'bg-error/5 text-error'}"
                     />
                   </td>
 
@@ -1339,6 +1339,7 @@
                   />
                 </td>
 
+                <!-- 단가 (col 1) -->
                 <td class="h-9 p-0 border-b border-dashed border-r border-base-300">
                   <input
                     id="cell-{newRowIdx}-1"
@@ -1355,24 +1356,29 @@
                   />
                 </td>
 
+                <!-- 가격적용시기 (col 2) -->
                 <td class="h-9 p-0 border-b border-dashed border-r border-base-300">
                   <input
                     id="cell-{newRowIdx}-2"
                     type="text"
-                    bind:value={newAlias}
+                    inputmode="numeric"
+                    value={newPriceDate}
+                    oninput={(e) => { newPriceDate = formatDateInput(e.currentTarget.value); e.currentTarget.value = newPriceDate; }}
                     onfocus={() => { activeRow = newRowIdx; }}
                     onblur={() => { if (activeRow === newRowIdx) activeRow = null; }}
                     onkeydown={(e) => handleCellKeydown(e, newRowIdx, 2)}
-                    placeholder="—"
-                    class="w-full h-full px-3 bg-transparent outline-none focus:bg-success/5 placeholder:opacity-30 transition-colors duration-75"
+                    placeholder="YYYY-MM-DD"
+                    class="w-full h-full px-3 text-center font-mono text-sm bg-transparent outline-none placeholder:opacity-30 transition-colors duration-75
+                      {newRowSubmitTried && !newRowDateOk ? 'bg-error/5 text-error' : 'focus:bg-success/5'}"
                   />
                 </td>
 
+                <!-- 별칭 (col 3) -->
                 <td class="h-9 p-0 border-b border-dashed border-r border-base-300">
                   <input
                     id="cell-{newRowIdx}-3"
                     type="text"
-                    bind:value={newCn}
+                    bind:value={newAlias}
                     onfocus={() => { activeRow = newRowIdx; }}
                     onblur={() => { if (activeRow === newRowIdx) activeRow = null; }}
                     onkeydown={(e) => handleCellKeydown(e, newRowIdx, 3)}
@@ -1381,11 +1387,12 @@
                   />
                 </td>
 
+                <!-- 중국어 (col 4) -->
                 <td class="h-9 p-0 border-b border-dashed border-r border-base-300">
                   <input
                     id="cell-{newRowIdx}-4"
                     type="text"
-                    bind:value={newEn}
+                    bind:value={newCn}
                     onfocus={() => { activeRow = newRowIdx; }}
                     onblur={() => { if (activeRow === newRowIdx) activeRow = null; }}
                     onkeydown={(e) => handleCellKeydown(e, newRowIdx, 4)}
@@ -1394,19 +1401,17 @@
                   />
                 </td>
 
+                <!-- 영어 (col 5) -->
                 <td class="h-9 p-0 border-b border-dashed border-r border-base-300">
                   <input
                     id="cell-{newRowIdx}-5"
                     type="text"
-                    inputmode="numeric"
-                    value={newPriceDate}
-                    oninput={(e) => { newPriceDate = formatDateInput(e.currentTarget.value); e.currentTarget.value = newPriceDate; }}
+                    bind:value={newEn}
                     onfocus={() => { activeRow = newRowIdx; }}
                     onblur={() => { if (activeRow === newRowIdx) activeRow = null; }}
                     onkeydown={(e) => handleCellKeydown(e, newRowIdx, 5)}
-                    placeholder="YYYY-MM-DD"
-                    class="w-full h-full px-3 text-center font-mono text-sm bg-transparent outline-none placeholder:opacity-30 transition-colors duration-75
-                      {newRowSubmitTried && !newRowDateOk ? 'bg-error/5 text-error' : 'focus:bg-success/5'}"
+                    placeholder="—"
+                    class="w-full h-full px-3 bg-transparent outline-none focus:bg-success/5 placeholder:opacity-30 transition-colors duration-75"
                   />
                 </td>
 
