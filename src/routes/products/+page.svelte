@@ -505,6 +505,7 @@
   }
 
   function getNewRowIndex() {
+    return currentItems.length;
   }
 
   async function moveFocus(row: number, col: GridCol) {
