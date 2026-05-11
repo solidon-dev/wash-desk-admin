@@ -432,7 +432,7 @@
 			didDrawPage: (data) => { y = data.cursor?.y ?? y; },
 		});
 
-		const finalY = (doc as any).lastAutoTable?.finalY ?? y;
+		const finalY = (doc as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? y;
 		let fy = finalY + 8;
 
 		// ── 메모 ──
