@@ -1,0 +1,1668 @@
+<script lang="ts">
+	import Icon from '@iconify/svelte';
+	import { tick } from 'svelte';
+	import { downloadXlsx } from './excel.js';
+	import jsPDF from 'jspdf';
+	import autoTable from 'jspdf-autotable';
+	import type { Cell, Sheet, MergeRegion, ColumnDef } from './excel.js';
+
+	const CATEGORY_LABELS: Record<string, string> = { towel: '타월', sheet: '시트', uniform: '유니폼', all: '전체' };
+
+	type InvoiceLine    = { category: string; itemName: string; quantity: number; unitPrice: number; amount: number };
+	type ClientContract = { id: string; clientId: string; startDate: string; endDate: string; memo?: string; createdAt: string };
+
+	const clients: { id: string; name: string; businessNo?: string; ownerName?: string; managerName?: string; phone?: string; address?: string; type?: string }[] = [
+		{ id: 'client-001', name: '그랜드호텔' },
+		{ id: 'client-002', name: '오션뷰펜션' },
+		{ id: 'client-003', name: '제주리조트' },
+		{ id: 'client-004', name: '힐사이드호텔' },
+		{ id: 'client-005', name: '선셋펜션' },
+		{ id: 'client-006', name: '블루라군리조트' },
+	];
+
+	let shipments = $state([
+		{ id: 'ship-001', clientId: 'client-001', items: [{ laundryItemId: 'item-001', itemName: '대형타올', category: 'towel', quantity: 50 }, { laundryItemId: 'item-002', itemName: '싱글시트', category: 'sheet', quantity: 20 }], driverId: 'driver-001', shippedAt: '2026-05-02T10:00:00', createdAt: '2026-05-02T10:00:00' },
+		{ id: 'ship-002', clientId: 'client-002', items: [{ laundryItemId: 'item-004', itemName: '소형타올', category: 'towel', quantity: 30 }], driverId: 'driver-001', shippedAt: '2026-05-05T14:00:00', createdAt: '2026-05-05T14:00:00' },
+		{ id: 'ship-003', clientId: 'client-001', items: [{ laundryItemId: 'item-001', itemName: '대형타올', category: 'towel', quantity: 40 }, { laundryItemId: 'item-003', itemName: '직원유니폼', category: 'uniform', quantity: 10 }], driverId: 'driver-002', shippedAt: '2026-05-07T09:00:00', createdAt: '2026-05-07T09:00:00' },
+		{ id: 'ship-004', clientId: 'client-003', items: [{ laundryItemId: 'item-006', itemName: '바스타올', category: 'towel', quantity: 80 }], driverId: 'driver-001', shippedAt: '2026-05-06T11:00:00', createdAt: '2026-05-06T11:00:00' },
+		{ id: 'ship-005', clientId: 'client-001', items: [{ laundryItemId: 'item-002', itemName: '싱글시트', category: 'sheet', quantity: 35 }, { laundryItemId: 'item-003', itemName: '직원유니폼', category: 'uniform', quantity: 5 }], driverId: 'driver-001', shippedAt: '2026-05-08T10:00:00', createdAt: '2026-05-08T10:00:00' },
+	]);
+
+	let clientContractsData = $state<ClientContract[]>([]);
+	let clientItemPrices  = $state<{ clientId: string; category: string; itemName: string; unitPrice: number }[]>([
+		{ clientId: 'client-001', category: 'towel',   itemName: '대형타올',   unitPrice: 800  },
+		{ clientId: 'client-001', category: 'sheet',   itemName: '싱글시트',   unitPrice: 1200 },
+		{ clientId: 'client-001', category: 'uniform', itemName: '직원유니폼', unitPrice: 2500 },
+		{ clientId: 'client-002', category: 'towel',   itemName: '소형타올',   unitPrice: 600  },
+		{ clientId: 'client-003', category: 'towel',   itemName: '바스타올',   unitPrice: 1000 },
+	]);
+
+	function getUnitPrice(clientId: string, category: string, itemName: string): number {
+		const p = clientItemPrices.find(pr => pr.clientId === clientId && pr.category === category && pr.itemName === itemName);
+		return p?.unitPrice ?? 0;
+	}
+
+	function buildInvoiceLines(clientId: string, from: string, to: string): InvoiceLine[] {
+		const fromTs = new Date(from + 'T00:00:00').getTime();
+		const toTs = new Date(to + 'T23:59:59').getTime();
+		const inRange = shipments.filter(s => {
+			if (s.clientId !== clientId) return false;
+			const ts = new Date(s.shippedAt).getTime();
+			return ts >= fromTs && ts <= toTs;
+		});
+		const map: Record<string, InvoiceLine> = {};
+		for (const s of inRange) {
+			for (const item of s.items) {
+				const key = item.category + '__' + item.itemName;
+				if (!map[key]) map[key] = { category: item.category, itemName: item.itemName, quantity: 0, unitPrice: getUnitPrice(clientId, item.category, item.itemName), amount: 0 };
+				map[key].quantity += item.quantity;
+				map[key].amount += item.quantity * map[key].unitPrice;
+			}
+		}
+		return Object.values(map);
+	}
+
+	// ── 탭 ──────────────────────────────────────────────────────────
+	type BillingTab = 'invoice' | 'statement' | 'contract';
+	const tabState = $state({ active: 'invoice' as BillingTab });
+	function switchTab(t: BillingTab) { tabState.active = t; }
+
+	// ── 거래처 선택 ─────────────────────────────────────────────────
+	let selectedClientId = $state<string>(clients[0]?.id ?? '');
+	const selectedClient = $derived(clients.find((c) => c.id === selectedClientId) ?? null);
+
+	// ── 기간 설정 (공통) ─────────────────────────────────────────────
+	let periodFrom = $state('');
+	let periodTo   = $state('');
+
+
+
+	// ── 청구서 미리보기 데이터 ────────────────────────────────────────
+	const invoiceLines = $derived.by((): InvoiceLine[] => {
+		if (!selectedClientId || !periodFrom || !periodTo) return [];
+		return buildInvoiceLines(selectedClientId, periodFrom, periodTo);
+	});
+
+	const invoiceTotal    = $derived(invoiceLines.reduce((s, l) => s + l.amount,   0));
+	const invoiceTotalQty = $derived(invoiceLines.reduce((s, l) => s + l.quantity, 0));
+
+	const invoiceByCategory = $derived.by(() => {
+		const cats: Record<string, { qty: number; amount: number }> = {};
+		for (const line of invoiceLines) {
+			if (!cats[line.category]) cats[line.category] = { qty: 0, amount: 0 };
+			cats[line.category].qty    += line.quantity;
+			cats[line.category].amount += line.amount;
+		}
+		return cats;
+	});
+
+	const unpricedCount = $derived(invoiceLines.filter((l) => l.unitPrice === 0).length);
+
+	// ── 거래내역서 뷰 모드 ────────────────────────────────────────────
+	type StmtViewMode = 'pivot' | 'daily';
+	let stmtViewMode = $state<StmtViewMode>('pivot');
+
+	// 피벗 스크롤 컨테이너 너비 (bind:clientWidth)
+	let pivotScrollWidth = $state(0);
+
+	// 날짜 열 1개 너비(px) — 항상 "31일 기준"으로 계산
+	// 31일 이하: 컨테이너를 꽉 채우는 너비, 31일 초과: 이 너비 고정 → 가로 스크롤
+	const pivotDateColWidth = $derived.by(() => {
+		if (!statementData || pivotScrollWidth === 0) return 28;
+		const FIXED_PX = (5.2 + 7.5 + 3.8) * 11; // 구분 + 품목명 + 합계 (font-size: 11px 기준)
+		const availPx = Math.max(31 * 24, pivotScrollWidth - FIXED_PX - 2); // 최소 24px * 31
+		return Math.max(24, availPx / 31);
+	});
+
+
+
+	// ── 거래내역서 데이터 (품목=세로/날짜=가로 구조) ─────────────────
+	type StmtRow      = { category: string; itemName: string; key: string; quantities: number[]; dateQtys: number[]; total: number };
+	type StmtCatGroup = { category: string; label: string; startIdx: number; count: number };
+	type StmtDailyItem = { category: string; itemName: string; quantity: number };
+	type StmtDailyRow  = { date: string; items: StmtDailyItem[]; total: number };
+	type StmtData     = {
+		rows:       StmtRow[];
+		catGroups:  StmtCatGroup[];
+		dailyRows:  StmtDailyRow[];
+		dates:      string[];           // periodFrom~periodTo 전체 날짜 (YYYY-MM-DD)
+		dateLabels: string[];           // 화면 표시 라벨 (단일월: "15", 복수월: "3/15")
+		dayTotals:  number[];           // 1~31일 합계 (31개 고정, print/Excel)
+		dateTotals: number[];           // dates 기반 합계 (screen pivot)
+		catTotals:  Record<string, number>;
+		grandTotal: number;
+		activeDays: number;             // 실제 출고 있는 날짜 수
+	};
+
+	const statementData = $derived.by((): StmtData | null => {
+		if (!selectedClientId || !periodFrom || !periodTo) return null;
+
+		const fromTs = new Date(periodFrom + 'T00:00:00').getTime();
+		const toTs   = new Date(periodTo   + 'T23:59:59').getTime();
+
+		const ships = shipments.filter((s) => {
+			if (s.clientId !== selectedClientId) return false;
+			const ts = new Date(s.shippedAt).getTime();
+			return ts >= fromTs && ts <= toTs;
+		});
+
+		if (ships.length === 0) return null;
+
+		// dates 배열 생성 (periodFrom ~ periodTo 전체)
+		const dates: string[] = [];
+		{
+			let ts = new Date(periodFrom + 'T00:00:00').getTime();
+			const endTs = new Date(periodTo + 'T00:00:00').getTime();
+			while (ts <= endTs) {
+				const d2 = new Date(ts);
+				const y = d2.getFullYear();
+				const m = String(d2.getMonth() + 1).padStart(2, '0');
+				const d = String(d2.getDate()).padStart(2, '0');
+				dates.push(`${y}-${m}-${d}`);
+				ts += 86400000;
+			}
+		}
+
+		// dateLabels 생성
+		const fromMonth  = periodFrom.slice(0, 7);
+		const toMonth    = periodTo.slice(0, 7);
+		const singleMonth = fromMonth === toMonth;
+		const dateLabels = dates.map(d =>
+			singleMonth ? String(parseInt(d.slice(8, 10))) : `${parseInt(d.slice(5, 7))}/${d.slice(8, 10)}`
+		);
+
+		// 고유 품목 수집
+		const itemSet: Record<string, { category: string; itemName: string }> = {};
+		for (const s of ships) {
+			for (const item of s.items) {
+				const key = `${item.category}__${item.itemName}`;
+				if (!itemSet[key]) itemSet[key] = { category: item.category, itemName: item.itemName };
+			}
+		}
+
+		// 카테고리 → 품목명 정렬
+		const catOrder: Record<string, number> = { towel: 0, sheet: 1, uniform: 2 };
+		const itemList = Object.entries(itemSet)
+			.map(([key, v]) => ({ key, ...v }))
+			.sort((a, b) => {
+				const co = (catOrder[a.category] ?? 99) - (catOrder[b.category] ?? 99);
+				return co !== 0 ? co : a.itemName.localeCompare(b.itemName);
+			});
+
+		// 카테고리 그룹 계산 (행 방향)
+		const catGroups: StmtCatGroup[] = [];
+		let lastCat = '';
+		for (let i = 0; i < itemList.length; i++) {
+			const cat = itemList[i].category;
+			if (cat !== lastCat) {
+				catGroups.push({ category: cat, label: CATEGORY_LABELS[cat as 'towel'|'sheet'|'uniform'] ?? cat, startIdx: i, count: 1 });
+				lastCat = cat;
+			} else {
+				catGroups[catGroups.length - 1].count++;
+			}
+		}
+
+		// 품목별 × 날짜(YYYY-MM-DD) 집계
+		const byItemDate: Record<string, Record<string, number>> = {};
+		const byDate: Record<string, Record<string, number>> = {};
+		for (const s of ships) {
+			const date = s.shippedAt.slice(0, 10);
+			if (!byDate[date]) byDate[date] = {};
+			for (const item of s.items) {
+				const key = `${item.category}__${item.itemName}`;
+				if (!byItemDate[key]) byItemDate[key] = {};
+				byItemDate[key][date] = (byItemDate[key][date] ?? 0) + item.quantity;
+				byDate[date][key]     = (byDate[date][key]     ?? 0) + item.quantity;
+			}
+		}
+
+		// 품목별 rows
+		const rows: StmtRow[] = itemList.map((item) => {
+			const dm = byItemDate[item.key] ?? {};
+			const dateQtys = dates.map(d => dm[d] ?? 0);
+			// print/Excel용 quantities (31개 고정)
+			const dm31: Record<number, number> = {};
+			for (const [d, q] of Object.entries(dm)) {
+				const day = parseInt(d.slice(8, 10), 10);
+				dm31[day] = (dm31[day] ?? 0) + q;
+			}
+			const quantities = Array.from({ length: 31 }, (_, i) => dm31[i + 1] ?? 0);
+			const total = dateQtys.reduce((s, n) => s + n, 0);
+			return { ...item, quantities, dateQtys, total };
+		});
+
+		// 날짜(1~31일) 합계 (print/Excel용)
+		const dayTotals = Array.from({ length: 31 }, (_, i) =>
+			rows.reduce((s, r) => s + r.quantities[i], 0)
+		);
+
+		// dates 기반 합계 (screen pivot용)
+		const dateTotals = dates.map((_, i) => rows.reduce((s, r) => s + r.dateQtys[i], 0));
+
+		// 카테고리별 총합
+		const catTotals: Record<string, number> = {};
+		for (const row of rows) {
+			catTotals[row.category] = (catTotals[row.category] ?? 0) + row.total;
+		}
+		const grandTotal = rows.reduce((s, r) => s + r.total, 0);
+
+		// 일별 상세 rows
+		const activeDateKeys = Object.keys(byDate).sort();
+		const dailyRows: StmtDailyRow[] = activeDateKeys.map((date) => {
+			const dm = byDate[date];
+			const items: StmtDailyItem[] = [];
+			for (const item of itemList) {
+				const qty = dm[item.key] ?? 0;
+				if (qty > 0) items.push({ category: item.category, itemName: item.itemName, quantity: qty });
+			}
+			const total = items.reduce((s, it) => s + it.quantity, 0);
+			return { date, items, total };
+		});
+
+		return { rows, catGroups, dailyRows, dates, dateLabels, dayTotals, dateTotals, catTotals, grandTotal, activeDays: activeDateKeys.length };
+	});
+
+
+	// ── 인쇄 / PDF ──────────────────────────────────────────────────
+	let invoiceMemo = $state('');
+
+	// ── PDF 미리보기 모달 상태 ──────────────────────────────────────
+	let showPdfModal  = $state(false);
+	let pdfBlobUrl    = $state<string | null>(null);
+	let pdfGenerating = $state(false);
+
+	async function openPdfModal() {
+		if (!selectedClient || invoiceLines.length === 0) return;
+		pdfGenerating = true;
+		showPdfModal  = true;
+		pdfBlobUrl    = null;
+
+		await tick();
+
+		try {
+			const url = await generateInvoicePdf();
+			pdfBlobUrl = url;
+		} finally {
+			pdfGenerating = false;
+		}
+	}
+
+	function closePdfModal() {
+		showPdfModal = false;
+		if (pdfBlobUrl) {
+			URL.revokeObjectURL(pdfBlobUrl);
+			pdfBlobUrl = null;
+		}
+	}
+
+	function downloadPdf() {
+		if (!pdfBlobUrl || !selectedClient) return;
+		const a = document.createElement('a');
+		a.href = pdfBlobUrl;
+		a.download = `청구서_${selectedClient.name}_${periodFrom}~${periodTo}.pdf`;
+		a.click();
+	}
+
+	async function generateInvoicePdf(): Promise<string> {
+		const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+		const pageW = doc.internal.pageSize.getWidth();
+		const margin = 14;
+		let y = margin;
+
+		// ── 폰트 등록 (기본 helvetica, 한글은 유니코드 폴백) ──
+		doc.setFont('helvetica');
+
+		// ── 제목 ──
+		doc.setFontSize(20);
+		doc.setTextColor(15, 23, 42);
+		doc.setFont('helvetica', 'bold');
+		doc.text('INVOICE', pageW / 2, y + 6, { align: 'center' });
+		y += 14;
+
+		doc.setFontSize(9);
+		doc.setFont('helvetica', 'normal');
+		doc.setTextColor(100, 116, 139);
+		doc.text(`Period: ${periodFrom} ~ ${periodTo}`, pageW / 2, y, { align: 'center' });
+		y += 10;
+
+		// ── 구분선 ──
+		doc.setDrawColor(226, 232, 240);
+		doc.setLineWidth(0.5);
+		doc.line(margin, y, pageW - margin, y);
+		y += 8;
+
+		// ── 거래처 + 청구 정보 2단 ──
+		const colW = (pageW - margin * 2 - 6) / 2;
+
+		// 왼쪽: 공급받는 자
+		doc.setFillColor(248, 250, 252);
+		doc.roundedRect(margin, y, colW, 36, 2, 2, 'F');
+		doc.setFontSize(7);
+		doc.setTextColor(148, 163, 184);
+		doc.setFont('helvetica', 'bold');
+		doc.text('BILL TO', margin + 4, y + 6);
+		doc.setFontSize(11);
+		doc.setTextColor(15, 23, 42);
+		doc.text(selectedClient?.name ?? '-', margin + 4, y + 14);
+		doc.setFontSize(8);
+		doc.setFont('helvetica', 'normal');
+		doc.setTextColor(71, 85, 105);
+		let ly = y + 21;
+		if (selectedClient?.businessNo) { doc.text(`BizNo: ${selectedClient.businessNo}`, margin + 4, ly); ly += 5; }
+		if (selectedClient?.ownerName)  { doc.text(`Rep: ${selectedClient.ownerName}`,     margin + 4, ly); ly += 5; }
+		if (selectedClient?.phone)      { doc.text(`Tel: ${selectedClient.phone}`,          margin + 4, ly); }
+
+		// 오른쪽: 청구 정보
+		const rx = margin + colW + 6;
+		doc.setFillColor(238, 242, 255);
+		doc.roundedRect(rx, y, colW, 36, 2, 2, 'F');
+		doc.setFontSize(7);
+		doc.setTextColor(148, 163, 184);
+		doc.setFont('helvetica', 'bold');
+		doc.text('INVOICE DETAILS', rx + 4, y + 6);
+		doc.setFontSize(8);
+		doc.setFont('helvetica', 'normal');
+		doc.setTextColor(71, 85, 105);
+		doc.text(`Period:   ${periodFrom} ~ ${periodTo}`,               rx + 4, y + 14);
+		doc.text(`Qty:      ${invoiceLines.reduce((s,l)=>s+l.quantity,0).toLocaleString()} pcs`, rx + 4, y + 20);
+		doc.text(`Date:     ${new Date().toISOString().slice(0,10)}`,   rx + 4, y + 26);
+		doc.setFontSize(11);
+		doc.setFont('helvetica', 'bold');
+		doc.setTextColor(67, 56, 202);
+		doc.text(`${invoiceTotal.toLocaleString()} KRW`, rx + colW - 4, y + 34, { align: 'right' });
+
+		y += 44;
+
+		// ── 카테고리별 배지 요약 ──
+		const cats = ['towel', 'sheet', 'uniform'] as const;
+		const catColors: Record<string, [number,number,number]> = {
+			towel:   [3,  105, 161],
+			sheet:   [67,  56, 202],
+			uniform: [146, 64,  14],
+		};
+		const catBgs: Record<string, [number,number,number]> = {
+			towel:   [240, 249, 255],
+			sheet:   [238, 242, 255],
+			uniform: [255, 251, 235],
+		};
+		const bw = (pageW - margin * 2 - 6) / 3;
+		cats.forEach((cat, ci) => {
+			const bx = margin + ci * (bw + 3);
+			const [r,g,b] = catBgs[cat];
+			const [cr,cg,cb] = catColors[cat];
+			doc.setFillColor(r,g,b);
+			doc.roundedRect(bx, y, bw, 14, 2, 2, 'F');
+			doc.setFontSize(7);
+			doc.setFont('helvetica', 'bold');
+			doc.setTextColor(cr,cg,cb);
+			doc.text(CATEGORY_LABELS[cat].toUpperCase(), bx + bw/2, y + 5, { align: 'center' });
+			const catLines = invoiceLines.filter(l => l.category === cat);
+			const catQty = catLines.reduce((s,l)=>s+l.quantity,0);
+			doc.setFontSize(9);
+			doc.text(catQty > 0 ? `${catQty.toLocaleString()} pcs` : '-', bx + bw/2, y + 11, { align: 'center' });
+		});
+		y += 20;
+
+		// ── 품목 테이블 ──
+		const catLabelMap: Record<string, string> = { towel: 'Towel', sheet: 'Sheet', uniform: 'Uniform' };
+		autoTable(doc, {
+			startY: y,
+			margin: { left: margin, right: margin },
+			head: [['Item', 'Category', 'Qty', 'Unit Price', 'Amount']],
+			body: invoiceLines.map(l => [
+				l.itemName,
+				catLabelMap[l.category] ?? l.category,
+				l.quantity.toLocaleString(),
+				l.unitPrice > 0 ? `${l.unitPrice.toLocaleString()} KRW` : '-',
+				`${l.amount.toLocaleString()} KRW`,
+			]),
+			foot: [['Total', '', invoiceLines.reduce((s,l)=>s+l.quantity,0).toLocaleString(), '', `${invoiceTotal.toLocaleString()} KRW`]],
+			headStyles:  { fillColor: [241,245,249], textColor: [100,116,139], fontStyle: 'bold', fontSize: 8 },
+			bodyStyles:  { fontSize: 8, textColor: [51,65,85] },
+			footStyles:  { fillColor: [238,242,255], textColor: [67,56,202],   fontStyle: 'bold', fontSize: 9 },
+			alternateRowStyles: { fillColor: [250,250,250] },
+			columnStyles: {
+				0: { cellWidth: 'auto' },
+				1: { halign: 'center', cellWidth: 24 },
+				2: { halign: 'right',  cellWidth: 18 },
+				3: { halign: 'right',  cellWidth: 30 },
+				4: { halign: 'right',  cellWidth: 34 },
+			},
+			didDrawPage: (data) => { y = data.cursor?.y ?? y; },
+		});
+
+		const finalY = (doc as any).lastAutoTable?.finalY ?? y;
+		let fy = finalY + 8;
+
+		// ── 메모 ──
+		if (invoiceMemo?.trim()) {
+			doc.setFillColor(248, 250, 252);
+			doc.roundedRect(margin, fy, pageW - margin * 2, 14, 2, 2, 'F');
+			doc.setFontSize(7);
+			doc.setFont('helvetica', 'bold');
+			doc.setTextColor(148, 163, 184);
+			doc.text('MEMO', margin + 4, fy + 5);
+			doc.setFont('helvetica', 'normal');
+			doc.setFontSize(8);
+			doc.setTextColor(71, 85, 105);
+			doc.text(invoiceMemo, margin + 4, fy + 11);
+			fy += 20;
+		}
+
+		// ── 푸터 ──
+		doc.setDrawColor(226, 232, 240);
+		doc.line(margin, fy, pageW - margin, fy);
+		fy += 5;
+		doc.setFontSize(7);
+		doc.setFont('helvetica', 'normal');
+		doc.setTextColor(148, 163, 184);
+		doc.text('Generated by WASH DESK Admin System', pageW / 2, fy, { align: 'center' });
+
+		const blob = doc.output('blob');
+		return URL.createObjectURL(blob);
+	}
+
+
+
+	// ── 거래내역서 엑셀 내보내기 ─────────────────────────────────────
+	function exportStatementExcel() {
+		const sd = statementData;
+		if (!sd || !selectedClient) return;
+
+		const clientName = selectedClient.name;
+		const period = `${periodFrom}~${periodTo}`;
+		const filename = `거래내역서_${clientName}_${period}.xlsx`;
+
+		// ── 스타일 정의 ──────────────────────────────
+		const S_TITLE:    Cell['style'] = { bold: true, fontSize: 16, align: 'center', fontColor: '0F172A' };
+		const S_META:     Cell['style'] = { fontSize: 10, align: 'center', fontColor: '64748B' };
+		const S_CAT_HEAD: Record<string, Cell['style']> = {
+			towel:   { bold: true, fontSize: 10, align: 'center', bgColor: 'E0F2FE', fontColor: '0369A1', border: true },
+			sheet:   { bold: true, fontSize: 10, align: 'center', bgColor: 'E0E7FF', fontColor: '4338CA', border: true },
+			uniform: { bold: true, fontSize: 10, align: 'center', bgColor: 'FEF3C7', fontColor: '92400E', border: true },
+		};
+		const S_ITEM_HEAD: Record<string, Cell['style']> = {
+			towel:   { bold: true, fontSize: 9, align: 'left', bgColor: 'F0F9FF', fontColor: '075985', border: true, wrapText: true },
+			sheet:   { bold: true, fontSize: 9, align: 'left', bgColor: 'EEF2FF', fontColor: '3730A3', border: true, wrapText: true },
+			uniform: { bold: true, fontSize: 9, align: 'left', bgColor: 'FFFBEB', fontColor: '78350F', border: true, wrapText: true },
+		};
+		const S_DAY_HEAD:     Cell['style'] = { bold: true, fontSize: 9,  align: 'center', bgColor: 'F8FAFC', fontColor: '334155', border: true };
+		const S_SUBTOTAL_HEAD: Cell['style'] = { bold: true, fontSize: 9, align: 'center', bgColor: 'F1F5F9', fontColor: '475569', border: true };
+		const S_CELL_TOWEL:   Cell['style'] = { fontSize: 9, align: 'center', fontColor: '0369A1', border: true, numFmt: '#,##0' };
+		const S_CELL_SHEET:   Cell['style'] = { fontSize: 9, align: 'center', fontColor: '4338CA', border: true, numFmt: '#,##0' };
+		const S_CELL_UNIFORM: Cell['style'] = { fontSize: 9, align: 'center', fontColor: '92400E', border: true, numFmt: '#,##0' };
+		const S_CELL_EMPTY:   Cell['style'] = { fontSize: 9, align: 'center', fontColor: 'E2E8F0', border: true };
+		const S_SUBTOTAL_VAL: Cell['style'] = { bold: true, fontSize: 9,  align: 'center', bgColor: 'F1F5F9', fontColor: '334155', border: true, numFmt: '#,##0' };
+		const S_FOOT_LABEL:   Cell['style'] = { bold: true, fontSize: 9,  align: 'center', bgColor: 'EEF2FF', fontColor: '334155', border: true };
+
+		const S_FOOT_GRAND:   Cell['style'] = { bold: true, fontSize: 11, align: 'center', bgColor: 'EEF2FF', fontColor: '4338CA', border: true, borderThick: true, numFmt: '#,##0' };
+		const S_SUMMARY_LABEL: Cell['style'] = { bold: true, fontSize: 10, align: 'left', bgColor: 'F8FAFC', fontColor: '475569', border: true };
+
+		// ── 레이아웃 상수 ─────────────────────────────
+		// 열 구성: 카테고리(1) + 품목명(1) + 1~31일(31) + 합계(1) = 34열
+		const TOTAL_COLS = 34;
+
+		// ── 열 너비 ──────────────────────────────────
+		const xlsColumns: ColumnDef[] = [
+			{ width: 8 },    // 카테고리
+			{ width: 14 },   // 품목명
+			...Array(31).fill({ width: 4.5 }),  // 1~31일
+			{ width: 7 },    // 합계
+		];
+
+		// ── 병합 영역 ─────────────────────────────────
+		const merges: MergeRegion[] = [];
+		let R = 1;
+		const sheetRows: Sheet['rows'] = [];
+
+		// 행1: 제목
+		sheetRows.push({ cells: [
+			{ value: '세 탁 거 래 내 역 서', style: S_TITLE },
+			...Array(TOTAL_COLS - 1).fill({ value: '', style: S_TITLE }),
+		], height: 30 });
+		merges.push({ r1: R, c1: 1, r2: R, c2: TOTAL_COLS });
+		R++;
+
+		// 행2: 메타
+		sheetRows.push({ cells: [
+			{ value: `거래처: ${clientName}    |    기간: ${periodFrom} ~ ${periodTo}    |    발행일: ${new Date().toISOString().slice(0,10)}`, style: S_META },
+			...Array(TOTAL_COLS - 1).fill({ value: '', style: S_META }),
+		], height: 18 });
+		merges.push({ r1: R, c1: 1, r2: R, c2: TOTAL_COLS });
+		R++;
+
+		// 행3: 품목수 & 출고일수 & 총수량
+		sheetRows.push({ cells: [
+			{ value: `품목 ${sd.rows.length}종  |  출고 ${sd.activeDays}일  |  총 출고: ${sd.grandTotal.toLocaleString()}개`, style: S_META },
+			...Array(TOTAL_COLS - 1).fill({ value: '', style: S_META }),
+		], height: 16 });
+		merges.push({ r1: R, c1: 1, r2: R, c2: TOTAL_COLS });
+		R++;
+
+		// 행4: 빈 행
+		sheetRows.push({ cells: [{ value: '' }], height: 8 });
+		R++;
+
+		// 행5: 헤더 (구분 | 품목명 | 1 | 2 | ... | 31 | 합계)
+		const headRow: Cell[] = [
+			{ value: '구분',  style: S_DAY_HEAD },
+			{ value: '품목명', style: S_DAY_HEAD },
+			...Array.from({ length: 31 }, (_, i) => ({ value: i + 1, style: S_DAY_HEAD })),
+			{ value: '합계',  style: S_SUBTOTAL_HEAD },
+		];
+		sheetRows.push({ cells: headRow, height: 18 });
+		R++;
+
+		// 행6~N: 품목별 데이터 (카테고리 그룹별 병합)
+		const dataStartR = R;
+		for (const cg of sd.catGroups) {
+			const groupRows = sd.rows.slice(cg.startIdx, cg.startIdx + cg.count);
+			const catStyle  = S_CAT_HEAD[cg.category] ?? S_CAT_HEAD['towel'];
+			const itemStyle = S_ITEM_HEAD[cg.category] ?? S_ITEM_HEAD['towel'];
+			const cellStyle = cg.category === 'towel' ? S_CELL_TOWEL : cg.category === 'sheet' ? S_CELL_SHEET : S_CELL_UNIFORM;
+
+			for (let ri = 0; ri < groupRows.length; ri++) {
+				const row   = groupRows[ri];
+				const altBg = (cg.startIdx + ri) % 2 === 1;
+				const bgAlt = cg.category === 'towel' ? 'F0F9FF' : cg.category === 'sheet' ? 'EEF2FF' : 'FFFBEB';
+				const cells: Cell[] = [
+					// 카테고리: 첫 행만 값, 나머지는 빈 값 (병합 후 보임)
+					{ value: ri === 0 ? cg.label : '', style: catStyle },
+					{ value: row.itemName, style: itemStyle },
+					...row.quantities.map((qty) => qty > 0
+						? { value: qty, style: { ...cellStyle, bgColor: altBg ? bgAlt : 'FFFFFF' } }
+						: { value: null, style: { ...S_CELL_EMPTY, bgColor: altBg ? 'F8FAFC' : 'FFFFFF' } }
+					),
+					{ value: row.total > 0 ? row.total : null, style: { ...S_SUBTOTAL_VAL, bgColor: altBg ? 'F1F5F9' : 'F8FAFC' } },
+				];
+				sheetRows.push({ cells, height: 16 });
+				R++;
+			}
+			// 카테고리 열 병합
+			if (cg.count > 1) {
+				merges.push({ r1: dataStartR + cg.startIdx, c1: 1, r2: dataStartR + cg.startIdx + cg.count - 1, c2: 1 });
+			}
+		}
+
+		// 날짜별 합계 행
+		const dayTotalRow: Cell[] = [
+			{ value: '합 계', style: S_FOOT_LABEL },
+			{ value: '',      style: S_FOOT_LABEL },
+			...sd.dayTotals.map((t) => t > 0
+				? { value: t, style: S_FOOT_GRAND }
+				: { value: null, style: { ...S_FOOT_LABEL, numFmt: '#,##0' } }
+			),
+			{ value: sd.grandTotal, style: S_FOOT_GRAND },
+		];
+		merges.push({ r1: R, c1: 1, r2: R, c2: 2 });
+		sheetRows.push({ cells: dayTotalRow, height: 20 });
+		R++;
+
+		// 빈 행
+		sheetRows.push({ cells: [{ value: '' }], height: 10 });
+		R++;
+
+		// ── 요약 섹션 ─────────────────────────────────
+		sheetRows.push({ cells: [
+			{ value: '[ 카테고리별 요약 ]', style: { bold: true, fontSize: 11, fontColor: '334155' } },
+		], height: 20 });
+		merges.push({ r1: R, c1: 1, r2: R, c2: 4 });
+		R++;
+
+		for (const cg of sd.catGroups) {
+			const labelStyle: Cell['style'] = {
+				bold: true, fontSize: 10, align: 'left',
+				bgColor:   cg.category === 'towel' ? 'F0F9FF' : cg.category === 'sheet' ? 'EEF2FF' : 'FFFBEB',
+				fontColor: cg.category === 'towel' ? '0369A1' : cg.category === 'sheet' ? '4338CA' : '92400E',
+				border: true,
+			};
+			const valStyle: Cell['style'] = {
+				bold: true, fontSize: 11, align: 'center',
+				bgColor:   cg.category === 'towel' ? 'E0F2FE' : cg.category === 'sheet' ? 'E0E7FF' : 'FEF3C7',
+				fontColor: cg.category === 'towel' ? '0369A1' : cg.category === 'sheet' ? '4338CA' : '92400E',
+				border: true, numFmt: '#,##0',
+			};
+			sheetRows.push({ cells: [
+				{ value: `${cg.label} (${cg.count}종)`, style: labelStyle },
+				{ value: sd.catTotals[cg.category] ?? 0, style: valStyle },
+				{ value: '', style: valStyle },
+				{ value: '개', style: { fontSize: 10, fontColor: '64748B' } },
+			], height: 20 });
+			merges.push({ r1: R, c1: 2, r2: R, c2: 3 });
+			R++;
+		}
+
+		sheetRows.push({ cells: [
+			{ value: '총 합계', style: { ...S_SUMMARY_LABEL, bgColor: 'EEF2FF', fontColor: '4338CA', bold: true } },
+			{ value: sd.grandTotal, style: S_FOOT_GRAND },
+			{ value: '', style: S_FOOT_GRAND },
+			{ value: '개', style: { fontSize: 10, fontColor: '64748B' } },
+		], height: 22 });
+		merges.push({ r1: R, c1: 2, r2: R, c2: 3 });
+		R++;
+
+		// ── 시트 조립 ─────────────────────────────────
+		const sheet: Sheet = {
+			name: `거래내역서_${periodFrom.slice(0,7)}`,
+			rows: sheetRows,
+			merges,
+			columns: xlsColumns,
+			freezeRow: 5,   // 헤더 5행 고정
+			freezeCol: 2,   // 카테고리+품목명 2열 고정
+		};
+
+		downloadXlsx([sheet], filename);
+	}
+
+	// ── 청구서 엑셀 내보내기 ─────────────────────────────────────────
+	function exportInvoiceExcel() {
+		if (!selectedClient || invoiceLines.length === 0) return;
+
+		const clientName = selectedClient.name;
+		const period = `${periodFrom}~${periodTo}`;
+		const filename = `청구서_${clientName}_${period}.xlsx`;
+
+		const S_TITLE:  Cell['style'] = { bold: true, fontSize: 16, align: 'center', fontColor: '0F172A' };
+		const S_META:   Cell['style'] = { fontSize: 10, align: 'center', fontColor: '64748B' };
+		const S_HEAD:   Cell['style'] = { bold: true, fontSize: 10, align: 'center', bgColor: 'F8FAFC', fontColor: '475569', border: true };
+		const S_LABEL:  Cell['style'] = { bold: true, fontSize: 10, align: 'left',   bgColor: 'F8FAFC', fontColor: '475569', border: true };
+		const S_NUM:    Cell['style'] = { fontSize: 10, align: 'right', border: true, numFmt: '#,##0', fontColor: '334155' };
+		const S_PRICE:  Cell['style'] = { fontSize: 10, align: 'right', border: true, numFmt: '#,##0', fontColor: '64748B' };
+		const S_AMOUNT: Cell['style'] = { bold: true, fontSize: 10, align: 'right', border: true, numFmt: '#,##0', fontColor: '1E293B' };
+		const S_CAT: Record<string, Cell['style']> = {
+			towel:   { bold: true, fontSize: 10, align: 'center', bgColor: 'E0F2FE', fontColor: '0369A1', border: true },
+			sheet:   { bold: true, fontSize: 10, align: 'center', bgColor: 'E0E7FF', fontColor: '4338CA', border: true },
+			uniform: { bold: true, fontSize: 10, align: 'center', bgColor: 'FEF3C7', fontColor: '92400E', border: true },
+		};
+		const S_TOTAL: Cell['style'] = { bold: true, fontSize: 12, align: 'right', bgColor: 'EEF2FF', fontColor: '4338CA', border: true, borderThick: true, numFmt: '#,##0' };
+		const S_TOTAL_LABEL: Cell['style'] = { bold: true, fontSize: 12, align: 'left', bgColor: 'EEF2FF', fontColor: '4338CA', border: true, borderThick: true };
+
+		const merges: MergeRegion[] = [];
+		const sheetRows: Sheet['rows'] = [];
+		let R = 1;
+
+		// 제목
+		sheetRows.push({ cells: [{ value: '세 탁 청 구 서', style: S_TITLE }, ...Array(4).fill({ value: '', style: S_TITLE })], height: 30 });
+		merges.push({ r1: R, c1: 1, r2: R, c2: 5 }); R++;
+
+		// 메타
+		sheetRows.push({ cells: [{ value: `거래처: ${clientName}    |    기간: ${periodFrom} ~ ${periodTo}    |    발행일: ${new Date().toISOString().slice(0,10)}`, style: S_META }, ...Array(4).fill({ value: '', style: S_META })], height: 18 });
+		merges.push({ r1: R, c1: 1, r2: R, c2: 5 }); R++;
+
+		// 거래처 정보
+		sheetRows.push({ cells: [{ value: '' }], height: 8 }); R++;
+		if (selectedClient.businessNo) {
+			sheetRows.push({ cells: [{ value: '사업자번호', style: S_LABEL }, { value: selectedClient.businessNo, style: { fontSize: 10, border: true } }, { value: '' }, { value: '' }, { value: '' }], height: 17 }); R++;
+		}
+		if (selectedClient.ownerName) {
+			sheetRows.push({ cells: [{ value: '대표자', style: S_LABEL }, { value: selectedClient.ownerName, style: { fontSize: 10, border: true } }, { value: '' }, { value: '' }, { value: '' }], height: 17 }); R++;
+		}
+		sheetRows.push({ cells: [{ value: '' }], height: 8 }); R++;
+
+		// 헤더
+		sheetRows.push({ cells: [
+			{ value: '품목명',  style: S_HEAD },
+			{ value: '카테고리', style: S_HEAD },
+			{ value: '수량',   style: S_HEAD },
+			{ value: '단가(원)', style: S_HEAD },
+			{ value: '금액(원)', style: S_HEAD },
+		], height: 20 }); R++;
+
+		// 데이터
+		for (const line of invoiceLines) {
+			sheetRows.push({ cells: [
+				{ value: line.itemName, style: { fontSize: 10, align: 'left', border: true, fontColor: '334155' } },
+				{ value: CATEGORY_LABELS[line.category], style: S_CAT[line.category] ?? S_HEAD },
+				{ value: line.quantity, style: S_NUM },
+				{ value: line.unitPrice > 0 ? line.unitPrice : null, style: S_PRICE },
+				{ value: line.amount, style: S_AMOUNT },
+			], height: 17 }); R++;
+		}
+
+		// 합계
+		sheetRows.push({ cells: [
+			{ value: '합  계', style: S_TOTAL_LABEL },
+			{ value: '', style: S_TOTAL_LABEL },
+			{ value: invoiceTotalQty, style: { ...S_TOTAL, fontSize: 10 } },
+			{ value: '', style: S_TOTAL },
+			{ value: invoiceTotal, style: { ...S_TOTAL, fontSize: 14 } },
+		], height: 26 }); R++;
+
+		const sheet: Sheet = {
+			name: `청구서_${periodFrom.slice(0,7)}`,
+			rows: sheetRows,
+			merges,
+			columns: [{ width: 22 }, { width: 10 }, { width: 8 }, { width: 12 }, { width: 14 }],
+		};
+
+		downloadXlsx([sheet], filename);
+	}
+
+	// ── 저장된 청구서 ─────────────────────────────────────────────────
+
+
+	// ── 헬퍼 ────────────────────────────────────────────────────────
+	const categoryBadge: Record<string, string> = {
+		towel:   'badge-info',
+		sheet:   'badge-secondary',
+		uniform: 'badge-warning'
+	};
+	const categoryColor: Record<string, string> = {
+		towel:   'bg-info',
+		sheet:   'bg-secondary',
+		uniform: 'bg-warning'
+	};
+
+	function formatDate(d: string) { return d.replace(/-/g, '.').slice(0, 10); }
+	function formatMoney(n: number) { return n.toLocaleString('ko-KR') + '원'; }
+
+	// ── 계약기간 관리 ─────────────────────────────────────────────────
+	const contracts = $derived(
+		selectedClientId ? clientContractsData.filter((c) => c.clientId === selectedClientId) : []
+	);
+
+	let showContractModal       = $state(false);
+	let editingContractId       = $state<string | null>(null);
+	let contractFrom            = $state('');
+	let contractTo              = $state('');
+	let contractMemo            = $state('');
+	let contractDeleteConfirmId = $state<string | null>(null);
+
+	function openAddContract() {
+		editingContractId = null;
+		const d   = new Date();
+		const pad = (n: number) => String(n).padStart(2, '0');
+		const y   = d.getFullYear();
+		const m   = d.getMonth() + 1;
+		const last = new Date(y, m, 0).getDate();
+		contractFrom = `${y}-${pad(m)}-01`;
+		contractTo   = `${y}-${pad(m)}-${pad(last)}`;
+		contractMemo = '';
+		showContractModal = true;
+	}
+
+	function openEditContract(c: ClientContract) {
+		editingContractId = c.id;
+		contractFrom = c.startDate;
+		contractTo   = c.endDate;
+		contractMemo = c.memo ?? '';
+		showContractModal = true;
+	}
+
+	function saveContract() {
+		if (!selectedClientId || !contractFrom || !contractTo) return;
+		if (editingContractId) {
+			const idx = clientContractsData.findIndex(ct => ct.id === editingContractId);
+			if (idx >= 0) { clientContractsData[idx].startDate = contractFrom; clientContractsData[idx].endDate = contractTo; clientContractsData[idx].memo = contractMemo || undefined; }
+		} else {
+			clientContractsData.push({ id: crypto.randomUUID(), clientId: selectedClientId, startDate: contractFrom, endDate: contractTo, memo: contractMemo || undefined, createdAt: new Date().toISOString() });
+		}
+		showContractModal = false;
+	}
+
+	function applyContractToBilling(c: ClientContract) {
+		periodFrom = c.startDate;
+		periodTo   = c.endDate;
+		switchTab('invoice');
+	}
+
+	function getContractStatus(startDate: string, endDate: string): 'active' | 'expired' | 'upcoming' {
+		const now   = Date.now();
+		const start = new Date(startDate + 'T00:00:00').getTime();
+		const end   = new Date(endDate   + 'T23:59:59').getTime();
+		if (now < start) return 'upcoming';
+		if (now > end)   return 'expired';
+		return 'active';
+	}
+
+	function getContractProgress(startDate: string, endDate: string): number {
+		const now   = Date.now();
+		const start = new Date(startDate + 'T00:00:00').getTime();
+		const end   = new Date(endDate   + 'T23:59:59').getTime();
+		if (now <= start) return 0;
+		if (now >= end)   return 100;
+		return Math.round(((now - start) / (end - start)) * 100);
+	}
+
+	function getDday(endDate: string): string {
+		const diff = Math.ceil(
+			(new Date(endDate + 'T23:59:59').getTime() - Date.now()) / 86400000
+		);
+		if (diff < 0)   return `D+${Math.abs(diff)}`;
+		if (diff === 0) return 'D-DAY';
+		return `D-${diff}`;
+	}
+
+
+</script>
+
+<svelte:head>
+	<title>청구서 관리 — 세탁 관리자</title>
+</svelte:head>
+
+<!-- ═══════════════ 화면 UI ═══════════════ -->
+<div class="min-h-screen bg-base-200 px-8 py-6" id="billing-screen-ui">
+
+	<!-- 헤더 + 탭 -->
+	<div class="mb-6 flex flex-wrap items-center justify-between gap-4">
+		<h2 class="text-2xl font-extrabold text-base-content">청구 관리</h2>
+		<div role="tablist" class="tabs tabs-boxed flex-wrap">
+			<button
+				type="button"
+				style="pointer-events: auto; cursor: pointer;"
+				class="tab {tabState.active === 'invoice' ? 'tab-active' : ''}"
+				onclick={() => switchTab('invoice')}
+			>📄 청구서</button>
+			<button
+				type="button"
+				style="pointer-events: auto; cursor: pointer;"
+				class="tab {tabState.active === 'statement' ? 'tab-active' : ''}"
+				onclick={() => switchTab('statement')}
+			>📋 거래내역서</button>
+			<button
+				type="button"
+				style="pointer-events: auto; cursor: pointer;"
+				class="tab {tabState.active === 'contract' ? 'tab-active' : ''}"
+				onclick={() => switchTab('contract')}
+			>🗓️ 계약기간</button>
+		</div>
+	</div>
+
+	<!-- 거래처 선택 -->
+	<div class="card card-sm bg-base-100 shadow-sm mb-6">
+		<div class="card-body flex-row flex-wrap items-center gap-3 py-3">
+			<span class="shrink-0 text-[11px] font-bold uppercase tracking-widest text-base-content/40">거래처</span>
+			<select
+				class="select select-bordered select-sm font-semibold"
+				bind:value={selectedClientId}
+			>
+				{#each clients as c (c.id)}
+					<option value={c.id}>{c.name}</option>
+				{/each}
+			</select>
+			{#if selectedClient}
+				<span class="badge badge-outline border-secondary/30 bg-secondary/10 text-secondary gap-1.5 py-3 px-3">
+					{selectedClient.name}
+				</span>
+				{#if selectedClient.managerName}
+					<span class="text-xs text-base-content/50">담당: {selectedClient.managerName}</span>
+				{/if}
+				{#if selectedClient.phone}
+					<span class="text-xs text-base-content/50">☎ {selectedClient.phone}</span>
+				{/if}
+			{/if}
+		</div>
+	</div>
+
+	<!-- ── 청구서 탭 ── -->
+	{#if tabState.active === 'invoice'}
+		<div class="grid grid-cols-12 gap-5">
+			<!-- 왼쪽: 기간 + 품목표 -->
+			<div class="col-span-8 space-y-5">
+				<!-- 기간 설정 -->
+				<div class="card bg-base-100 shadow-sm p-5">
+					<h3 class="mb-4 text-sm font-bold">📅 청구 기간 설정</h3>
+					<div class="flex flex-wrap items-end gap-3">
+						<div class="flex flex-col gap-1">
+							<label for="inv-from" class="text-xs font-semibold text-base-content/50">시작일</label>
+							<input id="inv-from" type="date" bind:value={periodFrom} class="input input-bordered input-sm" />
+						</div>
+						<span class="mb-1 text-base-content/40">~</span>
+						<div class="flex flex-col gap-1">
+							<label for="inv-to" class="text-xs font-semibold text-base-content/50">종료일</label>
+							<input id="inv-to" type="date" bind:value={periodTo} class="input input-bordered input-sm" />
+						</div>
+					</div>
+					{#if contracts.length > 0}
+						<div class="mt-3 flex flex-wrap gap-2 border-t border-base-200 pt-3">
+							<span class="self-center text-[11px] font-bold text-base-content/40">계약기간 적용:</span>
+							{#each contracts.slice(0, 4) as c (c.id)}
+								{@const status = getContractStatus(c.startDate, c.endDate)}
+								<button type="button"
+									class="btn btn-xs {status === 'active' ? 'btn-primary' : status === 'upcoming' ? 'btn-info' : 'btn-ghost'}"
+									onclick={() => { periodFrom = c.startDate; periodTo = c.endDate; }}>
+									{c.startDate.slice(5)} ~ {c.endDate.slice(5)}{c.memo ? ` (${c.memo})` : ''}
+								</button>
+							{/each}
+						</div>
+					{/if}
+				</div>
+
+				<!-- 품목 청구 표 -->
+				<div class="card bg-base-100 shadow-sm overflow-hidden">
+					<div class="flex items-center justify-between border-b border-base-200 px-5 py-4">
+						<div>
+							<h3 class="text-base font-bold">품목별 청구 내역</h3>
+							<p class="mt-0.5 text-xs text-base-content/40">{formatDate(periodFrom)} ~ {formatDate(periodTo)}</p>
+						</div>
+						{#if unpricedCount > 0}
+							<span class="badge badge-warning font-semibold">단가 미설정 {unpricedCount}건</span>
+						{/if}
+					</div>
+					{#if invoiceLines.length === 0}
+						<div class="py-16 text-center">
+							<p class="text-base-content/40">해당 기간에 출고 내역이 없습니다.</p>
+							<p class="mt-1 text-xs text-base-content/30">거래처와 기간을 확인해 주세요.</p>
+						</div>
+					{:else}
+						<div style="max-height: 420px; overflow-y: auto;">
+						<table class="table table-sm w-full">
+							<thead class="sticky top-0 z-10 bg-base-200">
+								<tr>
+									<th class="text-xs">품목명</th>
+									<th class="w-28 text-xs whitespace-nowrap">카테고리</th>
+									<th class="w-20 text-xs text-right">수량</th>
+									<th class="w-28 text-xs text-right">단가</th>
+									<th class="w-28 text-xs text-right">금액</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each (['towel', 'sheet', 'uniform'] as const) as cat (cat)}
+									{@const catLines = invoiceLines.filter((l) => l.category === cat)}
+									{#if catLines.length > 0}
+										<tr class="bg-base-200/50">
+											<td colspan="5" class="py-2">
+												<span class="badge badge-sm font-bold {categoryBadge[cat]}">
+													{CATEGORY_LABELS[cat]}
+												</span>
+											</td>
+										</tr>
+										{#each catLines as line (line.category + line.itemName)}
+											<tr class="hover">
+												<td class="pl-8 font-medium">{line.itemName}</td>
+												<td class="w-28">
+													<span class="badge badge-sm font-semibold {categoryBadge[line.category]}">
+														{CATEGORY_LABELS[line.category as 'towel'|'sheet'|'uniform']}
+													</span>
+												</td>
+												<td class="w-20 text-right">{line.quantity.toLocaleString()}</td>
+												<td class="w-28 whitespace-nowrap text-right {line.unitPrice === 0 ? 'font-semibold text-warning' : 'text-base-content/70'}">
+													{line.unitPrice === 0 ? '미설정' : formatMoney(line.unitPrice)}
+												</td>
+												<td class="w-28 whitespace-nowrap text-right font-bold {line.amount === 0 ? 'text-base-content/30' : ''}">
+													{formatMoney(line.amount)}
+												</td>
+											</tr>
+										{/each}
+										{#if catLines.length > 1}
+											<tr class="bg-base-200/50">
+												<td colspan="2" class="pl-8 text-xs font-semibold text-base-content/40">소계</td>
+												<td class="w-20 text-right text-xs font-bold">
+													{catLines.reduce((s, l) => s + l.quantity, 0).toLocaleString()}
+												</td>
+												<td class="w-28"></td>
+												<td class="w-28 whitespace-nowrap text-right text-xs font-bold">
+													{formatMoney(catLines.reduce((s, l) => s + l.amount, 0))}
+												</td>
+											</tr>
+										{/if}
+									{/if}
+								{/each}
+							</tbody>
+							<tfoot class="sticky bottom-0 z-10 bg-base-100">
+								<tr class="border-t-2 border-base-300 bg-primary/10">
+									<td colspan="2" class="px-3 py-3 text-sm font-extrabold">합계</td>
+									<td class="w-20 px-3 py-3 text-right text-sm font-extrabold">{invoiceTotalQty.toLocaleString()}</td>
+									<td class="w-28 px-3 py-3"></td>
+									<td class="w-28 whitespace-nowrap px-3 py-3 text-right text-lg font-black text-primary">{formatMoney(invoiceTotal)}</td>
+								</tr>
+							</tfoot>
+						</table>
+						</div>
+					{/if}
+				</div>
+
+				{#if invoiceLines.length > 0}
+					<div class="card bg-base-100 shadow-sm p-5">
+						<label for="inv-memo" class="mb-2 block text-sm font-bold text-base-content/60">메모 (선택)</label>
+						<textarea id="inv-memo" bind:value={invoiceMemo} rows="2"
+							class="textarea textarea-bordered w-full resize-none"
+							placeholder="청구서에 표시할 메모를 입력하세요..."></textarea>
+					</div>
+				{/if}
+			</div>
+
+			<!-- 오른쪽: 요약 + 액션 -->
+			<div class="col-span-4 space-y-5">
+				{#if selectedClient}
+					<div class="card bg-base-100 shadow-sm p-5">
+						<p class="mb-3 text-xs font-bold uppercase tracking-wide text-base-content/40">거래처 정보</p>
+						<p class="text-lg font-extrabold">{selectedClient.name}</p>
+						{#if selectedClient.businessNo}<p class="mt-1 text-xs text-base-content/50">사업자 {selectedClient.businessNo}</p>{/if}
+						{#if selectedClient.ownerName}<p class="text-xs text-base-content/50">대표 {selectedClient.ownerName}</p>{/if}
+						{#if selectedClient.managerName}<p class="text-xs text-base-content/50">담당 {selectedClient.managerName}</p>{/if}
+						{#if selectedClient.phone}<p class="text-xs text-base-content/50">연락처 {selectedClient.phone}</p>{/if}
+					</div>
+				{/if}
+
+				<div class="card bg-primary/10 border border-primary/20 shadow-sm p-5">
+					<p class="mb-3 text-xs font-bold uppercase tracking-wide text-primary/70">청구 요약</p>
+					<div class="space-y-2">
+						<div class="flex justify-between text-sm">
+							<span class="text-base-content/50">기간</span>
+							<span class="text-right text-xs font-semibold">
+								{formatDate(periodFrom)}<br/>~ {formatDate(periodTo)}
+							</span>
+						</div>
+						<div class="flex justify-between text-sm">
+							<span class="text-base-content/50">총 수량</span>
+							<span class="font-bold">{invoiceTotalQty.toLocaleString()}개</span>
+						</div>
+						{#if unpricedCount > 0}
+							<div class="flex justify-between text-sm">
+								<span class="text-warning">단가 미설정</span>
+								<span class="font-bold text-warning">{unpricedCount}건</span>
+							</div>
+						{/if}
+						<div class="mt-3 border-t border-primary/20 pt-3">
+							<div class="flex justify-between">
+								<span class="font-bold">청구 금액</span>
+								<span class="text-xl font-black text-primary">{formatMoney(invoiceTotal)}</span>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				{#if invoiceLines.length > 0}
+					<!-- 카테고리별 요약 -->
+					<div class="card bg-base-100 shadow-sm p-5">
+						<p class="mb-3 text-xs font-bold uppercase tracking-wide text-base-content/40">카테고리별</p>
+						<div class="space-y-2">
+							{#each (['towel', 'sheet', 'uniform'] as const) as cat (cat)}
+								{#if invoiceByCategory[cat]}
+									<div class="flex items-center gap-2">
+										<div class="h-2.5 w-2.5 shrink-0 rounded-full {categoryColor[cat]}"></div>
+										<span class="flex-1 text-xs font-medium">{CATEGORY_LABELS[cat]}</span>
+										<span class="text-xs text-base-content/50">{invoiceByCategory[cat].qty.toLocaleString()}개</span>
+										<span class="w-24 shrink-0 text-right text-xs font-bold">{formatMoney(invoiceByCategory[cat].amount)}</span>
+									</div>
+								{/if}
+							{/each}
+						</div>
+					</div>
+
+					<!-- 액션 버튼 -->
+					<div class="space-y-2">
+						<button type="button" class="btn btn-primary w-full gap-2" onclick={openPdfModal} disabled={invoiceLines.length === 0}>
+							<Icon icon="lucide:file-text" class="h-4 w-4" />
+							청구서 PDF
+						</button>
+						<button type="button" class="btn btn-success w-full gap-2" onclick={exportInvoiceExcel}>
+							<Icon icon="lucide:file-spreadsheet" class="h-4 w-4" />
+							청구서 엑셀 저장
+						</button>
+						</div>
+					{/if}
+				</div>
+			</div>
+
+	<!-- ── 거래내역서 탭 ── -->
+	{:else if tabState.active === 'statement'}
+		<div class="space-y-4">
+			<!-- 조회 기간 + 뷰 모드 + 액션 버튼 -->
+			<div class="card bg-base-100 shadow-sm p-4">
+				<div class="flex flex-wrap items-end gap-3">
+					<div class="flex flex-col gap-1">
+						<label for="stmt-from" class="text-xs font-semibold text-base-content/50">시작일</label>
+						<input id="stmt-from" type="date" bind:value={periodFrom} class="input input-bordered input-sm" />
+					</div>
+					<span class="mb-1 text-base-content/40">~</span>
+					<div class="flex flex-col gap-1">
+						<label for="stmt-to" class="text-xs font-semibold text-base-content/50">종료일</label>
+						<input id="stmt-to" type="date" bind:value={periodTo} class="input input-bordered input-sm" />
+					</div>
+					<!-- 뷰 모드 전환 -->
+					<div class="tabs tabs-boxed gap-0">
+						<button type="button"
+							class="tab {stmtViewMode === 'pivot' ? 'tab-active' : ''}"
+							onclick={() => stmtViewMode = 'pivot'}>
+							📊 피벗표
+						</button>
+						<button type="button"
+							class="tab {stmtViewMode === 'daily' ? 'tab-active' : ''}"
+							onclick={() => stmtViewMode = 'daily'}>
+							📅 일별상세
+						</button>
+					</div>
+					{#if statementData}
+						<div class="ml-auto flex gap-2">
+							<button type="button" class="btn btn-success btn-sm gap-1.5" onclick={exportStatementExcel}>
+								<Icon icon="lucide:file-spreadsheet" class="h-4 w-4" />
+								엑셀 저장
+							</button>
+						</div>
+					{/if}
+				</div>
+			</div>
+
+			{#if !statementData}
+				<div class="card border-2 border-dashed border-success/30 bg-success/5 p-16 text-center shadow-sm">
+					<p class="text-4xl">📋</p>
+					<p class="mt-3 text-lg font-bold text-success">거래내역이 없습니다</p>
+					<p class="mt-1 text-sm text-success/70">선택한 기간에 출고 기록이 없거나, 거래처를 확인해 주세요.</p>
+				</div>
+			{:else}
+				<!-- ━━ 피벗 뷰 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+				{#if stmtViewMode === 'pivot'}
+						<!-- 피벗 테이블 — 세로=품목, 가로=1~31일 고정 (가로 스크롤 없음) -->
+						<div class="card bg-base-100 shadow-sm overflow-hidden">
+							<!-- 카테고리 범례 -->
+							<div class="flex items-center gap-4 border-b border-base-200 px-4 py-2.5 bg-base-200/50">
+								{#each statementData.catGroups as cg (cg.category)}
+									{@const dot = cg.category === 'towel' ? 'bg-info' : cg.category === 'sheet' ? 'bg-primary' : 'bg-warning'}
+									{@const txt = cg.category === 'towel' ? 'text-info' : cg.category === 'sheet' ? 'text-primary' : 'text-warning'}
+									<div class="flex items-center gap-1.5">
+										<span class="h-2.5 w-2.5 rounded-full {dot}"></span>
+										<span class="text-xs font-semibold {txt}">{cg.label} ({cg.count}종)</span>
+									</div>
+								{/each}
+								<span class="ml-auto text-[10px] text-base-content/40">품목 {statementData.rows.length}종 · 출고 {statementData.activeDays}일</span>
+							</div>
+
+							<div bind:clientWidth={pivotScrollWidth} style="overflow-y: auto; {statementData.dates.length > 31 ? 'overflow-x: auto;' : ''} max-height: 70vh;">
+								<table class="border-collapse" style="table-layout: fixed; font-size: 11px; width: {statementData.dates.length > 31 ? ((5.2 + 7.5 + 3.8) * 11 + statementData.dates.length * pivotDateColWidth) + 'px' : '100%'};">
+									<colgroup>
+										<col style="width: 5.2em" /><!-- 구분 -->
+										<col style="width: 7.5em" /><!-- 품목명 -->
+										{#each statementData.dates as d (d)}
+											<col style="width: {pivotDateColWidth}px" /><!-- 날짜 -->
+										{/each}
+										<col style="width: 3.8em" /><!-- 합계 -->
+									</colgroup>
+									<thead class="sticky top-0 z-20">
+										<tr class="border-b-2 border-base-300 bg-base-200">
+											<th class="sticky left-0 z-30 bg-base-200 border-r border-base-300 py-2 text-center text-[10px] font-bold">구분</th>
+											<th class="sticky bg-base-200 border-r border-base-300 py-2 text-center text-[10px] font-bold" style="left: 5.2em; z-index: 31;">품목명</th>
+											{#each statementData.dateLabels as label, i (i)}
+												<th class="py-2 text-center text-[10px] font-bold border-r border-base-200">{label}</th>
+											{/each}
+											<th class="py-2 text-center text-[10px] font-bold border-l border-base-300 bg-base-200">합계</th>
+										</tr>
+									</thead>
+									<tbody>
+										{#each statementData.catGroups as cg (cg.category)}
+											{@const catBg  = cg.category === 'towel' ? 'bg-info/10'   : cg.category === 'sheet' ? 'bg-primary/10'   : 'bg-warning/10'}
+											{@const catTxt = cg.category === 'towel' ? 'text-info'    : cg.category === 'sheet' ? 'text-primary'    : 'text-warning'}
+											{@const altBg  = cg.category === 'towel' ? 'bg-info/5'    : cg.category === 'sheet' ? 'bg-primary/5'    : 'bg-warning/5'}
+											{@const activeBg = cg.category === 'towel' ? 'bg-info/20 font-semibold' : cg.category === 'sheet' ? 'bg-primary/20 font-semibold' : 'bg-warning/20 font-semibold'}
+											{#each statementData.rows.slice(cg.startIdx, cg.startIdx + cg.count) as row, ri (row.key)}
+												<tr class="border-b border-base-200 hover:bg-base-200/30 transition-colors {ri % 2 === 1 ? altBg : 'bg-base-100'}">
+													{#if ri === 0}
+														<td rowspan={cg.count}
+															class="sticky left-0 z-10 border-r border-base-200 text-center align-middle py-1 font-bold text-[10px] {catBg} {catTxt}"
+															style="writing-mode: vertical-rl; letter-spacing: 0.05em;">
+															{cg.label}
+														</td>
+													{/if}
+													<td class="sticky border-r border-base-200 px-1 py-1.5 text-[11px] font-medium truncate {ri % 2 === 1 ? altBg : 'bg-base-100'}" style="left: 5.2em; z-index: 9;">
+														{row.itemName}
+													</td>
+													{#each row.dateQtys as qty, di (di)}
+														<td class="py-1.5 text-center border-r border-base-100 {qty > 0 ? activeBg : ''}">
+															{qty > 0 ? qty : ''}
+														</td>
+													{/each}
+													<td class="py-1.5 text-center font-bold border-l border-base-200">
+														{row.total > 0 ? row.total : ''}
+													</td>
+												</tr>
+											{/each}
+										{/each}
+									</tbody>
+									<tfoot class="sticky bottom-0 z-20">
+										<tr class="border-t-2 border-primary/30 bg-primary/10">
+											<td colspan="2" class="sticky left-0 z-30 bg-primary/10 border-r border-primary/20 px-1 py-2 text-center text-xs font-extrabold text-primary">합 계</td>
+											{#each statementData.dateTotals as total, i (i)}
+												<td class="py-2 text-center text-xs font-bold border-r border-primary/10 {total > 0 ? 'text-primary' : 'text-base-content/20'}">
+													{total > 0 ? total : ''}
+												</td>
+											{/each}
+											<td class="py-2 text-center text-sm font-black text-primary border-l border-primary/20">{statementData.grandTotal.toLocaleString()}</td>
+										</tr>
+									</tfoot>
+								</table>
+							</div>
+						</div>
+
+				<!-- ━━ 일별 상세 뷰 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+					{:else}
+						{@const isMultiMonth = periodFrom.slice(0, 7) !== periodTo.slice(0, 7)}
+						<div class="card bg-base-100 shadow-sm overflow-hidden">
+
+							<!-- ── 컨럼 헤더 (sticky) ── -->
+							<div class="sticky top-0 z-10 grid border-b border-base-200 bg-base-100 shadow-sm"
+								 style="grid-template-columns: 6rem 1fr 1fr 1fr 6rem;">
+								<!-- 날짜 -->
+								<div class="flex items-center justify-center px-3 py-3.5 border-r border-base-200">
+									<span class="text-xs font-bold uppercase tracking-widest text-base-content/40">날짜</span>
+								</div>
+								<!-- 타월 -->
+								<div class="flex items-center gap-2 border-r border-base-200 px-4 py-3.5" style="border-top: 3px solid oklch(var(--in));">
+									<span class="h-2.5 w-2.5 rounded-full bg-info shrink-0"></span>
+									<span class="text-sm font-bold text-info">타월</span>
+									{#if statementData.catTotals['towel'] > 0}
+										<span class="ml-auto text-xs font-semibold text-info tabular-nums">{statementData.catTotals['towel'].toLocaleString()}개</span>
+									{/if}
+								</div>
+								<!-- 시트 -->
+								<div class="flex items-center gap-2 border-r border-base-200 px-4 py-3.5" style="border-top: 3px solid oklch(var(--p));">
+									<span class="h-2.5 w-2.5 rounded-full bg-primary shrink-0"></span>
+									<span class="text-sm font-bold text-primary">시트</span>
+									{#if statementData.catTotals['sheet'] > 0}
+										<span class="ml-auto text-xs font-semibold text-primary tabular-nums">{statementData.catTotals['sheet'].toLocaleString()}개</span>
+									{/if}
+								</div>
+								<!-- 유니폼 -->
+								<div class="flex items-center gap-2 border-r border-base-200 px-4 py-3.5" style="border-top: 3px solid oklch(var(--wa));">
+									<span class="h-2.5 w-2.5 rounded-full bg-warning shrink-0"></span>
+									<span class="text-sm font-bold text-warning">유니폼</span>
+									{#if statementData.catTotals['uniform'] > 0}
+										<span class="ml-auto text-xs font-semibold text-warning tabular-nums">{statementData.catTotals['uniform'].toLocaleString()}개</span>
+									{/if}
+								</div>
+								<!-- 합계 -->
+								<div class="flex items-center justify-end px-4 py-3.5">
+									<span class="text-xs font-bold uppercase tracking-widest text-base-content/40">합계</span>
+								</div>
+							</div>
+
+							<!-- ── 스크롤 바디 ── -->
+							<div style="max-height: 65vh; overflow-y: auto;">
+								{#each statementData.dailyRows as drow (drow.date)}
+									{@const dow      = ['일','월','화','수','목','금','토'][new Date(drow.date).getDay()]}
+									{@const isWeekend = new Date(drow.date).getDay() === 0 || new Date(drow.date).getDay() === 6}
+									{@const towelItems   = drow.items.filter(it => it.category === 'towel')}
+									{@const sheetItems   = drow.items.filter(it => it.category === 'sheet')}
+									{@const uniformItems = drow.items.filter(it => it.category === 'uniform')}
+
+									<div class="grid border-b border-base-200 last:border-b-0 transition-colors hover:bg-base-200/30 {isWeekend ? 'bg-error/5' : 'bg-base-100'}"
+										 style="grid-template-columns: 6rem 1fr 1fr 1fr 6rem;">
+
+										<!-- 날짜 셀 -->
+										<div class="flex flex-col items-center justify-center border-r border-base-200 py-4 px-2 {isWeekend ? 'bg-error/10' : ''}">
+											{#if isMultiMonth}
+												<span class="text-[10px] font-semibold text-base-content/40 leading-none mb-1">{drow.date.slice(5,7)}월</span>
+											{/if}
+											<span class="text-3xl font-black leading-none tabular-nums {isWeekend ? 'text-error' : ''}">{drow.date.slice(8,10)}</span>
+											<span class="mt-1.5 text-xs font-bold {isWeekend ? 'text-error/70' : 'text-base-content/40'}">{dow}</span>
+										</div>
+
+										<!-- 타월 셀 -->
+										<div class="border-r border-base-200 px-4 py-3.5" style="border-left: 2px solid oklch(var(--in) / 0.3);">
+											{#if towelItems.length > 0}
+												<div class="space-y-1.5">
+													{#each towelItems as it (it.itemName)}
+														<div class="flex items-center justify-between gap-2">
+															<span class="text-sm leading-snug">{it.itemName}</span>
+															<span class="shrink-0 text-sm font-bold tabular-nums text-info">{it.quantity.toLocaleString()}<span class="ml-0.5 text-xs font-normal text-base-content/40">개</span></span>
+														</div>
+													{/each}
+												</div>
+											{:else}
+												<span class="text-base text-base-content/20 select-none">—</span>
+											{/if}
+										</div>
+
+										<!-- 시트 셀 -->
+										<div class="border-r border-base-200 px-4 py-3.5" style="border-left: 2px solid oklch(var(--p) / 0.3);">
+											{#if sheetItems.length > 0}
+												<div class="space-y-1.5">
+													{#each sheetItems as it (it.itemName)}
+														<div class="flex items-center justify-between gap-2">
+															<span class="text-sm leading-snug">{it.itemName}</span>
+															<span class="shrink-0 text-sm font-bold tabular-nums text-primary">{it.quantity.toLocaleString()}<span class="ml-0.5 text-xs font-normal text-base-content/40">개</span></span>
+														</div>
+													{/each}
+												</div>
+											{:else}
+												<span class="text-base text-base-content/20 select-none">—</span>
+											{/if}
+										</div>
+
+										<!-- 유니폼 셀 -->
+										<div class="border-r border-base-200 px-4 py-3.5" style="border-left: 2px solid oklch(var(--wa) / 0.3);">
+											{#if uniformItems.length > 0}
+												<div class="space-y-1.5">
+													{#each uniformItems as it (it.itemName)}
+														<div class="flex items-center justify-between gap-2">
+															<span class="text-sm leading-snug">{it.itemName}</span>
+															<span class="shrink-0 text-sm font-bold tabular-nums text-warning">{it.quantity.toLocaleString()}<span class="ml-0.5 text-xs font-normal text-base-content/40">개</span></span>
+														</div>
+													{/each}
+												</div>
+											{:else}
+												<span class="text-base text-base-content/20 select-none">—</span>
+											{/if}
+										</div>
+
+										<!-- 합계 셀 -->
+										<div class="flex flex-col items-end justify-center px-4 py-3.5">
+											<span class="text-xl font-black tabular-nums leading-none {isWeekend ? 'text-error' : ''}">{drow.total.toLocaleString()}</span>
+											<span class="mt-1 text-xs text-base-content/40">개</span>
+										</div>
+									</div>
+								{/each}
+							</div>
+
+							<!-- ── 하단 합계 행 ── -->
+							<div class="grid border-t-2 border-base-300 bg-base-200"
+								 style="grid-template-columns: 6rem 1fr 1fr 1fr 6rem;">
+								<div class="flex items-center justify-center px-3 py-3 border-r border-base-200">
+									<span class="text-xs font-bold">{statementData.activeDays}일</span>
+								</div>
+								<div class="flex items-center justify-between px-4 py-3 border-r border-base-200">
+									{#if statementData.catTotals['towel'] > 0}
+										<span class="text-xs text-base-content/40">소계</span>
+										<span class="text-sm font-black tabular-nums text-info">{statementData.catTotals['towel'].toLocaleString()}<span class="ml-0.5 text-xs font-normal text-base-content/40">개</span></span>
+									{:else}
+										<span class="text-sm text-base-content/20">—</span>
+									{/if}
+								</div>
+								<div class="flex items-center justify-between px-4 py-3 border-r border-base-200">
+									{#if statementData.catTotals['sheet'] > 0}
+										<span class="text-xs text-base-content/40">소계</span>
+										<span class="text-sm font-black tabular-nums text-primary">{statementData.catTotals['sheet'].toLocaleString()}<span class="ml-0.5 text-xs font-normal text-base-content/40">개</span></span>
+									{:else}
+										<span class="text-sm text-base-content/20">—</span>
+									{/if}
+								</div>
+								<div class="flex items-center justify-between px-4 py-3 border-r border-base-200">
+									{#if statementData.catTotals['uniform'] > 0}
+										<span class="text-xs text-base-content/40">소계</span>
+										<span class="text-sm font-black tabular-nums text-warning">{statementData.catTotals['uniform'].toLocaleString()}<span class="ml-0.5 text-xs font-normal text-base-content/40">개</span></span>
+									{:else}
+										<span class="text-sm text-base-content/20">—</span>
+									{/if}
+								</div>
+								<div class="flex flex-col items-end justify-center px-4 py-3">
+									<span class="text-base font-black tabular-nums">{statementData.grandTotal.toLocaleString()}</span>
+									<span class="text-xs text-base-content/40">개</span>
+								</div>
+							</div>
+
+						</div>
+					{/if}
+			{/if}
+		</div>
+	{:else if tabState.active === 'contract'}
+		<div class="space-y-5">
+			{#if !selectedClientId}
+				<!-- 거래처 미선택 플레이스홀더 -->
+				<div class="card border-2 border-dashed border-secondary/30 bg-secondary/5 p-16 text-center shadow-sm">
+					<p class="text-4xl">🗓️</p>
+					<p class="mt-3 text-lg font-bold text-secondary">거래처를 선택해주세요</p>
+					<p class="mt-1 text-sm text-secondary/70">거래처를 선택하면 계약기간을 관리할 수 있습니다.</p>
+				</div>
+			{:else}
+				{@const activeCount   = contracts.filter(c => getContractStatus(c.startDate, c.endDate) === 'active').length}
+				{@const expiredCount  = contracts.filter(c => getContractStatus(c.startDate, c.endDate) === 'expired').length}
+				{@const upcomingCount = contracts.filter(c => getContractStatus(c.startDate, c.endDate) === 'upcoming').length}
+
+				<!-- 상단 배너 -->
+				<div class="card bg-secondary text-secondary-content p-5 shadow">
+					<div class="flex items-center justify-between">
+						<div>
+							<h3 class="text-lg font-extrabold tracking-tight">🗓️ 계약기간 관리</h3>
+							<p class="mt-0.5 text-sm opacity-70">{selectedClient?.name} · 총 {contracts.length}건</p>
+						</div>
+						<div class="flex items-center gap-3">
+							{#if activeCount > 0}
+								<div class="badge badge-success gap-1 px-3 py-3">
+									<span>진행중</span>
+									<span class="font-black">{activeCount}</span>
+								</div>
+							{/if}
+							{#if upcomingCount > 0}
+								<div class="badge badge-info gap-1 px-3 py-3">
+									<span>예정</span>
+									<span class="font-black">{upcomingCount}</span>
+								</div>
+							{/if}
+							{#if expiredCount > 0}
+								<div class="badge badge-ghost gap-1 px-3 py-3">
+									<span>만료</span>
+									<span class="font-black">{expiredCount}</span>
+								</div>
+							{/if}
+						</div>
+					</div>
+				</div>
+
+				<!-- 메인 레이아웃 -->
+				<div class="grid grid-cols-12 gap-5">
+					<!-- 왼쪽: 계약 카드 그리드 -->
+					<div class="col-span-8">
+						{#if contracts.length === 0}
+							<div class="card border-2 border-dashed border-secondary/30 bg-secondary/5 p-16 text-center">
+								<p class="text-4xl">📋</p>
+								<p class="mt-3 text-base font-bold text-secondary">아직 등록된 계약기간이 없습니다</p>
+								<p class="mt-1 text-sm text-base-content/40">오른쪽 패널에서 계약기간을 추가해 보세요.</p>
+							</div>
+						{:else}
+							<div class="overflow-y-auto pr-1" style="max-height: 68vh;">
+							<div class="grid grid-cols-2 gap-4">
+								{#each contracts as c (c.id)}
+									{@const status   = getContractStatus(c.startDate, c.endDate)}
+									{@const progress = getContractProgress(c.startDate, c.endDate)}
+									{@const dday     = getDday(c.endDate)}
+									<div class="card border shadow-sm transition-all hover:shadow-md
+										{status === 'active'
+											? 'border-secondary/30 bg-secondary/5'
+											: status === 'upcoming'
+											? 'border-info/30 bg-info/5'
+											: 'border-base-300 bg-base-100'}">
+										<div class="card-body p-5">
+											<!-- 상태 뇱죀 + D-day -->
+											<div class="mb-3 flex items-center justify-between">
+												<span class="badge
+													{status === 'active' ? 'badge-success' : status === 'upcoming' ? 'badge-info' : 'badge-ghost'}">
+													{status === 'active' ? '● 진행중' : status === 'upcoming' ? '◎ 예정' : '○ 만료'}
+												</span>
+												<span class="text-xs font-bold text-base-content/50">{dday}</span>
+											</div>
+
+											<!-- 날짜 -->
+											<p class="text-base font-extrabold">
+												{c.startDate.replace(/-/g, '.')} ~ {c.endDate.replace(/-/g, '.')}
+											</p>
+
+											<!-- 메모 -->
+											{#if c.memo}
+												<p class="mt-1 text-xs text-base-content/50">📝 {c.memo}</p>
+											{/if}
+
+											<!-- 진행률 바 -->
+											<div class="mt-3">
+												<div class="mb-1 flex items-center justify-between">
+													<span class="text-[10px] text-base-content/40">계약 진행률</span>
+													<span class="text-[10px] font-bold text-base-content/50">{progress}%</span>
+												</div>
+												<progress
+													class="progress w-full {status === 'active' ? 'progress-secondary' : status === 'upcoming' ? 'progress-info' : 'progress-ghost'}"
+													value={progress} max="100">
+												</progress>
+											</div>
+
+											<!-- 액션 버튼 -->
+											{#if contractDeleteConfirmId === c.id}
+												<div class="mt-3 rounded-xl border border-error/30 bg-error/10 p-3">
+													<p class="mb-2 text-xs font-semibold text-error">정말 삭제하시겠습니까?</p>
+													<div class="flex gap-2">
+														<button type="button" class="btn btn-ghost btn-xs flex-1"
+															onclick={() => (contractDeleteConfirmId = null)}>취소</button>
+														<button type="button" class="btn btn-error btn-xs flex-1"
+															onclick={() => { clientContractsData = clientContractsData.filter(ct => ct.id !== c.id); contractDeleteConfirmId = null; }}>삭제</button>
+													</div>
+												</div>
+											{:else}
+												<div class="mt-3 flex gap-2">
+													<button type="button" class="btn btn-secondary btn-xs flex-1"
+														onclick={() => applyContractToBilling(c)}>청구서 작성↗</button>
+													<button type="button" class="btn btn-ghost btn-xs"
+														onclick={() => openEditContract(c)}>수정</button>
+													<button type="button" class="btn btn-ghost btn-xs text-error"
+														onclick={() => (contractDeleteConfirmId = c.id)}>삭제</button>
+												</div>
+											{/if}
+										</div>
+									</div>
+								{/each}
+							</div>
+							</div>
+						{/if}
+					</div>
+
+					<!-- 오른쪽: 요약 패널 -->
+					<div class="col-span-4 space-y-4">
+						<!-- 추가 버튼 -->
+						<button type="button" class="btn btn-secondary w-full" onclick={openAddContract}>
+							+ 계약기간 추가
+						</button>
+
+						<!-- 요약 통계 -->
+						{#if contracts.length > 0}
+							{@const ac = contracts.filter(c => getContractStatus(c.startDate, c.endDate) === 'active').length}
+							{@const ec = contracts.filter(c => getContractStatus(c.startDate, c.endDate) === 'expired').length}
+							{@const uc = contracts.filter(c => getContractStatus(c.startDate, c.endDate) === 'upcoming').length}
+							<div class="card bg-base-100 shadow-sm p-5">
+								<p class="mb-3 text-xs font-bold uppercase tracking-wide text-base-content/40">계약 현황</p>
+								<div class="space-y-2.5">
+									<div class="flex items-center justify-between">
+										<div class="flex items-center gap-2">
+											<span class="h-2 w-2 rounded-full bg-success"></span>
+											<span class="text-sm">진행중</span>
+										</div>
+										<span class="text-sm font-bold text-success">{ac}건</span>
+									</div>
+									<div class="flex items-center justify-between">
+										<div class="flex items-center gap-2">
+											<span class="h-2 w-2 rounded-full bg-info"></span>
+											<span class="text-sm">예정</span>
+										</div>
+										<span class="text-sm font-bold text-info">{uc}건</span>
+									</div>
+									<div class="flex items-center justify-between">
+										<div class="flex items-center gap-2">
+											<span class="h-2 w-2 rounded-full bg-base-300"></span>
+											<span class="text-sm">만료</span>
+										</div>
+										<span class="text-sm font-bold text-base-content/40">{ec}건</span>
+									</div>
+									<div class="flex items-center justify-between border-t border-base-200 pt-2">
+										<span class="text-sm font-semibold">전체</span>
+										<span class="text-sm font-bold">{contracts.length}건</span>
+									</div>
+								</div>
+							</div>
+						{/if}
+
+						<!-- 안내 카드 -->
+						<div class="card bg-secondary/10 border border-secondary/20 p-4">
+							<p class="mb-1.5 text-xs font-bold text-secondary">💡 계약기간 활용하기</p>
+							<p class="text-xs leading-relaxed text-base-content/50">
+								계약기간을 등록하면 청구서 탭에서 빠르게 기간을 적용할 수 있습니다.
+							</p>
+						</div>
+					</div>
+				</div>
+			{/if}
+		</div>
+	{/if}
+</div>
+
+<!-- ═══════════════ 청구서 저장 확인 모달 ═══════════════ -->
+
+
+<!-- ═══════════════ 저장된 청구서 열람 모달 ═══════════════ -->
+
+
+<!-- ═══════════════ 저장된 청구서 열람 모달 ═══════════════ -->
+
+
+<!-- ═══════════════ 청구서 PDF 미리보기 모달 ═══════════════ -->
+{#if showPdfModal}
+	<dialog class="modal modal-open" aria-modal="true">
+		<div class="modal-box flex w-full max-w-4xl flex-col gap-0 overflow-hidden p-0" style="max-height: 90vh;">
+			<!-- 헤더 -->
+			<div class="flex shrink-0 items-center justify-between border-b border-base-200 bg-base-100 px-5 py-4">
+				<div class="flex items-center gap-2">
+					<Icon icon="lucide:file-text" class="h-5 w-5 text-primary" />
+					<h3 class="text-base font-extrabold">청구서 PDF 미리보기</h3>
+					{#if selectedClient}
+						<span class="badge badge-primary badge-sm">{selectedClient.name}</span>
+					{/if}
+				</div>
+				<div class="flex items-center gap-2">
+					{#if pdfBlobUrl}
+						<button type="button" class="btn btn-primary btn-sm gap-1.5" onclick={downloadPdf}>
+							<Icon icon="lucide:download" class="h-4 w-4" />
+							다운로드
+						</button>
+					{/if}
+					<button type="button" class="btn btn-ghost btn-sm btn-square" onclick={closePdfModal} aria-label="닫기">
+						<Icon icon="lucide:x" class="h-4 w-4" />
+					</button>
+				</div>
+			</div>
+
+			<!-- 미리보기 영역 -->
+			<div class="flex-1 overflow-hidden bg-base-200/50">
+				{#if pdfGenerating}
+					<div class="flex h-full min-h-96 items-center justify-center gap-3">
+						<span class="loading loading-spinner loading-md text-primary"></span>
+						<span class="text-sm font-semibold text-base-content/60">PDF 생성 중...</span>
+					</div>
+				{:else if pdfBlobUrl}
+					<iframe
+						src="{pdfBlobUrl}#toolbar=1&navpanes=0"
+						class="h-full w-full border-0"
+						style="min-height: 70vh;"
+						title="청구서 미리보기"
+					></iframe>
+				{:else}
+					<div class="flex h-full min-h-96 items-center justify-center">
+						<p class="text-sm text-base-content/40">PDF를 불러올 수 없습니다.</p>
+					</div>
+				{/if}
+			</div>
+		</div>
+		<form method="dialog" class="modal-backdrop"><button onclick={closePdfModal}>close</button></form>
+	</dialog>
+{/if}
+
+<!-- ═══════════════ 계약기간 모달 ═══════════════ -->
+{#if showContractModal}
+	<dialog class="modal modal-open" aria-modal="true">
+		<div class="modal-box w-full max-w-sm">
+			<h3 class="mb-4 text-base font-extrabold">
+				{editingContractId ? '계약기간 수정' : '계약기간 추가'}
+			</h3>
+			<div class="space-y-4">
+				<div class="form-control">
+					<label for="contract-from" class="label label-text text-xs font-semibold">시작일</label>
+					<input id="contract-from" type="date" bind:value={contractFrom} class="input input-bordered w-full" />
+				</div>
+				<div class="form-control">
+					<label for="contract-to" class="label label-text text-xs font-semibold">종료일</label>
+					<input id="contract-to" type="date" bind:value={contractTo} class="input input-bordered w-full" />
+				</div>
+				<div class="form-control">
+					<label for="contract-memo" class="label label-text text-xs font-semibold">메모 <span class="font-normal text-base-content/40">(선택)</span></label>
+					<input id="contract-memo" type="text" bind:value={contractMemo}
+						placeholder="예: 상반기 계약"
+						class="input input-bordered w-full" />
+				</div>
+			</div>
+			<div class="modal-action">
+				<button type="button" class="btn btn-ghost" onclick={() => (showContractModal = false)}>취소</button>
+				<button type="button" class="btn btn-secondary"
+					disabled={!contractFrom || !contractTo}
+					onclick={saveContract}>저장</button>
+			</div>
+		</div>
+		<form method="dialog" class="modal-backdrop"><button onclick={() => (showContractModal = false)}>close</button></form>
+	</dialog>
+{/if}
+
+
