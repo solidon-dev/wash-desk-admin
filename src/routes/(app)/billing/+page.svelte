@@ -22,17 +22,87 @@
 	];
 
 	let shipments = $state([
-		// client-001 (그랜드호텔)
+		// ─── client-001 그랜드호텔 (이전달)
 		{ id: 'ship-001', clientId: 'client-001', items: [{ laundryItemId: 'item-001', itemName: '대형타올', category: 'towel', quantity: 120 }, { laundryItemId: 'item-002', itemName: '싱글시트', category: 'sheet', quantity: 60 }], driverId: 'driver-001', shippedAt: '2026-04-14T09:00:00', createdAt: '2026-04-14T09:00:00' },
 		{ id: 'ship-002', clientId: 'client-001', items: [{ laundryItemId: 'item-001', itemName: '대형타올', category: 'towel', quantity: 95 }, { laundryItemId: 'item-003', itemName: '직원유니폼', category: 'uniform', quantity: 15 }], driverId: 'driver-001', shippedAt: '2026-04-16T10:00:00', createdAt: '2026-04-16T10:00:00' },
 		{ id: 'ship-003', clientId: 'client-001', items: [{ laundryItemId: 'item-002', itemName: '싱글시트', category: 'sheet', quantity: 80 }, { laundryItemId: 'item-005', itemName: '더블시트', category: 'sheet', quantity: 40 }], driverId: 'driver-002', shippedAt: '2026-04-19T11:00:00', createdAt: '2026-04-19T11:00:00' },
 		{ id: 'ship-004', clientId: 'client-001', items: [{ laundryItemId: 'item-001', itemName: '대형타올', category: 'towel', quantity: 110 }, { laundryItemId: 'item-002', itemName: '싱글시트', category: 'sheet', quantity: 55 }], driverId: 'driver-001', shippedAt: '2026-04-22T09:30:00', createdAt: '2026-04-22T09:30:00' },
 		{ id: 'ship-005', clientId: 'client-001', items: [{ laundryItemId: 'item-001', itemName: '대형타올', category: 'towel', quantity: 130 }, { laundryItemId: 'item-003', itemName: '직원유니폼', category: 'uniform', quantity: 12 }], driverId: 'driver-001', shippedAt: '2026-04-25T10:00:00', createdAt: '2026-04-25T10:00:00' },
 		{ id: 'ship-006', clientId: 'client-001', items: [{ laundryItemId: 'item-002', itemName: '싱글시트', category: 'sheet', quantity: 70 }, { laundryItemId: 'item-005', itemName: '더블시트', category: 'sheet', quantity: 35 }], driverId: 'driver-002', shippedAt: '2026-04-28T11:00:00', createdAt: '2026-04-28T11:00:00' },
-		{ id: 'ship-007', clientId: 'client-001', items: [{ laundryItemId: 'item-001', itemName: '대형타올', category: 'towel', quantity: 100 }, { laundryItemId: 'item-002', itemName: '싱글시트', category: 'sheet', quantity: 50 }, { laundryItemId: 'item-003', itemName: '직원유니폼', category: 'uniform', quantity: 8 }], driverId: 'driver-001', shippedAt: '2026-05-02T09:00:00', createdAt: '2026-05-02T09:00:00' },
-		{ id: 'ship-008', clientId: 'client-001', items: [{ laundryItemId: 'item-001', itemName: '대형타올', category: 'towel', quantity: 85 }, { laundryItemId: 'item-005', itemName: '더블시트', category: 'sheet', quantity: 30 }], driverId: 'driver-002', shippedAt: '2026-05-05T10:30:00', createdAt: '2026-05-05T10:30:00' },
-		{ id: 'ship-009', clientId: 'client-001', items: [{ laundryItemId: 'item-002', itemName: '싱글시트', category: 'sheet', quantity: 65 }, { laundryItemId: 'item-003', itemName: '직원유니폼', category: 'uniform', quantity: 10 }], driverId: 'driver-001', shippedAt: '2026-05-08T09:00:00', createdAt: '2026-05-08T09:00:00' },
-		{ id: 'ship-010', clientId: 'client-001', items: [{ laundryItemId: 'item-001', itemName: '대형타올', category: 'towel', quantity: 115 }, { laundryItemId: 'item-002', itemName: '싱글시트', category: 'sheet', quantity: 45 }], driverId: 'driver-001', shippedAt: '2026-05-12T10:00:00', createdAt: '2026-05-12T10:00:00' },
+		// ─── client-001 그랜드호텔 (이번달 2026-05, 품목 다양화)
+		{ id: 'ship-007', clientId: 'client-001', items: [
+			{ laundryItemId: 'item-001', itemName: '대형타올',     category: 'towel',   quantity: 120 },
+			{ laundryItemId: 'item-012', itemName: '중형타올',     category: 'towel',   quantity: 80  },
+			{ laundryItemId: 'item-013', itemName: '소형타올',     category: 'towel',   quantity: 60  },
+			{ laundryItemId: 'item-002', itemName: '싱글시트',     category: 'sheet',   quantity: 50  },
+			{ laundryItemId: 'item-005', itemName: '더블시트',     category: 'sheet',   quantity: 35  },
+		], driverId: 'driver-001', shippedAt: '2026-05-01T09:00:00', createdAt: '2026-05-01T09:00:00' },
+		{ id: 'ship-008', clientId: 'client-001', items: [
+			{ laundryItemId: 'item-014', itemName: '베개커버',     category: 'sheet',   quantity: 100 },
+			{ laundryItemId: 'item-015', itemName: '이불커버',     category: 'sheet',   quantity: 45  },
+			{ laundryItemId: 'item-003', itemName: '직원유니폼',   category: 'uniform', quantity: 20  },
+			{ laundryItemId: 'item-016', itemName: '주방앞치마',   category: 'uniform', quantity: 15  },
+		], driverId: 'driver-002', shippedAt: '2026-05-02T10:00:00', createdAt: '2026-05-02T10:00:00' },
+		{ id: 'ship-009', clientId: 'client-001', items: [
+			{ laundryItemId: 'item-001', itemName: '대형타올',     category: 'towel',   quantity: 95  },
+			{ laundryItemId: 'item-017', itemName: '풀커버',       category: 'sheet',   quantity: 30  },
+			{ laundryItemId: 'item-018', itemName: '매트리스커버', category: 'sheet',   quantity: 20  },
+		], driverId: 'driver-001', shippedAt: '2026-05-03T09:30:00', createdAt: '2026-05-03T09:30:00' },
+		{ id: 'ship-010', clientId: 'client-001', items: [
+			{ laundryItemId: 'item-012', itemName: '중형타올',     category: 'towel',   quantity: 75  },
+			{ laundryItemId: 'item-019', itemName: '발매트',       category: 'towel',   quantity: 55  },
+			{ laundryItemId: 'item-002', itemName: '싱글시트',     category: 'sheet',   quantity: 65  },
+			{ laundryItemId: 'item-016', itemName: '주방앞치마',   category: 'uniform', quantity: 12  },
+			{ laundryItemId: 'item-020', itemName: '조리복',       category: 'uniform', quantity: 18  },
+		], driverId: 'driver-001', shippedAt: '2026-05-05T08:30:00', createdAt: '2026-05-05T08:30:00' },
+		{ id: 'ship-011', clientId: 'client-001', items: [
+			{ laundryItemId: 'item-001', itemName: '대형타올',     category: 'towel',   quantity: 110 },
+			{ laundryItemId: 'item-013', itemName: '소형타올',     category: 'towel',   quantity: 70  },
+			{ laundryItemId: 'item-021', itemName: '헤어타올',     category: 'towel',   quantity: 90  },
+			{ laundryItemId: 'item-005', itemName: '더블시트',     category: 'sheet',   quantity: 40  },
+		], driverId: 'driver-002', shippedAt: '2026-05-06T10:00:00', createdAt: '2026-05-06T10:00:00' },
+		{ id: 'ship-012', clientId: 'client-001', items: [
+			{ laundryItemId: 'item-014', itemName: '베개커버',     category: 'sheet',   quantity: 120 },
+			{ laundryItemId: 'item-015', itemName: '이불커버',     category: 'sheet',   quantity: 55  },
+			{ laundryItemId: 'item-017', itemName: '풀커버',       category: 'sheet',   quantity: 25  },
+			{ laundryItemId: 'item-003', itemName: '직원유니폼',   category: 'uniform', quantity: 15  },
+		], driverId: 'driver-001', shippedAt: '2026-05-07T09:00:00', createdAt: '2026-05-07T09:00:00' },
+		{ id: 'ship-013', clientId: 'client-001', items: [
+			{ laundryItemId: 'item-001', itemName: '대형타올',     category: 'towel',   quantity: 130 },
+			{ laundryItemId: 'item-019', itemName: '발매트',       category: 'towel',   quantity: 60  },
+			{ laundryItemId: 'item-022', itemName: '킹시트',       category: 'sheet',   quantity: 35  },
+			{ laundryItemId: 'item-018', itemName: '매트리스커버', category: 'sheet',   quantity: 18  },
+			{ laundryItemId: 'item-020', itemName: '조리복',       category: 'uniform', quantity: 22  },
+		], driverId: 'driver-001', shippedAt: '2026-05-08T08:00:00', createdAt: '2026-05-08T08:00:00' },
+		{ id: 'ship-014', clientId: 'client-001', items: [
+			{ laundryItemId: 'item-012', itemName: '중형타올',     category: 'towel',   quantity: 85  },
+			{ laundryItemId: 'item-021', itemName: '헤어타올',     category: 'towel',   quantity: 100 },
+			{ laundryItemId: 'item-002', itemName: '싱글시트',     category: 'sheet',   quantity: 70  },
+			{ laundryItemId: 'item-016', itemName: '주방앞치마',   category: 'uniform', quantity: 10  },
+		], driverId: 'driver-002', shippedAt: '2026-05-09T10:00:00', createdAt: '2026-05-09T10:00:00' },
+		{ id: 'ship-015', clientId: 'client-001', items: [
+			{ laundryItemId: 'item-001', itemName: '대형타올',     category: 'towel',   quantity: 105 },
+			{ laundryItemId: 'item-013', itemName: '소형타올',     category: 'towel',   quantity: 65  },
+			{ laundryItemId: 'item-022', itemName: '킹시트',       category: 'sheet',   quantity: 40  },
+			{ laundryItemId: 'item-015', itemName: '이불커버',     category: 'sheet',   quantity: 30  },
+			{ laundryItemId: 'item-003', itemName: '직원유니폼',   category: 'uniform', quantity: 12  },
+			{ laundryItemId: 'item-020', itemName: '조리복',       category: 'uniform', quantity: 16  },
+		], driverId: 'driver-001', shippedAt: '2026-05-10T09:00:00', createdAt: '2026-05-10T09:00:00' },
+		{ id: 'ship-016', clientId: 'client-001', items: [
+			{ laundryItemId: 'item-019', itemName: '발매트',       category: 'towel',   quantity: 50  },
+			{ laundryItemId: 'item-021', itemName: '헤어타올',     category: 'towel',   quantity: 80  },
+			{ laundryItemId: 'item-014', itemName: '베개커버',     category: 'sheet',   quantity: 90  },
+			{ laundryItemId: 'item-017', itemName: '풀커버',       category: 'sheet',   quantity: 28  },
+			{ laundryItemId: 'item-018', itemName: '매트리스커버', category: 'sheet',   quantity: 15  },
+		], driverId: 'driver-001', shippedAt: '2026-05-12T08:30:00', createdAt: '2026-05-12T08:30:00' },
+		{ id: 'ship-017', clientId: 'client-001', items: [
+			{ laundryItemId: 'item-001', itemName: '대형타올',     category: 'towel',   quantity: 90  },
+			{ laundryItemId: 'item-012', itemName: '중형타올',     category: 'towel',   quantity: 60  },
+			{ laundryItemId: 'item-005', itemName: '더블시트',     category: 'sheet',   quantity: 45  },
+			{ laundryItemId: 'item-022', itemName: '킹시트',       category: 'sheet',   quantity: 30  },
+			{ laundryItemId: 'item-016', itemName: '주방앞치마',   category: 'uniform', quantity: 14  },
+			{ laundryItemId: 'item-020', itemName: '조리복',       category: 'uniform', quantity: 20  },
+		], driverId: 'driver-002', shippedAt: '2026-05-13T09:00:00', createdAt: '2026-05-13T09:00:00' },
 		// client-002 (오션뷰펜션)
 		{ id: 'ship-011', clientId: 'client-002', items: [{ laundryItemId: 'item-004', itemName: '소형타올', category: 'towel', quantity: 45 }], driverId: 'driver-001', shippedAt: '2026-04-15T14:00:00', createdAt: '2026-04-15T14:00:00' },
 		{ id: 'ship-012', clientId: 'client-002', items: [{ laundryItemId: 'item-004', itemName: '소형타올', category: 'towel', quantity: 60 }, { laundryItemId: 'item-007', itemName: '퀸시트', category: 'sheet', quantity: 20 }], driverId: 'driver-001', shippedAt: '2026-04-21T13:00:00', createdAt: '2026-04-21T13:00:00' },
@@ -69,9 +139,20 @@
 	let clientContractsData = $state<ClientContract[]>([]);
 	let clientItemPrices  = $state<{ clientId: string; category: string; itemName: string; unitPrice: number }[]>([
 		{ clientId: 'client-001', category: 'towel',   itemName: '대형타올',     unitPrice: 800  },
+		{ clientId: 'client-001', category: 'towel',   itemName: '중형타올',     unitPrice: 650  },
+		{ clientId: 'client-001', category: 'towel',   itemName: '소형타올',     unitPrice: 500  },
+		{ clientId: 'client-001', category: 'towel',   itemName: '헤어타올',     unitPrice: 450  },
+		{ clientId: 'client-001', category: 'towel',   itemName: '발매트',       unitPrice: 700  },
 		{ clientId: 'client-001', category: 'sheet',   itemName: '싱글시트',     unitPrice: 1200 },
 		{ clientId: 'client-001', category: 'sheet',   itemName: '더블시트',     unitPrice: 1500 },
+		{ clientId: 'client-001', category: 'sheet',   itemName: '킹시트',       unitPrice: 1800 },
+		{ clientId: 'client-001', category: 'sheet',   itemName: '베개커버',     unitPrice: 400  },
+		{ clientId: 'client-001', category: 'sheet',   itemName: '이불커버',     unitPrice: 1100 },
+		{ clientId: 'client-001', category: 'sheet',   itemName: '풀커버',       unitPrice: 900  },
+		{ clientId: 'client-001', category: 'sheet',   itemName: '매트리스커버', unitPrice: 2000 },
 		{ clientId: 'client-001', category: 'uniform', itemName: '직원유니폼',   unitPrice: 2500 },
+		{ clientId: 'client-001', category: 'uniform', itemName: '주방앞치마',   unitPrice: 1500 },
+		{ clientId: 'client-001', category: 'uniform', itemName: '조리복',       unitPrice: 3000 },
 		{ clientId: 'client-002', category: 'towel',   itemName: '소형타올',     unitPrice: 600  },
 		{ clientId: 'client-002', category: 'sheet',   itemName: '퀸시트',       unitPrice: 1800 },
 		{ clientId: 'client-003', category: 'towel',   itemName: '바스타올',     unitPrice: 1000 },
@@ -126,7 +207,7 @@
 	const selectedClient = $derived(clients.find((c) => c.id === selectedClientId) ?? null);
 
 	// ── 기간 설정 (공통) ──
-	let periodFrom = $state('2026-04-14');
+	let periodFrom = $state('2026-05-01');
 	let periodTo   = $state('2026-05-13');
 
 	// ── DatePicker 상태 ──
@@ -1115,76 +1196,92 @@
 <!-- ═══════════════ 화면 UI ═══════════════ -->
 <div class="min-h-screen bg-base-200 px-8 py-6" id="billing-screen-ui">
 
-	<!-- 헤더: 제목 + 탭 + 거래처 select 한 줄 -->
-	<div class="mb-6 flex items-center gap-4">
-		<h2 class="text-2xl font-extrabold text-base-content shrink-0">청구 관리</h2>
+	<!-- ── 페이지 헤더 ── -->
+	<div class="mb-5 flex items-center gap-3">
+		<h2 class="text-2xl font-extrabold text-base-content">청구 관리</h2>
+		<div class="h-6 w-px bg-base-300"></div>
+		<p class="text-sm text-base-content/40">거래처별 청구서 · 거래내역서 · 계약기간을 관리합니다</p>
+	</div>
 
-		<div role="tablist" class="tabs tabs-boxed mx-auto">
-			<button
-				type="button"
-				style="pointer-events: auto; cursor: pointer;"
-				class="tab {tabState.active === 'invoice' ? 'tab-active' : ''}"
-				onclick={() => switchTab('invoice')}
-			>청구서</button>
-			<button
-				type="button"
-				style="pointer-events: auto; cursor: pointer;"
-				class="tab {tabState.active === 'statement' ? 'tab-active' : ''}"
-				onclick={() => switchTab('statement')}
-			>거래내역서</button>
-			<button
-				type="button"
-				style="pointer-events: auto; cursor: pointer;"
-				class="tab {tabState.active === 'contract' ? 'tab-active' : ''}"
-				onclick={() => switchTab('contract')}
-			>계약기간</button>
+	<!-- ── 공통 컨트롤 바: 거래처 + 기간 + 탭 ── -->
+	<div class="card bg-base-100 shadow-sm mb-5">
+		<div class="flex items-stretch divide-x divide-base-200">
+			<!-- 거래처 선택 -->
+			<div class="flex flex-col justify-center px-5 py-4 shrink-0">
+				<p class="text-[10px] font-bold uppercase tracking-widest text-base-content/40 mb-1.5">거래처</p>
+				<select
+					class="select select-bordered select-sm font-bold min-w-36"
+					bind:value={selectedClientId}
+				>
+					{#each clients as c (c.id)}
+						<option value={c.id}>{c.name}</option>
+					{/each}
+				</select>
+			</div>
+
+			<!-- 기간 선택 -->
+			<div class="flex flex-col justify-center px-5 py-4">
+				<p class="text-[10px] font-bold uppercase tracking-widest text-base-content/40 mb-1.5">조회 기간</p>
+				<div class="flex items-center gap-2">
+					<button type="button"
+						class="btn btn-sm btn-outline gap-1.5 font-mono"
+						onclick={() => openPicker('from')}>
+						<Icon icon="lucide:calendar" class="h-3.5 w-3.5 shrink-0" />
+						{periodFrom || '시작일'}
+					</button>
+					<span class="text-base-content/30 text-sm font-bold">→</span>
+					<button type="button"
+						class="btn btn-sm btn-outline gap-1.5 font-mono"
+						onclick={() => openPicker('to')}>
+						<Icon icon="lucide:calendar" class="h-3.5 w-3.5 shrink-0" />
+						{periodTo || '종료일'}
+					</button>
+					{#if periodFrom && periodTo}
+						{@const days = Math.round((new Date(periodTo).getTime() - new Date(periodFrom).getTime()) / 86400000) + 1}
+						<span class="text-xs text-base-content/40 font-semibold">{days}일</span>
+					{/if}
+				</div>
+			</div>
+
+			<!-- 계약기간 빠른 적용 -->
+			{#if contracts.length > 0}
+				<div class="flex flex-col justify-center px-5 py-4">
+					<p class="text-[10px] font-bold uppercase tracking-widest text-base-content/40 mb-1.5">계약 빠른 선택</p>
+					<div class="flex items-center gap-1.5 flex-wrap">
+						{#each contracts.slice(0, 3) as c (c.id)}
+							{@const status = getContractStatus(c.startDate, c.endDate)}
+							<button type="button"
+								class="btn btn-xs {status === 'active' ? 'btn-primary' : status === 'upcoming' ? 'btn-info' : 'btn-ghost opacity-60'}"
+								onclick={() => { periodFrom = c.startDate; periodTo = c.endDate; }}>
+								{c.startDate.slice(2)} ~ {c.endDate.slice(2)}
+							</button>
+						{/each}
+					</div>
+				</div>
+			{/if}
+
+			<!-- 탭 (오른쪽 끝) -->
+			<div class="ml-auto flex items-center px-5 py-4 shrink-0">
+				<div role="tablist" class="tabs tabs-boxed">
+					<button type="button" class="tab {tabState.active === 'invoice' ? 'tab-active' : ''}" onclick={() => switchTab('invoice')}>청구서</button>
+					<button type="button" class="tab {tabState.active === 'statement' ? 'tab-active' : ''}" onclick={() => switchTab('statement')}>거래내역서</button>
+					<button type="button" class="tab {tabState.active === 'contract' ? 'tab-active' : ''}" onclick={() => switchTab('contract')}>계약기간</button>
+				</div>
+			</div>
 		</div>
-
-		<select
-			class="select select-bordered select-sm font-semibold shrink-0"
-			bind:value={selectedClientId}
-		>
-			{#each clients as c (c.id)}
-				<option value={c.id}>{c.name}</option>
-			{/each}
-		</select>
 	</div>
 
 	<!-- ── 청구서 탭 ── -->
 	{#if tabState.active === 'invoice'}
 		<div class="grid grid-cols-12 gap-5">
-			<!-- 왼쪽: 기간 + 품목표 -->
+			<!-- 왼쪽: 품목표 -->
 			<div class="col-span-8 space-y-5">
-				<!-- 품목 청구 표 (기간 컨트롤 인라인 포함) -->
 				<div class="card bg-base-100 shadow-sm overflow-hidden">
-					<!-- 컨트롤 바: 기간 picker + 계약기간 빠른 적용 + 카드 헤더 -->
-					<div class="flex flex-wrap items-center gap-3 border-b border-base-200 px-5 py-3">
-						<h3 class="text-base font-bold mr-2">품목별 청구 내역</h3>
-						<button type="button" class="btn btn-sm btn-outline gap-1.5" onclick={() => openPicker('from')}>
-							<Icon icon="lucide:calendar" class="h-3.5 w-3.5" />
-							{periodFrom || '시작일'}
-						</button>
-						<span class="text-base-content/40">~</span>
-						<button type="button" class="btn btn-sm btn-outline gap-1.5" onclick={() => openPicker('to')}>
-							<Icon icon="lucide:calendar" class="h-3.5 w-3.5" />
-							{periodTo || '종료일'}
-						</button>
-						{#if contracts.length > 0}
-							<span class="text-[11px] font-bold text-base-content/40 ml-1">계약:</span>
-							{#each contracts.slice(0, 4) as c (c.id)}
-								{@const status = getContractStatus(c.startDate, c.endDate)}
-								<button type="button"
-									class="btn btn-xs {status === 'active' ? 'btn-primary' : status === 'upcoming' ? 'btn-info' : 'btn-ghost'}"
-									onclick={() => { periodFrom = c.startDate; periodTo = c.endDate; }}>
-									{c.startDate.slice(5)} ~ {c.endDate.slice(5)}{c.memo ? ` (${c.memo})` : ''}
-								</button>
-							{/each}
+					<div class="flex items-center gap-3 border-b border-base-200 px-5 py-3">
+						<h3 class="text-base font-bold">품목별 청구 내역</h3>
+						{#if unpricedCount > 0}
+							<span class="badge badge-warning badge-sm font-semibold">단가 미설정 {unpricedCount}건</span>
 						{/if}
-						<div class="ml-auto flex items-center gap-2">
-							{#if unpricedCount > 0}
-								<span class="badge badge-warning font-semibold">단가 미설정 {unpricedCount}건</span>
-							{/if}
-						</div>
 					</div>
 					{#if invoiceLines.length === 0}
 						<div class="py-16 text-center">
@@ -1261,40 +1358,66 @@
 
 			</div>
 
-			<!-- 오른쪽: 요약 + 메모 + 액션 -->
-			<div class="col-span-4 space-y-5">
-				<div class="card bg-primary/10 border border-primary/20 shadow-sm p-5">
-					<p class="mb-3 text-xs font-bold uppercase tracking-wide text-primary/70">청구 요약</p>
-					<div class="space-y-2">
-						<div class="flex justify-between text-sm">
+			<!-- 오른쪽: 요약 + 액션 -->
+			<div class="col-span-4 space-y-4">
+				<!-- 청구 요약 카드 -->
+				<div class="card bg-base-100 shadow-sm overflow-hidden">
+					<div class="bg-primary px-5 py-3">
+						<p class="text-xs font-bold uppercase tracking-widest text-primary-content/70">청구 요약</p>
+						<p class="mt-0.5 text-sm font-bold text-primary-content">{selectedClient?.name ?? '-'}</p>
+					</div>
+					<div class="p-5 space-y-3">
+						<div class="flex justify-between items-center text-sm">
 							<span class="text-base-content/50">기간</span>
-							<span class="text-right text-xs font-semibold">
-								{formatDate(periodFrom)}<br/>~ {formatDate(periodTo)}
-							</span>
+							<span class="text-right text-xs font-semibold tabular-nums">{formatDate(periodFrom)} ~ {formatDate(periodTo)}</span>
 						</div>
-						<div class="flex justify-between text-sm">
+						<div class="flex justify-between items-center text-sm">
+							<span class="text-base-content/50">품목 수</span>
+							<span class="font-bold">{invoiceLines.length}종</span>
+						</div>
+						<div class="flex justify-between items-center text-sm">
 							<span class="text-base-content/50">총 수량</span>
-							<span class="font-bold">{invoiceTotalQty.toLocaleString()}개</span>
+							<span class="font-bold tabular-nums">{invoiceTotalQty.toLocaleString()}개</span>
 						</div>
 						{#if unpricedCount > 0}
-							<div class="flex justify-between text-sm">
+							<div class="flex justify-between items-center text-sm">
 								<span class="text-warning">단가 미설정</span>
 								<span class="font-bold text-warning">{unpricedCount}건</span>
 							</div>
 						{/if}
-						<div class="mt-3 border-t border-primary/20 pt-3">
-							<div class="flex justify-between">
-								<span class="font-bold">청구 금액</span>
-								<span class="text-xl font-black text-primary">{formatMoney(invoiceTotal)}</span>
+						<div class="border-t border-base-200 pt-3 mt-1">
+							<div class="flex justify-between items-end">
+								<span class="text-sm font-bold">청구 금액</span>
+								<span class="text-2xl font-black text-primary tabular-nums">{formatMoney(invoiceTotal)}</span>
 							</div>
 						</div>
 					</div>
 				</div>
 
+				<!-- 카테고리별 소계 -->
 				{#if invoiceLines.length > 0}
+					<div class="card bg-base-100 shadow-sm p-4 space-y-2">
+						<p class="text-[10px] font-bold uppercase tracking-widest text-base-content/40">카테고리별 소계</p>
+						{#each (['towel', 'sheet', 'uniform'] as const) as cat (cat)}
+							{@const catData = invoiceByCategory[cat]}
+							{#if catData}
+								<div class="flex items-center justify-between">
+									<div class="flex items-center gap-2">
+										<span class="h-2 w-2 rounded-full {categoryColor[cat]}"></span>
+										<span class="text-sm">{CATEGORY_LABELS[cat]}</span>
+									</div>
+									<div class="text-right">
+										<span class="text-xs text-base-content/40 tabular-nums">{catData.qty.toLocaleString()}개 · </span>
+										<span class="text-sm font-bold tabular-nums">{catData.amount.toLocaleString()}원</span>
+									</div>
+								</div>
+							{/if}
+						{/each}
+					</div>
+
 					<!-- 액션 버튼 -->
 					<div class="space-y-2">
-						<button type="button" class="btn btn-primary w-full gap-2" onclick={openPdfModal} disabled={invoiceLines.length === 0}>
+						<button type="button" class="btn btn-primary w-full gap-2" onclick={openPdfModal}>
 							<Icon icon="lucide:file-text" class="h-4 w-4" />
 							청구서 PDF
 						</button>
@@ -1310,40 +1433,18 @@
 	<!-- ── 거래내역서 탭 ── -->
 	{:else if tabState.active === 'statement'}
 		<div class="space-y-4">
-			<!-- 조회 기간 + 뷰 모드 + 액션 버튼 -->
-			<div class="card bg-base-100 shadow-sm p-4">
-				<div class="flex flex-wrap items-center gap-3">
-					<button type="button" class="btn btn-sm btn-outline gap-1.5" onclick={() => openPicker('from')}>
-						<Icon icon="lucide:calendar" class="h-3.5 w-3.5" />
-						{periodFrom || '시작일'}
-					</button>
-					<span class="text-base-content/40">~</span>
-					<button type="button" class="btn btn-sm btn-outline gap-1.5" onclick={() => openPicker('to')}>
-						<Icon icon="lucide:calendar" class="h-3.5 w-3.5" />
-						{periodTo || '종료일'}
-					</button>
-					<!-- 뷰 모드 전환 -->
-					<div class="tabs tabs-boxed gap-0">
-						<button type="button"
-							class="tab {stmtViewMode === 'pivot' ? 'tab-active' : ''}"
-							onclick={() => stmtViewMode = 'pivot'}>
-							피벗표
-						</button>
-						<button type="button"
-							class="tab {stmtViewMode === 'daily' ? 'tab-active' : ''}"
-							onclick={() => stmtViewMode = 'daily'}>
-							일별상세
-						</button>
-					</div>
-					{#if statementData}
-						<div class="ml-auto flex gap-2">
-							<button type="button" class="btn btn-success btn-sm gap-1.5" onclick={exportStatementExcel}>
-								<Icon icon="lucide:file-spreadsheet" class="h-4 w-4" />
-								엑셀 저장
-							</button>
-						</div>
-					{/if}
+			<!-- 뷰 모드 + 액션만 (기간/거래처는 상단 공통 바) -->
+			<div class="flex items-center gap-3">
+				<div class="tabs tabs-boxed">
+					<button type="button" class="tab {stmtViewMode === 'pivot' ? 'tab-active' : ''}" onclick={() => stmtViewMode = 'pivot'}>피벗표</button>
+					<button type="button" class="tab {stmtViewMode === 'daily' ? 'tab-active' : ''}" onclick={() => stmtViewMode = 'daily'}>일별상세</button>
 				</div>
+				{#if statementData}
+					<button type="button" class="btn btn-success btn-sm gap-1.5 ml-auto" onclick={exportStatementExcel}>
+						<Icon icon="lucide:file-spreadsheet" class="h-4 w-4" />
+						엑셀 저장
+					</button>
+				{/if}
 			</div>
 
 			{#if !statementData}
