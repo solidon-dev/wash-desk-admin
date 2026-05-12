@@ -3,6 +3,7 @@
 	import { afterNavigate, goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import Icon from '@iconify/svelte';
+	import SearchBar from '$lib/components/SearchBar.svelte';
 
 	let { children } = $props();
 
@@ -50,8 +51,8 @@
 	let selectedFactoryId = $state('factory-001');
 	const unreadMemoCount = 2;
 
-	let factoryOpen  = $state(false);
-	let sidebarOpen  = $state(false);
+	let factoryOpen   = $state(false);
+	let sidebarOpen   = $state(false);
 
 	const selectedFactory = $derived(
 		factories.find(f => f.id === selectedFactoryId && !f.isHidden)
@@ -92,10 +93,10 @@
 			{sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}"
 	>
 		<!-- 공장 셀렉터 -->
-		<div class="border-base-300 relative shrink-0 border-b px-3 py-3">
+		<div class="border-base-300 shrink-0 border-b px-3 py-3">
 			<button
 				class="btn btn-ghost w-full justify-start gap-2.5 rounded-xl px-3 py-2.5 text-left normal-case"
-				onclick={() => (factoryOpen = !factoryOpen)}
+				onclick={() => { factoryOpen = true; }}
 			>
 				<div class="bg-primary flex h-8 w-8 shrink-0 items-center justify-center rounded-lg">
 					<Icon icon="lucide:factory" class="text-primary-content h-4 w-4" />
@@ -106,31 +107,6 @@
 				</div>
 				<Icon icon="lucide:chevrons-up-down" class="text-base-content/50 h-4 w-4 shrink-0" />
 			</button>
-
-			{#if factoryOpen}
-				<div
-					class="fixed inset-0 z-10"
-					role="presentation"
-					onclick={() => (factoryOpen = false)}
-				></div>
-				<div class="border-base-300 bg-base-100 absolute left-3 right-3 top-full z-20 mt-1 overflow-hidden rounded-xl border shadow-2xl">
-					{#each factories.filter(f => !f.isHidden) as factory (factory.id)}
-						<button
-							class="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm transition-colors
-								{factory.id === selectedFactoryId
-									? 'bg-primary/20 text-primary'
-									: 'text-base-content/70 hover:bg-base-content/10'}"
-							onclick={() => { selectedFactoryId = factory.id; factoryOpen = false; }}
-						>
-							<Icon icon="lucide:factory" class="h-4 w-4 shrink-0 opacity-60" />
-							<span class="flex-1 truncate font-medium">{factory.name}</span>
-							{#if factory.id === selectedFactoryId}
-								<Icon icon="lucide:check" class="text-primary h-3.5 w-3.5 shrink-0" />
-							{/if}
-						</button>
-					{/each}
-				</div>
-			{/if}
 		</div>
 
 		<!-- 네비게이션 메뉴 -->
@@ -169,6 +145,75 @@
 		</div>
 	</aside>
 
+	<!-- 공장 선택 모달 -->
+	{#if factoryOpen}
+		<div
+			class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+			role="presentation"
+			onclick={() => (factoryOpen = false)}
+		>
+			<div
+				class="bg-base-100 rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+				style="width: 340px; height: 420px;"
+				role="dialog"
+				aria-modal="true"
+				aria-label="공장 선택"
+				tabindex="-1"
+				onclick={(e) => e.stopPropagation()}
+				onkeydown={(e) => e.key === 'Escape' && (factoryOpen = false)}
+			>
+				<!-- 헤더 -->
+				<div class="flex shrink-0 items-center justify-between border-b border-base-300 px-5 py-4">
+					<div>
+						<h2 class="text-sm font-bold text-base-content">공장 선택</h2>
+						<p class="mt-0.5 text-xs text-base-content/40">사용할 공장을 선택하세요</p>
+					</div>
+					<button
+						type="button"
+						class="btn btn-ghost btn-sm btn-square"
+						onclick={() => (factoryOpen = false)}
+					>
+						<Icon icon="lucide:x" class="h-4 w-4" />
+					</button>
+				</div>
+
+				<!-- 검색바 -->
+				<div class="shrink-0 px-4 py-3">
+					<SearchBar
+						placeholder="공장 검색..."
+						items={factories.filter(f => !f.isHidden).map(f => ({ id: f.id, label: f.name }))}
+						onselect={(id) => { if (id) { selectedFactoryId = id; factoryOpen = false; } }}
+					/>
+				</div>
+
+				<!-- 공장 리스트 (고정 높이 스크롤) -->
+				<ul class="flex-1 overflow-y-auto px-3 pb-3">
+					{#each factories.filter(f => !f.isHidden) as factory (factory.id)}
+						<li>
+							<button
+								type="button"
+								class="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm transition-colors
+									{factory.id === selectedFactoryId
+										? 'bg-primary/10 text-primary font-semibold'
+										: 'text-base-content/70 hover:bg-base-content/5 hover:text-base-content'}"
+								onclick={() => { selectedFactoryId = factory.id; factoryOpen = false; }}
+							>
+								<div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg
+									{factory.id === selectedFactoryId ? 'bg-primary/20 text-primary' : 'bg-base-content/5 text-base-content/40'}">
+									<Icon icon="lucide:factory" class="h-4 w-4" />
+								</div>
+								<span class="flex-1 truncate text-left">{factory.name}</span>
+								{#if factory.id === selectedFactoryId}
+									<Icon icon="lucide:check" class="text-primary h-4 w-4 shrink-0" />
+								{/if}
+							</button>
+						</li>
+					{/each}
+				</ul>
+			</div>
+		</div>
+	{/if}
+
 	<!-- 로그아웃 확인 모달 -->
 	{#if showLogoutModal}
 		<div
@@ -181,7 +226,9 @@
 				role="dialog"
 				aria-modal="true"
 				aria-labelledby="logout-title"
+				tabindex="-1"
 				onclick={(e) => e.stopPropagation()}
+				onkeydown={(e) => e.key === 'Escape' && (showLogoutModal = false)}
 			>
 				<div class="flex flex-col gap-1">
 					<h2 id="logout-title" class="text-base font-bold text-base-content">로그아웃</h2>
