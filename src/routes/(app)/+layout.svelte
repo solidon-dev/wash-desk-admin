@@ -29,11 +29,11 @@
 	const navItems = [
 		{ icon: 'lucide:building-2', label: '거래처 관리', path: '/clients', exact: true },
 		{ icon: 'lucide:users', label: '사용자 관리', path: '/users', exact: false },
-		{ icon: 'lucide:package', label: '상품 관리', path: '/products', exact: false },
-		{ icon: 'lucide:bar-chart-2', label: '입출고 · 통계', path: '/stats', exact: false },
-		{ icon: 'lucide:receipt', label: '청구서 관리', path: '/billing', exact: false },
-		{ icon: 'lucide:message-square', label: '메모 확인', path: '/memos', exact: false, badge: true },
 		{ icon: 'lucide:factory', label: '세탁공장 관리', path: '/factories', exact: false },
+		{ icon: 'lucide:package', label: '상품 관리', path: '/products', exact: false },
+		{ icon: 'lucide:receipt', label: '청구서 관리', path: '/billing', exact: false },
+		{ icon: 'lucide:bar-chart-2', label: '입출고 · 통계', path: '/stats', exact: false },
+		{ icon: 'lucide:message-square', label: '메모 확인', path: '/memos', exact: false, badge: true },
 	];
 
 	function isActive(nav: { path: string; exact: boolean }): boolean {
@@ -61,7 +61,10 @@
 
 	const currentNav = $derived(navItems.find(n => isActive(n)));
 
-	function handleLogout() {
+	let showLogoutModal = $state(false);
+
+	function confirmLogout() {
+		showLogoutModal = false;
 		localStorage.removeItem('auth_token');
 		goto('/');
 	}
@@ -145,9 +148,7 @@
 							<Icon icon={nav.icon} class="h-5 w-5 shrink-0" />
 							<span class="flex-1 text-left">{nav.label}</span>
 							{#if nav.badge && unreadMemoCount > 0}
-								<span class="badge badge-error badge-sm font-bold">
-									{unreadMemoCount}
-								</span>
+								<span class="badge badge-error badge-sm font-bold">{unreadMemoCount}</span>
 							{/if}
 						</a>
 					</li>
@@ -157,16 +158,50 @@
 
 		<!-- 로그아웃 버튼 -->
 		<div class="shrink-0 border-t border-base-300 px-2 py-2">
-			<a
-				href="/"
-				onclick={handleLogout}
+			<button
+				type="button"
+				onclick={() => (showLogoutModal = true)}
 				class="flex min-h-12 w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-base-content/60 transition-colors duration-150 hover:bg-base-content/5 hover:text-base-content"
 			>
 				<Icon icon="lucide:log-out" class="h-5 w-5 shrink-0" />
 				<span class="flex-1 text-left">로그아웃</span>
-			</a>
+			</button>
 		</div>
 	</aside>
+
+	<!-- 로그아웃 확인 모달 -->
+	{#if showLogoutModal}
+		<div
+			class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+			role="presentation"
+			onclick={() => (showLogoutModal = false)}
+		>
+			<div
+				class="bg-base-100 rounded-2xl shadow-2xl p-6 w-80 flex flex-col gap-4"
+				role="dialog"
+				aria-modal="true"
+				aria-labelledby="logout-title"
+				onclick={(e) => e.stopPropagation()}
+			>
+				<div class="flex flex-col gap-1">
+					<h2 id="logout-title" class="text-base font-bold text-base-content">로그아웃</h2>
+					<p class="text-sm text-base-content/60">정말 로그아웃 하시겠습니까?</p>
+				</div>
+				<div class="flex gap-2 justify-end">
+					<button
+						type="button"
+						class="btn btn-ghost btn-sm"
+						onclick={() => (showLogoutModal = false)}
+					>취소</button>
+					<button
+						type="button"
+						class="btn btn-error btn-sm"
+						onclick={confirmLogout}
+					>로그아웃</button>
+				</div>
+			</div>
+		</div>
+	{/if}
 
 	<!-- ── 우측 영역 ── -->
 	<div class="flex flex-1 flex-col overflow-hidden">
