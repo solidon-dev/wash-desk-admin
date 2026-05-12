@@ -109,11 +109,11 @@
                 <tr class="hover:bg-base-200/40">
                   <td class="text-center">
                     {#if i === 0}
-                      <span class="inline-flex h-4 w-4 items-center justify-center rounded-full bg-warning text-[9px] font-black text-warning-content">1</span>
+                      <span class="inline-flex h-4 w-4 items-center justify-center rounded-full bg-warning text-warning-content text-[9px] font-black">1</span>
                     {:else if i === 1}
                       <span class="inline-flex h-4 w-4 items-center justify-center rounded-full bg-base-300 text-[9px] font-black">2</span>
                     {:else if i === 2}
-                      <span class="inline-flex h-4 w-4 items-center justify-center rounded-full bg-orange-200 text-[9px] font-black text-orange-800">3</span>
+                      <span class="inline-flex h-4 w-4 items-center justify-center rounded-full bg-base-content/20 text-[9px] font-black">3</span>
                     {:else}
                       <span class="text-[10px] text-base-content/30">{i + 1}</span>
                     {/if}

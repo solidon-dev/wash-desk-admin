@@ -68,7 +68,7 @@
   class="shrink-0"
 >
   {#if total === 0}
-    <circle {cx} {cy} r={r} fill="none" stroke="#e2e8f0" stroke-width={r - innerR} />
+    <circle {cx} {cy} r={r} fill="none" stroke="var(--color-base-300)" stroke-width={r - innerR} />
   {:else}
     {#each arcs as arc (arc.label)}
       <path d={arc.d} fill={arc.color} opacity="0.9" />
@@ -82,7 +82,8 @@
       text-anchor="middle"
       dominant-baseline="middle"
       font-size={size * 0.11}
-      fill="#94a3b8"
+      fill="var(--color-base-content)"
+      opacity="0.4"
       font-weight="600"
     >{centerLabel}</text>
     <text
@@ -91,7 +92,7 @@
       text-anchor="middle"
       dominant-baseline="middle"
       font-size={size * 0.14}
-      fill="#1e293b"
+      fill="var(--color-base-content)"
       font-weight="800"
     >{centerValue}</text>
   {/if}

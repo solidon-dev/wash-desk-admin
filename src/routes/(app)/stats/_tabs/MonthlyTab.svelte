@@ -22,12 +22,12 @@
   const monthLabels = ['1','2','3','4','5','6','7','8','9','10','11','12'];
 
   const lineQtySeries = $derived([
-    { label: `${year}년`,     color: '#6366f1', dash: false, data: trend.map(r => r.qty) },
-    { label: `${prevYear}년`, color: '#94a3b8', dash: true,  data: prevTrend.map(r => r.qty) },
+    { label: `${year}년`,     color: 'var(--color-primary)', dash: false, data: trend.map(r => r.qty) },
+    { label: `${prevYear}년`, color: 'var(--color-base-content)', dash: true,  data: prevTrend.map(r => r.qty) },
   ]);
   const lineAmtSeries = $derived([
-    { label: `${year}년`,     color: '#10b981', dash: false, data: trend.map(r => r.amount) },
-    { label: `${prevYear}년`, color: '#94a3b8', dash: true,  data: prevTrend.map(r => r.amount) },
+    { label: `${year}년`,     color: 'var(--color-success)', dash: false, data: trend.map(r => r.amount) },
+    { label: `${prevYear}년`, color: 'var(--color-base-content)', dash: true,  data: prevTrend.map(r => r.amount) },
   ]);
 
   const stackData   = $derived(calcMonthlyCategoryStack(shipments, year, clientId));
@@ -77,8 +77,8 @@
       <div class="px-4 pt-2 pb-1 border-b border-base-200 shrink-0 flex items-center justify-between">
         <p class="text-[11px] font-bold uppercase tracking-widest text-base-content/40">월별 출고량</p>
         <div class="flex gap-3 text-[10px] text-base-content/40">
-          <span class="flex items-center gap-1"><span class="inline-block h-1.5 w-3 rounded" style="background:#6366f1"></span>{year}년</span>
-          <span class="flex items-center gap-1"><span class="inline-block h-1.5 w-3 rounded bg-slate-300"></span>{prevYear}년</span>
+          <span class="flex items-center gap-1"><span class="inline-block h-1.5 w-3 rounded bg-primary"></span>{year}년</span>
+          <span class="flex items-center gap-1"><span class="inline-block h-1.5 w-3 rounded bg-base-content/30"></span>{prevYear}년</span>
         </div>
       </div>
       <!-- flex-1 + min-h-0 → SVG height=100%가 부모 높이를 받음 -->
@@ -92,8 +92,8 @@
       <div class="px-4 pt-2 pb-1 border-b border-base-200 shrink-0 flex items-center justify-between">
         <p class="text-[11px] font-bold uppercase tracking-widest text-base-content/40">월별 매출</p>
         <div class="flex gap-3 text-[10px] text-base-content/40">
-          <span class="flex items-center gap-1"><span class="inline-block h-1.5 w-3 rounded" style="background:#10b981"></span>{year}년</span>
-          <span class="flex items-center gap-1"><span class="inline-block h-1.5 w-3 rounded bg-slate-300"></span>{prevYear}년</span>
+          <span class="flex items-center gap-1"><span class="inline-block h-1.5 w-3 rounded bg-success"></span>{year}년</span>
+          <span class="flex items-center gap-1"><span class="inline-block h-1.5 w-3 rounded bg-base-content/30"></span>{prevYear}년</span>
         </div>
       </div>
       <div class="flex-1 min-h-0 px-2 pb-1">

@@ -14,7 +14,15 @@
 
   let { monthStats, yearStats, fromDate, toDate, year }: Props = $props();
 
-  const CC = ['#6366f1','#10b981','#f59e0b','#ec4899','#0ea5e9','#a855f7'];
+  // DaisyUI semantic 컬러 순환 — 테마 자동 대응
+  const CC = [
+    'var(--color-primary)',
+    'var(--color-secondary)',
+    'var(--color-accent)',
+    'var(--color-success)',
+    'var(--color-warning)',
+    'var(--color-error)',
+  ];
 
   const activeCount     = $derived(monthStats.byClient.length);
   const avgAmtPerClient = $derived(activeCount > 0 ? Math.round(monthStats.amount / activeCount) : 0);

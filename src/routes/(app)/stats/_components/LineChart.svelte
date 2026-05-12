@@ -82,15 +82,15 @@
 
   <!-- 그리드 -->
   {#each ticks as tick (tick.y)}
-    <line x1={PL} y1={tick.y} x2={W - PR} y2={tick.y} stroke="#e2e8f0" stroke-width="0.8" />
-    <text x={PL - 3} y={tick.y} text-anchor="end" dominant-baseline="middle" font-size="8" fill="#94a3b8">
+    <line x1={PL} y1={tick.y} x2={W - PR} y2={tick.y} stroke="var(--color-base-300)" stroke-width="0.8" />
+    <text x={PL - 3} y={tick.y} text-anchor="end" dominant-baseline="middle" font-size="8" fill="var(--color-base-content)" opacity="0.4">
       {tick.val > 0 ? (tick.val >= 1000 ? `${(tick.val/1000).toFixed(0)}k` : tick.val) : ''}
     </text>
   {/each}
 
   <!-- X 레이블 -->
   {#each labels as lbl, i (i)}
-    <text x={xPos(i)} y={H - 3} text-anchor="middle" font-size="8" fill="#94a3b8">{lbl}</text>
+    <text x={xPos(i)} y={H - 3} text-anchor="middle" font-size="8" fill="var(--color-base-content)" opacity="0.4">{lbl}</text>
   {/each}
 
   <!-- 시리즈 -->

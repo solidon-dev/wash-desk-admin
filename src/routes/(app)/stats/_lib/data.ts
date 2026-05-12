@@ -9,14 +9,15 @@ export const CATEGORY_LABELS: Record<string, string> = {
   pillowcase: '베갯잇',
 };
 
+// DaisyUI CSS 변수 — 다크/라이트 테마 자동 대응
 export const CATEGORY_COLORS: Record<string, string> = {
-  towel: '#0ea5e9',
-  sheet: '#a855f7',
-  uniform: '#f97316',
-  mop: '#10b981',
-  mat: '#f59e0b',
-  apron: '#ec4899',
-  pillowcase: '#6366f1',
+  towel:       'var(--color-primary)',
+  sheet:       'var(--color-secondary)',
+  uniform:     'var(--color-accent)',
+  mop:         'var(--color-success)',
+  mat:         'var(--color-warning)',
+  apron:       'var(--color-error)',
+  pillowcase:  'var(--color-info)',
 };
 
 export const CATEGORY_KEYS = Object.keys(CATEGORY_LABELS);
