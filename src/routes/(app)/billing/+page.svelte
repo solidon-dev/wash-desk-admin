@@ -62,22 +62,24 @@
 		return Object.values(map);
 	}
 
-	// ── 탭 ──────────────────────────────────────────────────────────
+	// ── 포맷 함수 ──
+	function formatDate(d: string) { return d.replace(/-/g, '.').slice(0, 10); }
+	function formatMoney(n: number) { return n.toLocaleString('ko-KR') + '원'; }
+
+	// ── 탭 ──
 	type BillingTab = 'invoice' | 'statement' | 'contract';
 	const tabState = $state({ active: 'invoice' as BillingTab });
 	function switchTab(t: BillingTab) { tabState.active = t; }
 
-	// ── 거래처 선택 ─────────────────────────────────────────────────
+	// ── 거래처 선택 ──
 	let selectedClientId = $state<string>(clients[0]?.id ?? '');
 	const selectedClient = $derived(clients.find((c) => c.id === selectedClientId) ?? null);
 
-	// ── 기간 설정 (공통) ─────────────────────────────────────────────
+	// ── 기간 설정 (공통) ──
 	let periodFrom = $state('');
 	let periodTo   = $state('');
 
-
-
-	// ── 청구서 미리보기 데이터 ────────────────────────────────────────
+	// ── 청구서 미리보기 데이터 ──
 	const invoiceLines = $derived.by((): InvoiceLine[] => {
 		if (!selectedClientId || !periodFrom || !periodTo) return [];
 		return buildInvoiceLines(selectedClientId, periodFrom, periodTo);
@@ -98,7 +100,7 @@
 
 	const unpricedCount = $derived(invoiceLines.filter((l) => l.unitPrice === 0).length);
 
-	// ── 거래내역서 뷰 모드 ────────────────────────────────────────────
+	// ── 거래내역서 뷰 모드 ──
 	type StmtViewMode = 'pivot' | 'daily';
 	let stmtViewMode = $state<StmtViewMode>('pivot');
 
@@ -114,9 +116,7 @@
 		return Math.max(24, availPx / 31);
 	});
 
-
-
-	// ── 거래내역서 데이터 (품목=세로/날짜=가로 구조) ─────────────────
+	// ── 거래내역서 데이터 (품목=세로/날짜=가로 구조) ──
 	type StmtRow      = { category: string; itemName: string; key: string; quantities: number[]; dateQtys: number[]; total: number };
 	type StmtCatGroup = { category: string; label: string; startIdx: number; count: number };
 	type StmtDailyItem = { category: string; itemName: string; quantity: number };
@@ -262,11 +262,10 @@
 		return { rows, catGroups, dailyRows, dates, dateLabels, dayTotals, dateTotals, catTotals, grandTotal, activeDays: activeDateKeys.length };
 	});
 
-
-	// ── 인쇄 / PDF ──────────────────────────────────────────────
+	// ── 인쇄 / PDF ──
 	let invoiceMemo = $state('');
 
-	// ── 공급자 정보 (로컈스토리지 지속) ───────────────────────
+	// ── 공급자 정보 (로컬스토리지 지속) ──
 	const SUPPLIER_DEFAULT = {
 		regNo:   '233-87-00260',
 		name:    '㎌아람씨앤큐',
@@ -287,7 +286,7 @@
 		try { localStorage.setItem('washdesk_supplier', JSON.stringify(s)); } catch (e) { console.warn(e); }
 	}
 
-	// ── PDF 미리보기 모달 상태 ─────────────────────────────────
+	// ── PDF 미리보기 모달 상태 ──
 	let showSupplierModal = $state(false);
 	let supplierEdit = $state(loadSupplier());
 
@@ -368,7 +367,7 @@
 		const cW      = pageW - margin * 2; // 186mm
 		let   y       = margin;
 
-		// ── 공급자 상태 사용 (supplierEdit) ──
+		// ── 공급자 상태 사용 ──
 		const SUPPLIER = supplierEdit;
 
 		// ── 금액 계산 ──
@@ -635,7 +634,7 @@
 
 		fy += sumRows.length * sumRowH + 8;
 
-		// ── 푸터: 회사명 + 연락처 + 저작권 ──
+		// ── 푸터 ──
 		doc.setDrawColor(210, 220, 235);
 		doc.setLineWidth(0.3);
 		doc.line(margin, fy, margin + cW, fy);
@@ -666,9 +665,7 @@
 		return URL.createObjectURL(doc.output('blob'));
 	}
 
-
-
-	// ── 거래내역서 엑셀 내보내기 ─────────────────────────────────────
+	// ── 거래내역서 엑셀 내보내기 ──
 	function exportStatementExcel() {
 		const sd = statementData;
 		if (!sd || !selectedClient) return;
@@ -677,7 +674,7 @@
 		const period = `${periodFrom}~${periodTo}`;
 		const filename = `거래내역서_${clientName}_${period}.xlsx`;
 
-		// ── 스타일 정의 ──────────────────────────────
+		// ── 스타일 정의 ──
 		const S_TITLE:    Cell['style'] = { bold: true, fontSize: 16, align: 'center', fontColor: '0F172A' };
 		const S_META:     Cell['style'] = { fontSize: 10, align: 'center', fontColor: '64748B' };
 		const S_CAT_HEAD: Record<string, Cell['style']> = {
@@ -702,11 +699,11 @@
 		const S_FOOT_GRAND:   Cell['style'] = { bold: true, fontSize: 11, align: 'center', bgColor: 'EEF2FF', fontColor: '4338CA', border: true, borderThick: true, numFmt: '#,##0' };
 		const S_SUMMARY_LABEL: Cell['style'] = { bold: true, fontSize: 10, align: 'left', bgColor: 'F8FAFC', fontColor: '475569', border: true };
 
-		// ── 레이아웃 상수 ─────────────────────────────
+		// ── 레이아웃 상수 ──
 		// 열 구성: 카테고리(1) + 품목명(1) + 1~31일(31) + 합계(1) = 34열
 		const TOTAL_COLS = 34;
 
-		// ── 열 너비 ──────────────────────────────────
+		// ── 열 너비 ──
 		const xlsColumns: ColumnDef[] = [
 			{ width: 8 },    // 카테고리
 			{ width: 14 },   // 품목명
@@ -714,7 +711,7 @@
 			{ width: 7 },    // 합계
 		];
 
-		// ── 병합 영역 ─────────────────────────────────
+		// ── 병합 영역 ──
 		const merges: MergeRegion[] = [];
 		let R = 1;
 		const sheetRows: Sheet['rows'] = [];
@@ -806,7 +803,7 @@
 		sheetRows.push({ cells: [{ value: '' }], height: 10 });
 		R++;
 
-		// ── 요약 섹션 ─────────────────────────────────
+		// ── 요약 섹션 ──
 		sheetRows.push({ cells: [
 			{ value: '[ 카테고리별 요약 ]', style: { bold: true, fontSize: 11, fontColor: '334155' } },
 		], height: 20 });
@@ -843,9 +840,8 @@
 			{ value: '개', style: { fontSize: 10, fontColor: '64748B' } },
 		], height: 22 });
 		merges.push({ r1: R, c1: 2, r2: R, c2: 3 });
-		R++;
 
-		// ── 시트 조립 ─────────────────────────────────
+		// ── 시트 조립 ──
 		const sheet: Sheet = {
 			name: `거래내역서_${periodFrom.slice(0,7)}`,
 			rows: sheetRows,
@@ -858,7 +854,7 @@
 		downloadXlsx([sheet], filename);
 	}
 
-	// ── 청구서 엑셀 내보내기 ─────────────────────────────────────────
+	// ── 청구서 엑셀 내보내기 ──
 	function exportInvoiceExcel() {
 		if (!selectedClient || invoiceLines.length === 0) return;
 
@@ -930,7 +926,7 @@
 			{ value: invoiceTotalQty, style: { ...S_TOTAL, fontSize: 10 } },
 			{ value: '', style: S_TOTAL },
 			{ value: invoiceTotal, style: { ...S_TOTAL, fontSize: 14 } },
-		], height: 26 }); R++;
+		], height: 26 });
 
 		const sheet: Sheet = {
 			name: `청구서_${periodFrom.slice(0,7)}`,
@@ -942,10 +938,7 @@
 		downloadXlsx([sheet], filename);
 	}
 
-	// ── 저장된 청구서 ─────────────────────────────────────────────────
-
-
-	// ── 헬퍼 ────────────────────────────────────────────────────────
+	// ── 헬퍼 ──
 	const categoryBadge: Record<string, string> = {
 		towel:   'badge-info',
 		sheet:   'badge-secondary',
@@ -957,10 +950,7 @@
 		uniform: 'bg-warning'
 	};
 
-	function formatDate(d: string) { return d.replace(/-/g, '.').slice(0, 10); }
-	function formatMoney(n: number) { return n.toLocaleString('ko-KR') + '원'; }
-
-	// ── 계약기간 관리 ─────────────────────────────────────────────────
+	// ── 계약기간 관리 ──
 	const contracts = $derived(
 		selectedClientId ? clientContractsData.filter((c) => c.clientId === selectedClientId) : []
 	);
@@ -1036,8 +1026,6 @@
 		if (diff === 0) return 'D-DAY';
 		return `D-${diff}`;
 	}
-
-
 </script>
 
 <svelte:head>
@@ -1792,36 +1780,36 @@
 
 		<div class="grid grid-cols-2 gap-3">
 			<div class="form-control">
-				<label class="label label-text text-xs font-semibold">등록번호</label>
-				<input type="text" bind:value={supplierEdit.regNo} class="input input-bordered input-sm w-full" />
+				<label for="sup-regNo" class="label label-text text-xs font-semibold">등록번호</label>
+				<input id="sup-regNo" type="text" bind:value={supplierEdit.regNo} class="input input-bordered input-sm w-full" />
 			</div>
 			<div class="form-control">
-				<label class="label label-text text-xs font-semibold">상호명</label>
-				<input type="text" bind:value={supplierEdit.name} class="input input-bordered input-sm w-full" />
+				<label for="sup-name" class="label label-text text-xs font-semibold">상호명</label>
+				<input id="sup-name" type="text" bind:value={supplierEdit.name} class="input input-bordered input-sm w-full" />
 			</div>
 			<div class="form-control">
-				<label class="label label-text text-xs font-semibold">대표자 성명</label>
-				<input type="text" bind:value={supplierEdit.ceo} class="input input-bordered input-sm w-full" />
+				<label for="sup-ceo" class="label label-text text-xs font-semibold">대표자 성명</label>
+				<input id="sup-ceo" type="text" bind:value={supplierEdit.ceo} class="input input-bordered input-sm w-full" />
 			</div>
 			<div class="form-control">
-				<label class="label label-text text-xs font-semibold">TEL</label>
-				<input type="text" bind:value={supplierEdit.tel} class="input input-bordered input-sm w-full" />
+				<label for="sup-tel" class="label label-text text-xs font-semibold">TEL</label>
+				<input id="sup-tel" type="text" bind:value={supplierEdit.tel} class="input input-bordered input-sm w-full" />
 			</div>
 			<div class="form-control col-span-2">
-				<label class="label label-text text-xs font-semibold">사업장 주소</label>
-				<input type="text" bind:value={supplierEdit.address} class="input input-bordered input-sm w-full" />
+				<label for="sup-address" class="label label-text text-xs font-semibold">사업장 주소</label>
+				<input id="sup-address" type="text" bind:value={supplierEdit.address} class="input input-bordered input-sm w-full" />
 			</div>
 			<div class="form-control">
-				<label class="label label-text text-xs font-semibold">업태</label>
-				<input type="text" bind:value={supplierEdit.bizType} class="input input-bordered input-sm w-full" />
+				<label for="sup-bizType" class="label label-text text-xs font-semibold">업태</label>
+				<input id="sup-bizType" type="text" bind:value={supplierEdit.bizType} class="input input-bordered input-sm w-full" />
 			</div>
 			<div class="form-control">
-				<label class="label label-text text-xs font-semibold">종목</label>
-				<input type="text" bind:value={supplierEdit.bizItem} class="input input-bordered input-sm w-full" />
+				<label for="sup-bizItem" class="label label-text text-xs font-semibold">종목</label>
+				<input id="sup-bizItem" type="text" bind:value={supplierEdit.bizItem} class="input input-bordered input-sm w-full" />
 			</div>
 			<div class="form-control col-span-2">
-				<label class="label label-text text-xs font-semibold">입금계좌</label>
-				<input type="text" bind:value={supplierEdit.bank} class="input input-bordered input-sm w-full" placeholder="은행명 계좌번호" />
+				<label for="sup-bank" class="label label-text text-xs font-semibold">입금계좌</label>
+				<input id="sup-bank" type="text" bind:value={supplierEdit.bank} class="input input-bordered input-sm w-full" placeholder="은행명 계좌번호" />
 			</div>
 		</div>
 
@@ -1836,7 +1824,7 @@
 		</div>
 	</div>
 	<form method="dialog" class="modal-backdrop">
-		<button onclick={() => (showSupplierModal = false)}></button>
+		<button aria-label="닫기" onclick={() => (showSupplierModal = false)}></button>
 	</form>
 </dialog>
 {/if}
