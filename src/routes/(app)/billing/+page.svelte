@@ -3,7 +3,7 @@
 	import { tick } from 'svelte';
 	import { downloadXlsx } from './excel.js';
 	import jsPDF from 'jspdf';
-	import autoTable from 'jspdf-autotable';
+	import autoTable, { type CellHookData, type HookData } from 'jspdf-autotable';
 	import type { Cell, Sheet, MergeRegion, ColumnDef } from './excel.js';
 
 	const CATEGORY_LABELS: Record<string, string> = { towel: '타월', sheet: '시트', uniform: '유니폼', all: '전체' };
@@ -263,22 +263,51 @@
 	});
 
 
-	// ── 인쇄 / PDF ──────────────────────────────────────────────────
+	// ── 인쇄 / PDF ──────────────────────────────────────────────
 	let invoiceMemo = $state('');
 
-	// ── PDF 미리보기 모달 상태 ──────────────────────────────────────
+	// ── 공급자 정보 (로컈스토리지 지속) ───────────────────────
+	const SUPPLIER_DEFAULT = {
+		regNo:   '233-87-00260',
+		name:    '㎌아람씨앤큐',
+		ceo:     '문창배',
+		address: '제주특별자치도 제주시 애월읍 납읍동 2길 16',
+		bizType: '서비스',
+		bizItem: '세탁업',
+		tel:     '064) 799 - 3211',
+		bank:    '농협 301-3119-3577-71',
+	};
+	function loadSupplier() {
+		try {
+			const saved = localStorage.getItem('washdesk_supplier');
+			return saved ? { ...SUPPLIER_DEFAULT, ...JSON.parse(saved) } : { ...SUPPLIER_DEFAULT };
+		} catch { return { ...SUPPLIER_DEFAULT }; }
+	}
+	function saveSupplier(s: typeof SUPPLIER_DEFAULT) {
+		try { localStorage.setItem('washdesk_supplier', JSON.stringify(s)); } catch (e) { console.warn(e); }
+	}
+
+	// ── PDF 미리보기 모달 상태 ─────────────────────────────────
+	let showSupplierModal = $state(false);
+	let supplierEdit = $state(loadSupplier());
+
 	let showPdfModal  = $state(false);
 	let pdfBlobUrl    = $state<string | null>(null);
 	let pdfGenerating = $state(false);
 
-	async function openPdfModal() {
+	function openSupplierThenPdf() {
 		if (!selectedClient || invoiceLines.length === 0) return;
+		supplierEdit = loadSupplier();
+		showSupplierModal = true;
+	}
+
+	async function confirmSupplierAndPdf() {
+		saveSupplier(supplierEdit);
+		showSupplierModal = false;
 		pdfGenerating = true;
 		showPdfModal  = true;
 		pdfBlobUrl    = null;
-
 		await tick();
-
 		try {
 			const url = await generateInvoicePdf();
 			pdfBlobUrl = url;
@@ -287,12 +316,27 @@
 		}
 	}
 
+	async function openPdfModal() {
+		openSupplierThenPdf();
+	}
+
 	function closePdfModal() {
 		showPdfModal = false;
 		if (pdfBlobUrl) {
 			URL.revokeObjectURL(pdfBlobUrl);
 			pdfBlobUrl = null;
 		}
+	}
+
+	// ArrayBuffer → Base64 안전 변환 (스택 오버플로우 방지)
+	function arrayBufferToBase64(buffer: ArrayBuffer): string {
+		let binary = '';
+		const bytes = new Uint8Array(buffer);
+		const chunkSize = 8192;
+		for (let i = 0; i < bytes.length; i += chunkSize) {
+			binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+		}
+		return btoa(binary);
 	}
 
 	function downloadPdf() {
@@ -306,161 +350,320 @@
 	async function generateInvoicePdf(): Promise<string> {
 		const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
-		const pageW = doc.internal.pageSize.getWidth();
-		const margin = 14;
-		let y = margin;
+		// ── 나눔고딕 Regular + Bold 로드 ──
+		const [fontRegResp, fontBoldResp] = await Promise.all([
+			fetch('/NanumGothic-Regular.ttf'),
+			fetch('/NanumGothic-Bold.ttf'),
+		]);
+		if (!fontRegResp.ok)  throw new Error(`폰트 로드 실패(Regular): ${fontRegResp.status}`);
+		if (!fontBoldResp.ok) throw new Error(`폰트 로드 실패(Bold): ${fontBoldResp.status}`);
+		const [fontRegBuf, fontBoldBuf] = await Promise.all([fontRegResp.arrayBuffer(), fontBoldResp.arrayBuffer()]);
+		doc.addFileToVFS('NanumGothic-Regular.ttf', arrayBufferToBase64(fontRegBuf));
+		doc.addFont('NanumGothic-Regular.ttf', 'NanumGothic', 'normal');
+		doc.addFileToVFS('NanumGothic-Bold.ttf', arrayBufferToBase64(fontBoldBuf));
+		doc.addFont('NanumGothic-Bold.ttf', 'NanumGothic', 'bold');
 
-		// ── 폰트 등록 (기본 helvetica, 한글은 유니코드 폴백) ──
-		doc.setFont('helvetica');
+		const pageW   = doc.internal.pageSize.getWidth(); // 210mm
+		const margin  = 12;
+		const cW      = pageW - margin * 2; // 186mm
+		let   y       = margin;
 
-		// ── 제목 ──
-		doc.setFontSize(20);
-		doc.setTextColor(15, 23, 42);
-		doc.setFont('helvetica', 'bold');
-		doc.text('INVOICE', pageW / 2, y + 6, { align: 'center' });
-		y += 14;
+		// ── 공급자 상태 사용 (supplierEdit) ──
+		const SUPPLIER = supplierEdit;
 
+		// ── 금액 계산 ──
+		const supplyAmount = invoiceTotal;
+		const vatRaw     = Math.floor(supplyAmount * 0.1);
+		const vat        = Math.floor(vatRaw / 10) * 10;   // 10원 미만 절사
+		const jeolsa     = vatRaw - vat;                    // 절사액 (양수, 표시는 음수)
+		const grandTotal = supplyAmount + vat;
+
+		// ═══════════════════════════════════════
+		// 1. 제목
+		// ═══════════════════════════════════════
+		// ── 제목 텍스트: YYYY년 MM월 청구서 ──
+		const titleDate = (() => {
+			const d = new Date(periodTo + 'T00:00:00');
+			return `${d.getFullYear()}년 ${d.getMonth() + 1}월`;
+		})();
+		doc.setFillColor(10, 36, 99);
+		doc.rect(margin, y, cW, 13, 'F');
+		doc.setFont('NanumGothic', 'bold');
+		doc.setFontSize(15);
+		doc.setTextColor(255, 255, 255);
+		doc.text(`${titleDate}  청  구  서`, pageW / 2, y + 9, { align: 'center' });
+		y += 17;
+
+		// ═══════════════════════════════════════
+		// 2. 헤더: 좌(수신자) | 우(공급자)
+		// ═══════════════════════════════════════
+		const leftW  = cW * 0.38;       // ~70.7mm
+		const rightW = cW - leftW;      // ~115.3mm
+		const rightX = margin + leftW;
+		const hdrH   = 54;
+
+		// 외곽 사각형
+		doc.setDrawColor(150, 165, 195);
+		doc.setLineWidth(0.4);
+		doc.rect(margin, y, cW, hdrH);
+		// 좌우 세로 구분선
+		doc.line(rightX, y, rightX, y + hdrH);
+
+		// ─ 좌측: 날짜 / 수신자 / 청구 안내 ─
+		const dateStr = (() => {
+			const d = new Date(periodTo + 'T00:00:00');
+			return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
+		})();
+		doc.setFont('NanumGothic', 'normal');
 		doc.setFontSize(9);
-		doc.setFont('helvetica', 'normal');
-		doc.setTextColor(100, 116, 139);
-		doc.text(`Period: ${periodFrom} ~ ${periodTo}`, pageW / 2, y, { align: 'center' });
-		y += 10;
+		doc.setTextColor(75, 90, 115);
+		doc.text(dateStr, margin + 5, y + 10);
 
-		// ── 구분선 ──
-		doc.setDrawColor(226, 232, 240);
-		doc.setLineWidth(0.5);
-		doc.line(margin, y, pageW - margin, y);
-		y += 8;
+		doc.setFont('NanumGothic', 'bold');
+		doc.setFontSize(13);
+		doc.setTextColor(10, 20, 45);
+		doc.text(selectedClient?.name ?? '-', margin + 5, y + 24);
+		doc.setFontSize(10);
+		doc.text('귀하', margin + 5, y + 33);
 
-		// ── 거래처 + 청구 정보 2단 ──
-		const colW = (pageW - margin * 2 - 6) / 2;
+		doc.setFont('NanumGothic', 'normal');
+		doc.setFontSize(8.5);
+		doc.setTextColor(75, 90, 115);
+		doc.text('아래와 같이 청구합니다.', margin + 5, y + 46);
 
-		// 왼쪽: 공급받는 자
-		doc.setFillColor(248, 250, 252);
-		doc.roundedRect(margin, y, colW, 36, 2, 2, 'F');
-		doc.setFontSize(7);
-		doc.setTextColor(148, 163, 184);
-		doc.setFont('helvetica', 'bold');
-		doc.text('BILL TO', margin + 4, y + 6);
-		doc.setFontSize(11);
-		doc.setTextColor(15, 23, 42);
-		doc.text(selectedClient?.name ?? '-', margin + 4, y + 14);
+		// ─ 우측: 공급자 정보 ─
+		const ROW_COUNT  = 6;
+		const sRowH      = hdrH / ROW_COUNT; // 9mm
+		const labelColW  = 16;
+
+		// 공급자 헤더 바
+		doc.setFillColor(230, 237, 255);
+		doc.rect(rightX, y, rightW, sRowH, 'F');
+		doc.setFont('NanumGothic', 'bold');
 		doc.setFontSize(8);
-		doc.setFont('helvetica', 'normal');
-		doc.setTextColor(71, 85, 105);
-		let ly = y + 21;
-		if (selectedClient?.businessNo) { doc.text(`BizNo: ${selectedClient.businessNo}`, margin + 4, ly); ly += 5; }
-		if (selectedClient?.ownerName)  { doc.text(`Rep: ${selectedClient.ownerName}`,     margin + 4, ly); ly += 5; }
-		if (selectedClient?.phone)      { doc.text(`Tel: ${selectedClient.phone}`,          margin + 4, ly); }
+		doc.setTextColor(30, 50, 120);
+		doc.text('공  급  자', rightX + rightW / 2, y + sRowH * 0.72, { align: 'center' });
 
-		// 오른쪽: 청구 정보
-		const rx = margin + colW + 6;
-		doc.setFillColor(238, 242, 255);
-		doc.roundedRect(rx, y, colW, 36, 2, 2, 'F');
-		doc.setFontSize(7);
-		doc.setTextColor(148, 163, 184);
-		doc.setFont('helvetica', 'bold');
-		doc.text('INVOICE DETAILS', rx + 4, y + 6);
-		doc.setFontSize(8);
-		doc.setFont('helvetica', 'normal');
-		doc.setTextColor(71, 85, 105);
-		doc.text(`Period:   ${periodFrom} ~ ${periodTo}`,               rx + 4, y + 14);
-		doc.text(`Qty:      ${invoiceLines.reduce((s,l)=>s+l.quantity,0).toLocaleString()} pcs`, rx + 4, y + 20);
-		doc.text(`Date:     ${new Date().toISOString().slice(0,10)}`,   rx + 4, y + 26);
-		doc.setFontSize(11);
-		doc.setFont('helvetica', 'bold');
-		doc.setTextColor(67, 56, 202);
-		doc.text(`${invoiceTotal.toLocaleString()} KRW`, rx + colW - 4, y + 34, { align: 'right' });
+		// 가로 구분선 (1줄~5줄)
+		doc.setDrawColor(190, 205, 225);
+		doc.setLineWidth(0.2);
+		for (let i = 1; i <= 5; i++) {
+			doc.line(rightX, y + sRowH * i, rightX + rightW, y + sRowH * i);
+		}
+		// 라벨 | 값 세로선
+		doc.line(rightX + labelColW, y + sRowH, rightX + labelColW, y + hdrH);
 
-		y += 44;
+		const supplierRows = [
+			{ label: '등록번호', v1: SUPPLIER.regNo,    l2: '',        v2: '' },
+			{ label: '상호명',   v1: SUPPLIER.name,    l2: '성  명', v2: SUPPLIER.ceo },
+			{ label: '주    소', v1: SUPPLIER.address, l2: '',        v2: '' },
+			{ label: '업    태', v1: SUPPLIER.bizType, l2: '종    목', v2: SUPPLIER.bizItem },
+			{ label: 'TEL',      v1: SUPPLIER.tel,     l2: '',        v2: '' },
+		];
+		const label2ColW = 14; // 2번째 라벨 열 너비
+		supplierRows.forEach((row, i) => {
+			const ry = y + sRowH * (i + 1) + sRowH * 0.68;
+			// 1번째 라벨
+			doc.setFont('NanumGothic', 'bold');
+			doc.setFontSize(6.5);
+			doc.setTextColor(100, 116, 145);
+			doc.text(row.label, rightX + labelColW / 2, ry, { align: 'center' });
 
-		// ── 카테고리별 배지 요약 ──
-		const cats = ['towel', 'sheet', 'uniform'] as const;
-		const catColors: Record<string, [number,number,number]> = {
-			towel:   [3,  105, 161],
-			sheet:   [67,  56, 202],
-			uniform: [146, 64,  14],
-		};
-		const catBgs: Record<string, [number,number,number]> = {
-			towel:   [240, 249, 255],
-			sheet:   [238, 242, 255],
-			uniform: [255, 251, 235],
-		};
-		const bw = (pageW - margin * 2 - 6) / 3;
-		cats.forEach((cat, ci) => {
-			const bx = margin + ci * (bw + 3);
-			const [r,g,b] = catBgs[cat];
-			const [cr,cg,cb] = catColors[cat];
-			doc.setFillColor(r,g,b);
-			doc.roundedRect(bx, y, bw, 14, 2, 2, 'F');
-			doc.setFontSize(7);
-			doc.setFont('helvetica', 'bold');
-			doc.setTextColor(cr,cg,cb);
-			doc.text(CATEGORY_LABELS[cat].toUpperCase(), bx + bw/2, y + 5, { align: 'center' });
-			const catLines = invoiceLines.filter(l => l.category === cat);
-			const catQty = catLines.reduce((s,l)=>s+l.quantity,0);
-			doc.setFontSize(9);
-			doc.text(catQty > 0 ? `${catQty.toLocaleString()} pcs` : '-', bx + bw/2, y + 11, { align: 'center' });
+			if (row.l2) {
+				// 2열 구조: [라벨1][값1 절반] | [라벨2][값2 절반]
+				const halfX = rightX + labelColW + (rightW - labelColW) * 0.5;
+				// 중간 세로선
+				doc.setDrawColor(190, 205, 225);
+				doc.setLineWidth(0.2);
+				doc.line(halfX, y + sRowH * (i + 1), halfX, y + sRowH * (i + 2));
+				// 2번째 라벨 세로선
+				doc.line(halfX + label2ColW, y + sRowH * (i + 1), halfX + label2ColW, y + sRowH * (i + 2));
+				// 값1
+				doc.setFont('NanumGothic', 'normal');
+				doc.setFontSize(7.5);
+				doc.setTextColor(15, 25, 55);
+				doc.text(row.v1, rightX + labelColW + 2, ry);
+				// 2번째 라벨
+				doc.setFont('NanumGothic', 'bold');
+				doc.setFontSize(6.5);
+				doc.setTextColor(100, 116, 145);
+				doc.text(row.l2, halfX + label2ColW / 2, ry, { align: 'center' });
+				// 값2
+				doc.setFont('NanumGothic', 'normal');
+				doc.setFontSize(7.5);
+				doc.setTextColor(15, 25, 55);
+				doc.text(row.v2, halfX + label2ColW + 2, ry);
+			} else {
+				// 1열 구조: 값1 전체
+				doc.setFont('NanumGothic', 'normal');
+				doc.setFontSize(7.5);
+				doc.setTextColor(15, 25, 55);
+				doc.text(row.v1, rightX + labelColW + 2, ry);
+			}
 		});
-		y += 20;
+		y += hdrH + 4;
 
-		// ── 품목 테이블 ──
-		const catLabelMap: Record<string, string> = { towel: 'Towel', sheet: 'Sheet', uniform: 'Uniform' };
+		// ═══════════════════════════════════════
+		// 3. 청구금액 요약 바
+		// ═══════════════════════════════════════
+		doc.setFillColor(236, 244, 255);
+		doc.setDrawColor(130, 175, 240);
+		doc.setLineWidth(0.35);
+		doc.rect(margin, y, cW, 11, 'FD');
+		doc.setFont('NanumGothic', 'bold');
+		doc.setFontSize(8);
+		doc.setTextColor(70, 105, 165);
+		doc.text('청구금액', margin + 5, y + 7.2);
+		doc.setFontSize(13);
+		doc.setTextColor(10, 36, 140);
+		doc.text(`${grandTotal.toLocaleString()} 원`, pageW / 2, y + 7.5, { align: 'center' });
+		doc.setFontSize(7.5);
+		doc.setTextColor(100, 125, 160);
+		doc.text(`청구기간: ${periodFrom} ~ ${periodTo}`, margin + cW - 3, y + 7.2, { align: 'right' });
+		y += 15;
+
+		// ═══════════════════════════════════════
+		// 4. 품목 테이블
+		// ═══════════════════════════════════════
+		const catLabelMap: Record<string, string> = { towel: '수건', sheet: '시트', uniform: '유니폼' };
+		const col1 = 24; const col2 = 20; const col3 = 36; const col4 = 40;
+		const col0 = cW - col1 - col2 - col3 - col4;
+		const totalQty = invoiceLines.reduce((s, l) => s + l.quantity, 0);
 		autoTable(doc, {
 			startY: y,
 			margin: { left: margin, right: margin },
-			head: [['Item', 'Category', 'Qty', 'Unit Price', 'Amount']],
+			head: [['품목명', '구분', '수량', '단가', '금액']],
 			body: invoiceLines.map(l => [
 				l.itemName,
 				catLabelMap[l.category] ?? l.category,
 				l.quantity.toLocaleString(),
-				l.unitPrice > 0 ? `${l.unitPrice.toLocaleString()} KRW` : '-',
-				`${l.amount.toLocaleString()} KRW`,
+				l.unitPrice > 0 ? `${l.unitPrice.toLocaleString()} 원` : '-',
+				`${l.amount.toLocaleString()} 원`,
 			]),
-			foot: [['Total', '', invoiceLines.reduce((s,l)=>s+l.quantity,0).toLocaleString(), '', `${invoiceTotal.toLocaleString()} KRW`]],
-			headStyles:  { fillColor: [241,245,249], textColor: [100,116,139], fontStyle: 'bold', fontSize: 8 },
-			bodyStyles:  { fontSize: 8, textColor: [51,65,85] },
-			footStyles:  { fillColor: [238,242,255], textColor: [67,56,202],   fontStyle: 'bold', fontSize: 9 },
-			alternateRowStyles: { fillColor: [250,250,250] },
+			foot: [['품목합계', '', totalQty.toLocaleString(), '', `${supplyAmount.toLocaleString()} 원`]],
+			styles:            { font: 'NanumGothic', fontSize: 8, valign: 'middle' },
+			headStyles:        { fillColor: [225, 232, 245], textColor: [60, 80, 130], fontStyle: 'bold', fontSize: 8 },
+			bodyStyles:        { textColor: [40, 55, 80], fontStyle: 'normal' },
+			footStyles:        { fillColor: [236, 244, 255], textColor: [10, 36, 140], fontStyle: 'bold', fontSize: 9 },
+			alternateRowStyles:{ fillColor: [248, 251, 255] },
 			columnStyles: {
-				0: { cellWidth: 'auto' },
-				1: { halign: 'center', cellWidth: 24 },
-				2: { halign: 'right',  cellWidth: 18 },
-				3: { halign: 'right',  cellWidth: 30 },
-				4: { halign: 'right',  cellWidth: 34 },
+				0: { cellWidth: col0 },
+				1: { cellWidth: col1 },
+				2: { cellWidth: col2 },
+				3: { cellWidth: col3 },
+				4: { cellWidth: col4 },
 			},
-			didDrawPage: (data) => { y = data.cursor?.y ?? y; },
+			didParseCell: (data: CellHookData) => {
+				data.cell.styles.font = 'NanumGothic';
+				if (data.column.index === 0) data.cell.styles.halign = 'left';
+				if (data.column.index === 1) data.cell.styles.halign = 'center';
+				if (data.column.index >= 2)  data.cell.styles.halign = 'right';
+			},
+			didDrawPage: (data: HookData) => { y = data.cursor?.y ?? y; },
 		});
 
 		const finalY = (doc as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? y;
-		let fy = finalY + 8;
+		let fy = finalY + 6;
 
-		// ── 메모 ──
+		// ═══════════════════════════════════════
+		// 5. 메모
+		// ═══════════════════════════════════════
 		if (invoiceMemo?.trim()) {
 			doc.setFillColor(248, 250, 252);
-			doc.roundedRect(margin, fy, pageW - margin * 2, 14, 2, 2, 'F');
+			doc.setDrawColor(210, 220, 235);
+			doc.setLineWidth(0.3);
+			doc.rect(margin, fy, cW, 12, 'FD');
+			doc.setFont('NanumGothic', 'bold');
 			doc.setFontSize(7);
-			doc.setFont('helvetica', 'bold');
 			doc.setTextColor(148, 163, 184);
-			doc.text('MEMO', margin + 4, fy + 5);
-			doc.setFont('helvetica', 'normal');
+			doc.text('메모', margin + 4, fy + 5);
+			doc.setFont('NanumGothic', 'normal');
 			doc.setFontSize(8);
-			doc.setTextColor(71, 85, 105);
-			doc.text(invoiceMemo, margin + 4, fy + 11);
-			fy += 20;
+			doc.setTextColor(70, 85, 105);
+			doc.text(invoiceMemo, margin + 16, fy + 5);
+			fy += 16;
 		}
 
-		// ── 푸터 ──
-		doc.setDrawColor(226, 232, 240);
-		doc.line(margin, fy, pageW - margin, fy);
-		fy += 5;
-		doc.setFontSize(7);
-		doc.setFont('helvetica', 'normal');
-		doc.setTextColor(148, 163, 184);
-		doc.text('Generated by WASH DESK Admin System', pageW / 2, fy, { align: 'center' });
+		// ═══════════════════════════════════════
+		// 6. 청구 구조 + VAT 요약 (차우 배치)
+		// ═══════════════════════════════════════
+		const sumTblW  = 90;                         // 요약 표 너비
+		const sumTblX  = margin + cW - sumTblW;      // 오른쪽 정렬
+		const sumLabelW = 38;
+		const sumRowH  = 7.5;
+		const sumRows  = [
+			{ label: '공급가액',   value: supplyAmount.toLocaleString() + ' 원', bold: false },
+			{ label: '절  사',   value: jeolsa > 0 ? `-${jeolsa}` : '-',          bold: false },
+			{ label: 'VAT (10%)', value: vat.toLocaleString() + ' 원',          bold: false },
+			{ label: '총계 금액', value: grandTotal.toLocaleString() + ' 원',  bold: true  },
+		];
 
-		const blob = doc.output('blob');
-		return URL.createObjectURL(blob);
+		// 계좌번호 (좌측)
+		doc.setFont('NanumGothic', 'bold');
+		doc.setFontSize(8.5);
+		doc.setTextColor(10, 36, 140);
+		doc.text(`입금계좌: ${SUPPLIER.bank}  ${SUPPLIER.name}`, margin, fy + 5);
+
+		// 요약 표
+		sumRows.forEach((row, i) => {
+			const rx = sumTblX;
+			const ry = fy + i * sumRowH;
+			// 배경
+			doc.setFillColor(
+				row.bold ? 224 : 245,
+				row.bold ? 236 : 249,
+				row.bold ? 255 : 255,
+			);
+			doc.rect(rx, ry, sumTblW, sumRowH, 'F');
+			// 테두리
+			doc.setDrawColor(row.bold ? 100 : 190, row.bold ? 140 : 210, row.bold ? 220 : 235);
+			doc.setLineWidth(row.bold ? 0.5 : 0.2);
+			doc.rect(rx, ry, sumTblW, sumRowH);
+			// 세로 구분선
+			doc.line(rx + sumLabelW, ry, rx + sumLabelW, ry + sumRowH);
+			// 라벨
+			doc.setFont('NanumGothic', row.bold ? 'bold' : 'normal');
+			doc.setFontSize(8);
+			doc.setTextColor(row.bold ? 10 : 75, row.bold ? 36 : 90, row.bold ? 140 : 125);
+			doc.text(row.label, rx + sumLabelW / 2, ry + sumRowH * 0.68, { align: 'center' });
+			// 값
+			doc.setFont('NanumGothic', row.bold ? 'bold' : 'normal');
+			doc.setFontSize(row.bold ? 9 : 8);
+			doc.setTextColor(row.bold ? 10 : 30, row.bold ? 36 : 45, row.bold ? 140 : 80);
+			doc.text(row.value, rx + sumTblW - 4, ry + sumRowH * 0.68, { align: 'right' });
+		});
+
+		fy += sumRows.length * sumRowH + 8;
+
+		// ── 푸터: 회사명 + 연락처 + 저작권 ──
+		doc.setDrawColor(210, 220, 235);
+		doc.setLineWidth(0.3);
+		doc.line(margin, fy, margin + cW, fy);
+		fy += 5;
+		// 회사명 좌측
+		doc.setFont('NanumGothic', 'bold');
+		doc.setFontSize(8);
+		doc.setTextColor(30, 50, 110);
+		doc.text(SUPPLIER.name, margin, fy);
+		// TEL 중앙
+		doc.setFont('NanumGothic', 'normal');
+		doc.setFontSize(7);
+		doc.setTextColor(110, 125, 150);
+		doc.text(`TEL. ${SUPPLIER.tel}`, pageW / 2, fy, { align: 'center' });
+		// 주소 우측
+		doc.text(SUPPLIER.address, margin + cW, fy, { align: 'right' });
+		fy += 5;
+		// 구분선
+		doc.setDrawColor(225, 232, 245);
+		doc.setLineWidth(0.2);
+		doc.line(margin, fy, margin + cW, fy);
+		fy += 4;
+		doc.setFont('NanumGothic', 'normal');
+		doc.setFontSize(6.5);
+		doc.setTextColor(185, 195, 215);
+		doc.text(`사업자등록번호 ${SUPPLIER.regNo}  |  대표 ${SUPPLIER.ceo}  |  ${SUPPLIER.bizType} / ${SUPPLIER.bizItem}`, pageW / 2, fy, { align: 'center' });
+
+		return URL.createObjectURL(doc.output('blob'));
 	}
 
 
@@ -1581,6 +1784,63 @@
 
 
 <!-- ═══════════════ 청구서 PDF 미리보기 모달 ═══════════════ -->
+{#if showSupplierModal}
+<dialog class="modal modal-open" aria-modal="true">
+	<div class="modal-box w-full max-w-lg">
+		<h3 class="mb-1 text-base font-extrabold">공급자 정보 확인</h3>
+		<p class="mb-4 text-xs text-base-content/50">입력값은 자동 저장됩니다. 다음 출력 시 그대로 사용됩니다.</p>
+
+		<div class="grid grid-cols-2 gap-3">
+			<div class="form-control">
+				<label class="label label-text text-xs font-semibold">등록번호</label>
+				<input type="text" bind:value={supplierEdit.regNo} class="input input-bordered input-sm w-full" />
+			</div>
+			<div class="form-control">
+				<label class="label label-text text-xs font-semibold">상호명</label>
+				<input type="text" bind:value={supplierEdit.name} class="input input-bordered input-sm w-full" />
+			</div>
+			<div class="form-control">
+				<label class="label label-text text-xs font-semibold">대표자 성명</label>
+				<input type="text" bind:value={supplierEdit.ceo} class="input input-bordered input-sm w-full" />
+			</div>
+			<div class="form-control">
+				<label class="label label-text text-xs font-semibold">TEL</label>
+				<input type="text" bind:value={supplierEdit.tel} class="input input-bordered input-sm w-full" />
+			</div>
+			<div class="form-control col-span-2">
+				<label class="label label-text text-xs font-semibold">사업장 주소</label>
+				<input type="text" bind:value={supplierEdit.address} class="input input-bordered input-sm w-full" />
+			</div>
+			<div class="form-control">
+				<label class="label label-text text-xs font-semibold">업태</label>
+				<input type="text" bind:value={supplierEdit.bizType} class="input input-bordered input-sm w-full" />
+			</div>
+			<div class="form-control">
+				<label class="label label-text text-xs font-semibold">종목</label>
+				<input type="text" bind:value={supplierEdit.bizItem} class="input input-bordered input-sm w-full" />
+			</div>
+			<div class="form-control col-span-2">
+				<label class="label label-text text-xs font-semibold">입금계좌</label>
+				<input type="text" bind:value={supplierEdit.bank} class="input input-bordered input-sm w-full" placeholder="은행명 계좌번호" />
+			</div>
+		</div>
+
+		<div class="modal-action mt-5">
+			<button type="button" class="btn btn-ghost btn-sm"
+				onclick={() => (showSupplierModal = false)}>취소</button>
+			<button type="button" class="btn btn-primary btn-sm gap-1.5"
+				onclick={confirmSupplierAndPdf}>
+				<Icon icon="lucide:file-text" class="h-4 w-4" />
+				PDF 출력
+			</button>
+		</div>
+	</div>
+	<form method="dialog" class="modal-backdrop">
+		<button onclick={() => (showSupplierModal = false)}></button>
+	</form>
+</dialog>
+{/if}
+
 {#if showPdfModal}
 	<dialog class="modal modal-open" aria-modal="true">
 		<div class="modal-box flex w-full max-w-4xl flex-col gap-0 overflow-hidden p-0" style="max-height: 90vh;">
