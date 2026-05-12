@@ -283,7 +283,7 @@
 	});
 
 	// ── 인쇄 / PDF ──
-	let invoiceMemo = $state('');
+
 
 	// ── 공급자 정보 (로컬스토리지 지속) ──
 	const SUPPLIER_DEFAULT = {
@@ -585,26 +585,7 @@
 		let fy = finalY + 6;
 
 		// ═══════════════════════════════════════
-		// 5. 메모
-		// ═══════════════════════════════════════
-		if (invoiceMemo?.trim()) {
-			doc.setFillColor(248, 250, 252);
-			doc.setDrawColor(210, 220, 235);
-			doc.setLineWidth(0.3);
-			doc.rect(margin, fy, cW, 12, 'FD');
-			doc.setFont('NanumGothic', 'bold');
-			doc.setFontSize(7);
-			doc.setTextColor(148, 163, 184);
-			doc.text('메모', margin + 4, fy + 5);
-			doc.setFont('NanumGothic', 'normal');
-			doc.setFontSize(8);
-			doc.setTextColor(70, 85, 105);
-			doc.text(invoiceMemo, margin + 16, fy + 5);
-			fy += 16;
-		}
-
-		// ═══════════════════════════════════════
-		// 6. 청구 구조 + VAT 요약 (차우 배치)
+		// 5. 청구 구조 + VAT 요약 (차우 배치)
 		// ═══════════════════════════════════════
 		const sumTblW  = 90;                         // 요약 표 너비
 		const sumTblX  = margin + cW - sumTblW;      // 오른쪽 정렬
@@ -1232,14 +1213,6 @@
 				</div>
 
 				{#if invoiceLines.length > 0}
-					<!-- 메모 -->
-					<div class="card bg-base-100 shadow-sm p-5">
-						<label for="inv-memo" class="mb-2 block text-xs font-bold uppercase tracking-wide text-base-content/40">메모 (선택)</label>
-						<textarea id="inv-memo" bind:value={invoiceMemo} rows="2"
-							class="textarea textarea-bordered w-full resize-none text-sm"
-							placeholder="청구서에 표시할 메모..."></textarea>
-					</div>
-
 					<!-- 액션 버튼 -->
 					<div class="space-y-2">
 						<button type="button" class="btn btn-primary w-full gap-2" onclick={openPdfModal} disabled={invoiceLines.length === 0}>
