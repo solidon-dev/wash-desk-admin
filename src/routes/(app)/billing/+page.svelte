@@ -233,6 +233,8 @@
 		const last  = new Date(contractCalYear, contractCalMonth + 1, 0).getDate();
 		const cells: (number | null)[] = Array(first).fill(null);
 		for (let d = 1; d <= last; d++) cells.push(d);
+		// 항상 42칸(6행×7열) 고정 — 달마다 높이가 바뀌지 않도록
+		while (cells.length < 42) cells.push(null);
 		return cells;
 	}
 	function contractCalPrev() {
@@ -246,8 +248,16 @@
 	function contractCalSelectDay(day: number) {
 		function pad(n: number) { return String(n).padStart(2, '0'); }
 		const ymd = `${contractCalYear}-${pad(contractCalMonth + 1)}-${pad(day)}`;
-		if (contractCalTarget === 'from') { contractFrom = ymd; contractCalTarget = 'to'; }
-		else { contractTo = ymd; }
+		if (contractCalTarget === 'from') {
+			contractFrom = ymd;
+			// 시작일이 종료일보다 뒤면 종료일 초기화
+			if (contractTo && ymd >= contractTo) contractTo = '';
+			contractCalTarget = 'to';
+		} else {
+			// 종료일은 시작일보다 앞이면 선택 불가
+			if (contractFrom && ymd < contractFrom) return;
+			contractTo = ymd;
+		}
 	}
 	function openContractCal(t: 'from' | 'to') {
 		contractCalTarget = t;
@@ -1194,60 +1204,50 @@
 </svelte:head>
 
 <!-- ═══════════════ 화면 UI ═══════════════ -->
-<div class="min-h-screen bg-base-200 px-8 py-6" id="billing-screen-ui">
+<div class="h-screen flex flex-col bg-base-200 overflow-hidden" id="billing-screen-ui">
 
-	<!-- ── 페이지 헤더 ── -->
-	<div class="mb-5 flex items-center gap-3">
-		<h2 class="text-2xl font-extrabold text-base-content">청구 관리</h2>
-		<div class="h-6 w-px bg-base-300"></div>
-		<p class="text-sm text-base-content/40">거래처별 청구서 · 거래내역서 · 계약기간을 관리합니다</p>
-	</div>
+	<!-- ── 상단 통합 헤더 바 ── -->
+	<div class="shrink-0 bg-base-100 border-b border-base-200 px-8 py-0">
+		<div class="flex items-stretch h-16 gap-0">
+			<!-- 제목 -->
+			<div class="flex items-center gap-3 pr-6 border-r border-base-200">
+				<Icon icon="lucide:receipt" class="h-5 w-5 text-primary" />
+				<h2 class="text-lg font-extrabold text-base-content whitespace-nowrap">청구 관리</h2>
+			</div>
 
-	<!-- ── 공통 컨트롤 바: 거래처 + 기간 + 탭 ── -->
-	<div class="card bg-base-100 shadow-sm mb-5">
-		<div class="flex items-stretch divide-x divide-base-200">
 			<!-- 거래처 선택 -->
-			<div class="flex flex-col justify-center px-5 py-4 shrink-0">
-				<p class="text-[10px] font-bold uppercase tracking-widest text-base-content/40 mb-1.5">거래처</p>
-				<select
-					class="select select-bordered select-sm font-bold min-w-36"
-					bind:value={selectedClientId}
-				>
+			<div class="flex items-center gap-2.5 px-6 border-r border-base-200">
+				<span class="text-xs font-bold text-base-content/40 shrink-0">거래처</span>
+				<select class="select select-bordered select-sm font-bold min-w-36" bind:value={selectedClientId}>
 					{#each clients as c (c.id)}
 						<option value={c.id}>{c.name}</option>
 					{/each}
 				</select>
 			</div>
 
-			<!-- 기간 선택 -->
-			<div class="flex flex-col justify-center px-5 py-4">
-				<p class="text-[10px] font-bold uppercase tracking-widest text-base-content/40 mb-1.5">조회 기간</p>
-				<div class="flex items-center gap-2">
-					<button type="button"
-						class="btn btn-sm btn-outline gap-1.5 font-mono"
-						onclick={() => openPicker('from')}>
-						<Icon icon="lucide:calendar" class="h-3.5 w-3.5 shrink-0" />
-						{periodFrom || '시작일'}
-					</button>
-					<span class="text-base-content/30 text-sm font-bold">→</span>
-					<button type="button"
-						class="btn btn-sm btn-outline gap-1.5 font-mono"
-						onclick={() => openPicker('to')}>
-						<Icon icon="lucide:calendar" class="h-3.5 w-3.5 shrink-0" />
-						{periodTo || '종료일'}
-					</button>
-					{#if periodFrom && periodTo}
-						{@const days = Math.round((new Date(periodTo).getTime() - new Date(periodFrom).getTime()) / 86400000) + 1}
-						<span class="text-xs text-base-content/40 font-semibold">{days}일</span>
-					{/if}
-				</div>
+			<!-- 조회 기간 -->
+			<div class="flex items-center gap-2.5 px-6 border-r border-base-200">
+				<span class="text-xs font-bold text-base-content/40 shrink-0">기간</span>
+				<button type="button" class="btn btn-sm btn-ghost border border-base-300 gap-1.5 font-mono text-sm" onclick={() => openPicker('from')}>
+					<Icon icon="lucide:calendar" class="h-3.5 w-3.5 text-base-content/50" />
+					{periodFrom || '시작일'}
+				</button>
+				<span class="text-base-content/30 text-xs font-bold">→</span>
+				<button type="button" class="btn btn-sm btn-ghost border border-base-300 gap-1.5 font-mono text-sm" onclick={() => openPicker('to')}>
+					<Icon icon="lucide:calendar" class="h-3.5 w-3.5 text-base-content/50" />
+					{periodTo || '종료일'}
+				</button>
+				{#if periodFrom && periodTo}
+					{@const days = Math.round((new Date(periodTo).getTime() - new Date(periodFrom).getTime()) / 86400000) + 1}
+					<span class="badge badge-ghost badge-sm font-semibold">{days}일</span>
+				{/if}
 			</div>
 
-			<!-- 계약기간 빠른 적용 -->
+			<!-- 계약 빠른 선택 -->
 			{#if contracts.length > 0}
-				<div class="flex flex-col justify-center px-5 py-4">
-					<p class="text-[10px] font-bold uppercase tracking-widest text-base-content/40 mb-1.5">계약 빠른 선택</p>
-					<div class="flex items-center gap-1.5 flex-wrap">
+				<div class="flex items-center gap-2 px-6 border-r border-base-200">
+					<span class="text-xs font-bold text-base-content/40 shrink-0">계약</span>
+					<div class="flex items-center gap-1">
 						{#each contracts.slice(0, 3) as c (c.id)}
 							{@const status = getContractStatus(c.startDate, c.endDate)}
 							<button type="button"
@@ -1261,8 +1261,8 @@
 			{/if}
 
 			<!-- 탭 (오른쪽 끝) -->
-			<div class="ml-auto flex items-center px-5 py-4 shrink-0">
-				<div role="tablist" class="tabs tabs-boxed">
+			<div class="ml-auto flex items-center pl-6">
+				<div role="tablist" class="tabs tabs-boxed bg-base-200">
 					<button type="button" class="tab {tabState.active === 'invoice' ? 'tab-active' : ''}" onclick={() => switchTab('invoice')}>청구서</button>
 					<button type="button" class="tab {tabState.active === 'statement' ? 'tab-active' : ''}" onclick={() => switchTab('statement')}>거래내역서</button>
 					<button type="button" class="tab {tabState.active === 'contract' ? 'tab-active' : ''}" onclick={() => switchTab('contract')}>계약기간</button>
@@ -1271,79 +1271,72 @@
 		</div>
 	</div>
 
+	<!-- ── 탭 콘텐츠 영역 (나머지 높이 전체 사용) ── -->
+	<div class="flex-1 overflow-auto px-8 py-5">
+
 	<!-- ── 청구서 탭 ── -->
 	{#if tabState.active === 'invoice'}
-		<div class="grid grid-cols-12 gap-5">
+		<div class="grid grid-cols-12 gap-5 h-full">
 			<!-- 왼쪽: 품목표 -->
-			<div class="col-span-8 space-y-5">
-				<div class="card bg-base-100 shadow-sm overflow-hidden">
-					<div class="flex items-center gap-3 border-b border-base-200 px-5 py-3">
+			<div class="col-span-8 flex flex-col min-h-0">
+				<div class="card bg-base-100 shadow-sm flex flex-col flex-1 min-h-0 overflow-hidden">
+					<div class="flex items-center gap-3 border-b border-base-200 px-5 py-3 shrink-0">
 						<h3 class="text-base font-bold">품목별 청구 내역</h3>
 						{#if unpricedCount > 0}
 							<span class="badge badge-warning badge-sm font-semibold">단가 미설정 {unpricedCount}건</span>
 						{/if}
 					</div>
 					{#if invoiceLines.length === 0}
-						<div class="py-16 text-center">
+						<div class="flex-1 flex flex-col items-center justify-center">
 							<p class="text-base-content/40">해당 기간에 출고 내역이 없습니다.</p>
 							<p class="mt-1 text-xs text-base-content/30">거래처와 기간을 확인해 주세요.</p>
 						</div>
 					{:else}
-						<div style="max-height: 420px; overflow-y: auto;">
-						<table class="table table-sm w-full">
-							<thead class="sticky top-0 z-10 bg-base-200">
-								<tr>
-									<th class="text-xs">품목명</th>
-									<th class="w-20 text-xs text-right">수량</th>
-									<th class="w-28 text-xs text-right">단가</th>
-									<th class="w-28 text-xs text-right">금액</th>
-								</tr>
-							</thead>
-							<tbody>
-								{#each (['towel', 'sheet', 'uniform'] as const) as cat (cat)}
-									{@const catLines = invoiceLines.filter((l) => l.category === cat)}
-									{#if catLines.length > 0}
-										<tr class="bg-base-200/50">
-											<td colspan="4" class="py-2 pl-3">
-												<span class="inline-flex items-center gap-1.5">
-													<span class="h-2 w-2 rounded-full {categoryColor[cat]}"></span>
-													<span class="text-xs font-bold {categoryBadge[cat].includes('info') ? 'text-info' : categoryBadge[cat].includes('primary') ? 'text-primary' : 'text-warning'}">
-														{CATEGORY_LABELS[cat]}
+						<div class="flex-1 overflow-y-auto">
+							<table class="table table-sm w-full">
+								<thead class="sticky top-0 z-10 bg-base-200">
+									<tr>
+										<th class="text-xs">품목명</th>
+										<th class="w-20 text-xs text-right">수량</th>
+										<th class="w-28 text-xs text-right">단가</th>
+										<th class="w-28 text-xs text-right">금액</th>
+									</tr>
+								</thead>
+								<tbody>
+									{#each (['towel', 'sheet', 'uniform'] as const) as cat (cat)}
+										{@const catLines = invoiceLines.filter((l) => l.category === cat)}
+										{#if catLines.length > 0}
+											<tr class="bg-base-200/50">
+												<td colspan="4" class="py-2 pl-3">
+													<span class="inline-flex items-center gap-1.5">
+														<span class="h-2 w-2 rounded-full {categoryColor[cat]}"></span>
+														<span class="text-xs font-bold {categoryBadge[cat].includes('info') ? 'text-info' : categoryBadge[cat].includes('primary') ? 'text-primary' : 'text-warning'}">{CATEGORY_LABELS[cat]}</span>
+														{#if invoiceByCategory[cat]}
+															<span class="ml-2 text-[11px] text-base-content/40">소계 {invoiceByCategory[cat].qty.toLocaleString()}개</span>
+														{/if}
 													</span>
-													{#if invoiceByCategory[cat]}
-														<span class="ml-2 text-[11px] text-base-content/40">소계 {invoiceByCategory[cat].qty.toLocaleString()}개</span>
-													{/if}
-												</span>
-											</td>
-										</tr>
-										{#each catLines as line (line.category + line.itemName)}
-											<tr class="hover">
-												<td class="pl-8 font-medium">{line.itemName}</td>
-												<td class="w-20 text-right">{line.quantity.toLocaleString()}</td>
-												<td class="w-28 whitespace-nowrap text-right {line.unitPrice === 0 ? 'font-semibold text-warning' : 'text-base-content/70'}">
-													{line.unitPrice === 0 ? '미설정' : formatMoney(line.unitPrice)}
-												</td>
-												<td class="w-28 whitespace-nowrap text-right font-bold {line.amount === 0 ? 'text-base-content/30' : ''}">
-													{formatMoney(line.amount)}
 												</td>
 											</tr>
-										{/each}
-										{#if catLines.length > 1}
-														<tr class="bg-base-200/50">
-															<td class="pl-8 text-xs font-semibold text-base-content/40">소계</td>
-															<td class="w-20 text-right text-xs font-bold">
-																{catLines.reduce((s, l) => s + l.quantity, 0).toLocaleString()}
-															</td>
-															<td class="w-28"></td>
-															<td class="w-28 whitespace-nowrap text-right text-xs font-bold">
-																{formatMoney(catLines.reduce((s, l) => s + l.amount, 0))}
-															</td>
-														</tr>
-													{/if}
-									{/if}
-								{/each}
-							</tbody>
-							<tfoot class="sticky bottom-0 z-10 bg-base-100">
+											{#each catLines as line (line.category + line.itemName)}
+												<tr class="hover">
+													<td class="pl-8 font-medium">{line.itemName}</td>
+													<td class="w-20 text-right">{line.quantity.toLocaleString()}</td>
+													<td class="w-28 whitespace-nowrap text-right {line.unitPrice === 0 ? 'font-semibold text-warning' : 'text-base-content/70'}">{line.unitPrice === 0 ? '미설정' : formatMoney(line.unitPrice)}</td>
+													<td class="w-28 whitespace-nowrap text-right font-bold {line.amount === 0 ? 'text-base-content/30' : ''}">{formatMoney(line.amount)}</td>
+												</tr>
+											{/each}
+											{#if catLines.length > 1}
+												<tr class="bg-base-200/50">
+													<td class="pl-8 text-xs font-semibold text-base-content/40">소계</td>
+													<td class="w-20 text-right text-xs font-bold">{catLines.reduce((s, l) => s + l.quantity, 0).toLocaleString()}</td>
+													<td class="w-28"></td>
+													<td class="w-28 whitespace-nowrap text-right text-xs font-bold">{formatMoney(catLines.reduce((s, l) => s + l.amount, 0))}</td>
+												</tr>
+											{/if}
+										{/if}
+									{/each}
+								</tbody>
+								<tfoot class="sticky bottom-0 z-10 bg-base-100">
 									<tr class="border-t-2 border-base-300 bg-primary/10">
 										<td class="px-3 py-3 text-sm font-extrabold">합계</td>
 										<td class="w-20 px-3 py-3 text-right text-sm font-extrabold">{invoiceTotalQty.toLocaleString()}</td>
@@ -1351,17 +1344,16 @@
 										<td class="w-28 whitespace-nowrap px-3 py-3 text-right text-lg font-black text-primary">{formatMoney(invoiceTotal)}</td>
 									</tr>
 								</tfoot>
-						</table>
+							</table>
 						</div>
 					{/if}
 				</div>
-
 			</div>
 
 			<!-- 오른쪽: 요약 + 액션 -->
-			<div class="col-span-4 space-y-4">
+			<div class="col-span-4 flex flex-col gap-4 min-h-0">
 				<!-- 청구 요약 카드 -->
-				<div class="card bg-base-100 shadow-sm overflow-hidden">
+				<div class="card bg-base-100 shadow-sm overflow-hidden shrink-0">
 					<div class="bg-primary px-5 py-3">
 						<p class="text-xs font-bold uppercase tracking-widest text-primary-content/70">청구 요약</p>
 						<p class="mt-0.5 text-sm font-bold text-primary-content">{selectedClient?.name ?? '-'}</p>
@@ -1396,7 +1388,7 @@
 
 				<!-- 카테고리별 소계 -->
 				{#if invoiceLines.length > 0}
-					<div class="card bg-base-100 shadow-sm p-4 space-y-2">
+					<div class="card bg-base-100 shadow-sm p-4 space-y-2 shrink-0">
 						<p class="text-[10px] font-bold uppercase tracking-widest text-base-content/40">카테고리별 소계</p>
 						{#each (['towel', 'sheet', 'uniform'] as const) as cat (cat)}
 							{@const catData = invoiceByCategory[cat]}
@@ -1416,7 +1408,7 @@
 					</div>
 
 					<!-- 액션 버튼 -->
-					<div class="space-y-2">
+					<div class="space-y-2 shrink-0">
 						<button type="button" class="btn btn-primary w-full gap-2" onclick={openPdfModal}>
 							<Icon icon="lucide:file-text" class="h-4 w-4" />
 							청구서 PDF
@@ -1855,6 +1847,7 @@
 			{/if}
 		</div>
 	{/if}
+	</div><!-- /flex-1 overflow-auto -->
 </div>
 
 <!-- ═══════════════ 청구서 저장 확인 모달 ═══════════════ -->
