@@ -48,6 +48,19 @@ export interface MonthlyRow {
   amount: number;
 }
 
+export interface DailyRow {
+  date: string;   // 'YYYY-MM-DD'
+  qty: number;
+  amount: number;
+}
+
+export interface RangeMonthRow {
+  ym: string;     // 'YYYY-MM'
+  label: string;  // '5월' | '25/12'
+  qty: number;
+  amount: number;
+}
+
 export interface DiffResult {
   sign: string;
   pct: string;
@@ -326,4 +339,97 @@ export function offsetDate(base: Date, days: number): string {
   const ms = base.getTime() + days * 86_400_000;
   const d = new Date(ms);
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+// ─── 기간 유틸 ────────────────────────────────────────────────────────────────
+
+/** 두 'YYYY-MM-DD' 사이의 일수 (양 끝 포함) */
+export function daysBetween(from: string, to: string): number {
+  const a = new Date(from + 'T00:00:00').getTime();
+  const b = new Date(to + 'T00:00:00').getTime();
+  return Math.round((b - a) / 86_400_000) + 1;
+}
+
+/** 직전 동일 길이 기간 반환. ex) 5/1~5/12 (12일) → 4/19~4/30 */
+export function prevPeriod(from: string, to: string): { from: string; to: string } {
+  const len = daysBetween(from, to);
+  const fromDate = new Date(from + 'T00:00:00');
+  const prevTo = offsetDate(fromDate, -1);
+  const prevFrom = offsetDate(new Date(prevTo + 'T00:00:00'), -(len - 1));
+  return { from: prevFrom, to: prevTo };
+}
+
+// ─── 일별 집계 ────────────────────────────────────────────────────────────────
+
+/** from~to 사이 매일자 0으로 채운 후 출고 합산 */
+export function calcDaily(
+  shipments: Shipment[],
+  from: string,
+  to: string,
+  clientId?: string,
+): DailyRow[] {
+  const len = daysBetween(from, to);
+  const fromDate = new Date(from + 'T00:00:00');
+  const rows: DailyRow[] = Array.from({ length: len }, (_, i) => ({
+    date: offsetDate(fromDate, i),
+    qty: 0,
+    amount: 0,
+  }));
+  const idx: Record<string, DailyRow> = Object.fromEntries(rows.map((r) => [r.date, r]));
+
+  for (const s of shipments) {
+    if (clientId != null && s.clientId !== clientId) continue;
+    const d = s.shippedAt.slice(0, 10);
+    const row = idx[d];
+    if (!row) continue;
+    for (const item of s.items) {
+      const unit = UNIT_PRICES[item.itemName] ?? 0;
+      row.qty += item.quantity;
+      row.amount += item.quantity * unit;
+    }
+  }
+  return rows;
+}
+
+// ─── 범위 월별 집계 (연도 무관, 범위가 걸치는 모든 월) ──────────────────────
+
+export function calcRangeMonthly(
+  shipments: Shipment[],
+  from: string,
+  to: string,
+  clientId?: string,
+): RangeMonthRow[] {
+  const fromY = parseInt(from.slice(0, 4), 10);
+  const fromM = parseInt(from.slice(5, 7), 10);
+  const toY   = parseInt(to.slice(0, 4), 10);
+  const toM   = parseInt(to.slice(5, 7), 10);
+
+  const months: RangeMonthRow[] = [];
+  let y = fromY, m = fromM;
+  while (y < toY || (y === toY && m <= toM)) {
+    const ym = `${y}-${pad(m)}`;
+    const sameYear = fromY === toY;
+    months.push({
+      ym,
+      label: sameYear ? `${m}월` : `${String(y).slice(2)}/${pad(m)}`,
+      qty: 0,
+      amount: 0,
+    });
+    if (m === 12) { m = 1; y += 1; } else { m += 1; }
+  }
+
+  const idx: Record<string, RangeMonthRow> = Object.fromEntries(months.map((r) => [r.ym, r]));
+  for (const s of shipments) {
+    if (clientId != null && s.clientId !== clientId) continue;
+    if (!inRange(s.shippedAt, from, to)) continue;
+    const ym = s.shippedAt.slice(0, 7);
+    const row = idx[ym];
+    if (!row) continue;
+    for (const item of s.items) {
+      const unit = UNIT_PRICES[item.itemName] ?? 0;
+      row.qty += item.quantity;
+      row.amount += item.quantity * unit;
+    }
+  }
+  return months;
 }

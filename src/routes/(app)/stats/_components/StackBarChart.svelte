@@ -12,24 +12,26 @@
 
   let { months, series }: Props = $props();
 
-  const W = 520;
-  const H = 120;
-  const PL = 20;
-  const PR = 8;
-  const PT = 8;
-  const PB = 20;
-  const innerW = W - PL - PR;
-  const innerH = H - PT - PB;
+  const PL = 32; // px — HTML Y축 레이블 영역 너비
 
   const colTotals = $derived(
     months.map((_, mi) => series.reduce((s, sr) => s + (sr.data[mi] ?? 0), 0))
   );
   const maxTotal = $derived(Math.max(...colTotals, 1));
-  const barW = $derived(months.length > 0 ? (innerW / months.length) * 0.6 : 20);
+
+  // SVG 내부 좌표계 (Y축 레이블 없이 순수 바 영역)
+  const W = 480;
+  const H = 100;
+  const PT = 6;
+  const PB = 4;
+  const PR = 4;
+  const innerH = H - PT - PB;
+
+  const barW = $derived(months.length > 0 ? (W / months.length) * 0.55 : 20);
 
   function xCenter(mi: number): number {
-    const slot = innerW / months.length;
-    return PL + slot * mi + slot / 2;
+    const slot = W / months.length;
+    return slot * mi + slot / 2;
   }
 
   const rects = $derived(
@@ -49,35 +51,49 @@
     })()
   );
 
-  const tickVals = $derived([0, 0.5, 1].map((f) => ({
-    y: PT + innerH - f * innerH,
-    val: Math.round(maxTotal * f)
-  })));
+  const tickPcts = [0, 0.5, 1]; // 0%, 50%, 100%
 </script>
 
-<svg
-  viewBox="0 0 {W} {H}"
-  width="100%"
-  height="100%"
-  xmlns="http://www.w3.org/2000/svg"
-  class="block"
-  preserveAspectRatio="none"
->
-  <!-- 그리드 -->
-  {#each tickVals as tick (tick.y)}
-    <line x1={PL} y1={tick.y} x2={W - PR} y2={tick.y} stroke="var(--color-base-300)" stroke-width="0.8" />
-    <text x={PL - 3} y={tick.y} text-anchor="end" dominant-baseline="middle" font-size="8" fill="var(--color-base-content)" opacity="0.4">
-      {tick.val > 0 ? (tick.val >= 1000 ? `${(tick.val/1000).toFixed(0)}k` : tick.val) : ''}
-    </text>
-  {/each}
+<div class="flex w-full h-full gap-0">
+  <!-- Y축 레이블 (HTML) -->
+  <div class="flex flex-col-reverse justify-between shrink-0 pb-[18px]" style="width:{PL}px">
+    {#each tickPcts as f (f)}
+      <div class="text-[11px] font-medium text-base-content/50 text-right pr-1.5 leading-none">
+        {#if f === 0}{''}{:else}{Math.round(maxTotal * f) >= 1000 ? `${(Math.round(maxTotal * f)/1000).toFixed(0)}k` : Math.round(maxTotal * f)}{/if}
+      </div>
+    {/each}
+  </div>
 
-  <!-- 바 -->
-  {#each rects as rect (rect.key)}
-    <rect x={rect.x} y={rect.y} width={rect.w} height={rect.h} fill={rect.color} opacity="0.85" />
-  {/each}
+  <!-- 바 + X축 -->
+  <div class="flex flex-col flex-1 min-w-0 h-full">
+    <!-- SVG 바 영역 -->
+    <div class="flex-1 min-h-0 w-full">
+      <svg
+        viewBox="0 0 {W} {H}"
+        width="100%"
+        height="100%"
+        xmlns="http://www.w3.org/2000/svg"
+        class="block"
+        preserveAspectRatio="none"
+      >
+        <!-- 그리드 라인만 -->
+        {#each tickPcts as f (f)}
+          {@const y = PT + innerH - f * innerH}
+          <line x1={0} y1={y} x2={W - PR} y2={y} stroke="var(--color-base-300)" stroke-width="0.8" />
+        {/each}
 
-  <!-- X 레이블 -->
-  {#each months as m, mi (m)}
-    <text x={xCenter(mi)} y={H - 3} text-anchor="middle" font-size="8" fill="var(--color-base-content)" opacity="0.4">{m}월</text>
-  {/each}
-</svg>
+        <!-- 바 -->
+        {#each rects as rect (rect.key)}
+          <rect x={rect.x} y={rect.y} width={rect.w} height={rect.h} fill={rect.color} opacity="0.85" rx="1" />
+        {/each}
+      </svg>
+    </div>
+
+    <!-- X축 레이블 (HTML) -->
+    <div class="flex shrink-0">
+      {#each months as m (m)}
+        <div class="flex-1 text-center text-[11px] font-semibold text-base-content/60 leading-none py-1">{m}월</div>
+      {/each}
+    </div>
+  </div>
+</div>

@@ -14,14 +14,14 @@
 
   let { series, labels, showArea = false }: Props = $props();
 
-  // 고정 viewBox 좌표계
+  const PL = 34; // px — HTML Y축 레이블 영역 너비
+
+  // SVG 내부 좌표계 (Y축 레이블 없이 순수 라인 영역)
   const W = 480;
-  const H = 120;
-  const PL = 30;
-  const PR = 8;
+  const H = 100;
   const PT = 8;
-  const PB = 20;
-  const innerW = W - PL - PR;
+  const PB = 4;
+  const PR = 8;
   const innerH = H - PT - PB;
 
   const n = $derived(labels.length);
@@ -29,8 +29,8 @@
   const maxVal = $derived(Math.max(...allVals, 1));
 
   function xPos(i: number): number {
-    if (n <= 1) return PL + innerW / 2;
-    return PL + (i / (n - 1)) * innerW;
+    if (n <= 1) return W / 2;
+    return (i / (n - 1)) * (W - PR);
   }
 
   function yPos(v: number): number {
@@ -51,69 +51,85 @@
 
   const built = $derived(series.map((s) => buildPath(s.data)));
 
-  const ticks = $derived([0, 0.5, 1].map((f) => ({
-    y: PT + innerH - f * innerH,
-    val: Math.round(maxVal * f)
-  })));
+  const tickPcts = [0, 0.5, 1];
 </script>
 
-<!--
-  컨테이너가 h-full을 가져야 함.
-  SVG는 viewBox 고정 + preserveAspectRatio=none 으로 컨테이너를 꽉 채움.
--->
-<svg
-  viewBox="0 0 {W} {H}"
-  width="100%"
-  height="100%"
-  xmlns="http://www.w3.org/2000/svg"
-  class="block overflow-visible"
-  preserveAspectRatio="none"
->
-  <defs>
-    {#each series as s, i (s.label)}
-      {#if showArea}
-        <linearGradient id="area-grad-{i}" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color={s.color} stop-opacity="0.2" />
-          <stop offset="100%" stop-color={s.color} stop-opacity="0.02" />
-        </linearGradient>
-      {/if}
+<div class="flex w-full h-full gap-0">
+  <!-- Y축 레이블 (HTML) -->
+  <div class="flex flex-col-reverse justify-between shrink-0 pb-[18px]" style="width:{PL}px">
+    {#each tickPcts as f (f)}
+      <div class="text-[11px] font-medium text-base-content/50 text-right pr-1.5 leading-none">
+        {#if f === 0}{''}{:else}{@const v = Math.round(maxVal * f)}{v >= 1000 ? `${(v/1000).toFixed(0)}k` : v}{/if}
+      </div>
     {/each}
-  </defs>
+  </div>
 
-  <!-- 그리드 -->
-  {#each ticks as tick (tick.y)}
-    <line x1={PL} y1={tick.y} x2={W - PR} y2={tick.y} stroke="var(--color-base-300)" stroke-width="0.8" />
-    <text x={PL - 3} y={tick.y} text-anchor="end" dominant-baseline="middle" font-size="8" fill="var(--color-base-content)" opacity="0.4">
-      {tick.val > 0 ? (tick.val >= 1000 ? `${(tick.val/1000).toFixed(0)}k` : tick.val) : ''}
-    </text>
-  {/each}
+  <!-- 라인 + X축 -->
+  <div class="flex flex-col flex-1 min-w-0 h-full">
+    <!-- SVG 라인 영역 -->
+    <div class="flex-1 min-h-0 w-full">
+      <svg
+        viewBox="0 0 {W} {H}"
+        width="100%"
+        height="100%"
+        xmlns="http://www.w3.org/2000/svg"
+        class="block overflow-visible"
+        preserveAspectRatio="none"
+      >
+        <defs>
+          {#each series as s, i (s.label)}
+            {#if showArea}
+              <linearGradient id="area-grad-{i}" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color={s.color} stop-opacity="0.2" />
+                <stop offset="100%" stop-color={s.color} stop-opacity="0.02" />
+              </linearGradient>
+            {/if}
+          {/each}
+        </defs>
 
-  <!-- X 레이블 -->
-  {#each labels as lbl, i (i)}
-    <text x={xPos(i)} y={H - 3} text-anchor="middle" font-size="8" fill="var(--color-base-content)" opacity="0.4">{lbl}</text>
-  {/each}
+        <!-- 그리드 라인만 -->
+        {#each tickPcts as f (f)}
+          {@const y = PT + innerH - f * innerH}
+          <line x1={0} y1={y} x2={W} y2={y} stroke="var(--color-base-300)" stroke-width="0.8" />
+        {/each}
 
-  <!-- 시리즈 -->
-  {#each series as s, i (s.label)}
-    {#if showArea && built[i].area}
-      <path d={built[i].area} fill="url(#area-grad-{i})" />
-    {/if}
-    {#if built[i].path}
-      <path
-        d={built[i].path}
-        fill="none"
-        stroke={s.color}
-        stroke-width={i === 0 ? 2 : 1.5}
-        stroke-dasharray={s.dash ? '5,3' : undefined}
-        stroke-linejoin="round"
-        stroke-linecap="round"
-        vector-effect="non-scaling-stroke"
-      />
-      {#each built[i].pts as pt, pi (pi)}
-        {#if pt.v > 0}
-          <circle cx={pt.x} cy={pt.y} r="2.5" fill={s.color} stroke="white" stroke-width="1.5" vector-effect="non-scaling-stroke" />
+        <!-- 시리즈 -->
+        {#each series as s, i (s.label)}
+          {#if showArea && built[i].area}
+            <path d={built[i].area} fill="url(#area-grad-{i})" />
+          {/if}
+          {#if built[i].path}
+            <path
+              d={built[i].path}
+              fill="none"
+              stroke={s.color}
+              stroke-width={i === 0 ? 2 : 1.5}
+              stroke-dasharray={s.dash ? '5,3' : undefined}
+              stroke-linejoin="round"
+              stroke-linecap="round"
+              vector-effect="non-scaling-stroke"
+            />
+            {#each built[i].pts as pt, pi (pi)}
+              {#if pt.v > 0}
+                <circle cx={pt.x} cy={pt.y} r="2.5" fill={s.color} stroke="white" stroke-width="1.5" vector-effect="non-scaling-stroke" />
+              {/if}
+            {/each}
+          {/if}
+        {/each}
+      </svg>
+    </div>
+
+    <!-- X축 레이블 (HTML, 절대 위치) -->
+    <div class="relative shrink-0 h-5">
+      {#each labels as lbl, i (i)}
+        {#if lbl}
+          {@const pct = labels.length <= 1 ? 50 : (i / (labels.length - 1)) * 100}
+          <div
+            class="absolute text-[11px] font-semibold text-base-content/60 leading-none whitespace-nowrap"
+            style="left:{pct}%; transform:translateX(-50%); top:3px"
+          >{lbl}</div>
         {/if}
       {/each}
-    {/if}
-  {/each}
-</svg>
+    </div>
+  </div>
+</div>
