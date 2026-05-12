@@ -1035,55 +1035,39 @@
 <!-- ═══════════════ 화면 UI ═══════════════ -->
 <div class="min-h-screen bg-base-200 px-8 py-6" id="billing-screen-ui">
 
-	<!-- 헤더 + 탭 -->
-	<div class="mb-6 flex flex-wrap items-center justify-between gap-4">
-		<h2 class="text-2xl font-extrabold text-base-content">청구 관리</h2>
-		<div role="tablist" class="tabs tabs-boxed flex-wrap">
+	<!-- 헤더: 제목 + 탭 + 거래처 select 한 줄 -->
+	<div class="mb-6 flex items-center gap-4">
+		<h2 class="text-2xl font-extrabold text-base-content shrink-0">청구 관리</h2>
+
+		<div role="tablist" class="tabs tabs-boxed mx-auto">
 			<button
 				type="button"
 				style="pointer-events: auto; cursor: pointer;"
 				class="tab {tabState.active === 'invoice' ? 'tab-active' : ''}"
 				onclick={() => switchTab('invoice')}
-			>📄 청구서</button>
+			>청구서</button>
 			<button
 				type="button"
 				style="pointer-events: auto; cursor: pointer;"
 				class="tab {tabState.active === 'statement' ? 'tab-active' : ''}"
 				onclick={() => switchTab('statement')}
-			>📋 거래내역서</button>
+			>거래내역서</button>
 			<button
 				type="button"
 				style="pointer-events: auto; cursor: pointer;"
 				class="tab {tabState.active === 'contract' ? 'tab-active' : ''}"
 				onclick={() => switchTab('contract')}
-			>🗓️ 계약기간</button>
+			>계약기간</button>
 		</div>
-	</div>
 
-	<!-- 거래처 선택 -->
-	<div class="card card-sm bg-base-100 shadow-sm mb-6">
-		<div class="card-body flex-row flex-wrap items-center gap-3 py-3">
-			<span class="shrink-0 text-[11px] font-bold uppercase tracking-widest text-base-content/40">거래처</span>
-			<select
-				class="select select-bordered select-sm font-semibold"
-				bind:value={selectedClientId}
-			>
-				{#each clients as c (c.id)}
-					<option value={c.id}>{c.name}</option>
-				{/each}
-			</select>
-			{#if selectedClient}
-				<span class="badge badge-outline border-secondary/30 bg-secondary/10 text-secondary gap-1.5 py-3 px-3">
-					{selectedClient.name}
-				</span>
-				{#if selectedClient.managerName}
-					<span class="text-xs text-base-content/50">담당: {selectedClient.managerName}</span>
-				{/if}
-				{#if selectedClient.phone}
-					<span class="text-xs text-base-content/50">☎ {selectedClient.phone}</span>
-				{/if}
-			{/if}
-		</div>
+		<select
+			class="select select-bordered select-sm font-semibold shrink-0"
+			bind:value={selectedClientId}
+		>
+			{#each clients as c (c.id)}
+				<option value={c.id}>{c.name}</option>
+			{/each}
+		</select>
 	</div>
 
 	<!-- ── 청구서 탭 ── -->
@@ -1091,23 +1075,16 @@
 		<div class="grid grid-cols-12 gap-5">
 			<!-- 왼쪽: 기간 + 품목표 -->
 			<div class="col-span-8 space-y-5">
-				<!-- 기간 설정 -->
-				<div class="card bg-base-100 shadow-sm p-5">
-					<h3 class="mb-4 text-sm font-bold">📅 청구 기간 설정</h3>
-					<div class="flex flex-wrap items-end gap-3">
-						<div class="flex flex-col gap-1">
-							<label for="inv-from" class="text-xs font-semibold text-base-content/50">시작일</label>
-							<input id="inv-from" type="date" bind:value={periodFrom} class="input input-bordered input-sm" />
-						</div>
-						<span class="mb-1 text-base-content/40">~</span>
-						<div class="flex flex-col gap-1">
-							<label for="inv-to" class="text-xs font-semibold text-base-content/50">종료일</label>
-							<input id="inv-to" type="date" bind:value={periodTo} class="input input-bordered input-sm" />
-						</div>
-					</div>
-					{#if contracts.length > 0}
-						<div class="mt-3 flex flex-wrap gap-2 border-t border-base-200 pt-3">
-							<span class="self-center text-[11px] font-bold text-base-content/40">계약기간 적용:</span>
+				<!-- 품목 청구 표 (기간 컨트롤 인라인 포함) -->
+				<div class="card bg-base-100 shadow-sm overflow-hidden">
+					<!-- 컨트롤 바: 기간 picker + 계약기간 빠른 적용 + 카드 헤더 -->
+					<div class="flex flex-wrap items-center gap-3 border-b border-base-200 px-5 py-3">
+						<h3 class="text-base font-bold mr-2">품목별 청구 내역</h3>
+						<input id="inv-from" type="date" bind:value={periodFrom} class="input input-bordered input-sm" />
+						<span class="text-base-content/40">~</span>
+						<input id="inv-to" type="date" bind:value={periodTo} class="input input-bordered input-sm" />
+						{#if contracts.length > 0}
+							<span class="text-[11px] font-bold text-base-content/40 ml-1">계약:</span>
 							{#each contracts.slice(0, 4) as c (c.id)}
 								{@const status = getContractStatus(c.startDate, c.endDate)}
 								<button type="button"
@@ -1116,20 +1093,12 @@
 									{c.startDate.slice(5)} ~ {c.endDate.slice(5)}{c.memo ? ` (${c.memo})` : ''}
 								</button>
 							{/each}
-						</div>
-					{/if}
-				</div>
-
-				<!-- 품목 청구 표 -->
-				<div class="card bg-base-100 shadow-sm overflow-hidden">
-					<div class="flex items-center justify-between border-b border-base-200 px-5 py-4">
-						<div>
-							<h3 class="text-base font-bold">품목별 청구 내역</h3>
-							<p class="mt-0.5 text-xs text-base-content/40">{formatDate(periodFrom)} ~ {formatDate(periodTo)}</p>
-						</div>
-						{#if unpricedCount > 0}
-							<span class="badge badge-warning font-semibold">단가 미설정 {unpricedCount}건</span>
 						{/if}
+						<div class="ml-auto flex items-center gap-2">
+							{#if unpricedCount > 0}
+								<span class="badge badge-warning font-semibold">단가 미설정 {unpricedCount}건</span>
+							{/if}
+						</div>
 					</div>
 					{#if invoiceLines.length === 0}
 						<div class="py-16 text-center">
@@ -1142,7 +1111,6 @@
 							<thead class="sticky top-0 z-10 bg-base-200">
 								<tr>
 									<th class="text-xs">품목명</th>
-									<th class="w-28 text-xs whitespace-nowrap">카테고리</th>
 									<th class="w-20 text-xs text-right">수량</th>
 									<th class="w-28 text-xs text-right">단가</th>
 									<th class="w-28 text-xs text-right">금액</th>
@@ -1153,20 +1121,21 @@
 									{@const catLines = invoiceLines.filter((l) => l.category === cat)}
 									{#if catLines.length > 0}
 										<tr class="bg-base-200/50">
-											<td colspan="5" class="py-2">
-												<span class="badge badge-sm font-bold {categoryBadge[cat]}">
-													{CATEGORY_LABELS[cat]}
+											<td colspan="4" class="py-2 pl-3">
+												<span class="inline-flex items-center gap-1.5">
+													<span class="h-2 w-2 rounded-full {categoryColor[cat]}"></span>
+													<span class="text-xs font-bold {categoryBadge[cat].includes('info') ? 'text-info' : categoryBadge[cat].includes('primary') ? 'text-primary' : 'text-warning'}">
+														{CATEGORY_LABELS[cat]}
+													</span>
+													{#if invoiceByCategory[cat]}
+														<span class="ml-2 text-[11px] text-base-content/40">소계 {invoiceByCategory[cat].qty.toLocaleString()}개</span>
+													{/if}
 												</span>
 											</td>
 										</tr>
 										{#each catLines as line (line.category + line.itemName)}
 											<tr class="hover">
 												<td class="pl-8 font-medium">{line.itemName}</td>
-												<td class="w-28">
-													<span class="badge badge-sm font-semibold {categoryBadge[line.category]}">
-														{CATEGORY_LABELS[line.category as 'towel'|'sheet'|'uniform']}
-													</span>
-												</td>
 												<td class="w-20 text-right">{line.quantity.toLocaleString()}</td>
 												<td class="w-28 whitespace-nowrap text-right {line.unitPrice === 0 ? 'font-semibold text-warning' : 'text-base-content/70'}">
 													{line.unitPrice === 0 ? '미설정' : formatMoney(line.unitPrice)}
@@ -1177,56 +1146,37 @@
 											</tr>
 										{/each}
 										{#if catLines.length > 1}
-											<tr class="bg-base-200/50">
-												<td colspan="2" class="pl-8 text-xs font-semibold text-base-content/40">소계</td>
-												<td class="w-20 text-right text-xs font-bold">
-													{catLines.reduce((s, l) => s + l.quantity, 0).toLocaleString()}
-												</td>
-												<td class="w-28"></td>
-												<td class="w-28 whitespace-nowrap text-right text-xs font-bold">
-													{formatMoney(catLines.reduce((s, l) => s + l.amount, 0))}
-												</td>
-											</tr>
-										{/if}
+														<tr class="bg-base-200/50">
+															<td class="pl-8 text-xs font-semibold text-base-content/40">소계</td>
+															<td class="w-20 text-right text-xs font-bold">
+																{catLines.reduce((s, l) => s + l.quantity, 0).toLocaleString()}
+															</td>
+															<td class="w-28"></td>
+															<td class="w-28 whitespace-nowrap text-right text-xs font-bold">
+																{formatMoney(catLines.reduce((s, l) => s + l.amount, 0))}
+															</td>
+														</tr>
+													{/if}
 									{/if}
 								{/each}
 							</tbody>
 							<tfoot class="sticky bottom-0 z-10 bg-base-100">
-								<tr class="border-t-2 border-base-300 bg-primary/10">
-									<td colspan="2" class="px-3 py-3 text-sm font-extrabold">합계</td>
-									<td class="w-20 px-3 py-3 text-right text-sm font-extrabold">{invoiceTotalQty.toLocaleString()}</td>
-									<td class="w-28 px-3 py-3"></td>
-									<td class="w-28 whitespace-nowrap px-3 py-3 text-right text-lg font-black text-primary">{formatMoney(invoiceTotal)}</td>
-								</tr>
-							</tfoot>
+									<tr class="border-t-2 border-base-300 bg-primary/10">
+										<td class="px-3 py-3 text-sm font-extrabold">합계</td>
+										<td class="w-20 px-3 py-3 text-right text-sm font-extrabold">{invoiceTotalQty.toLocaleString()}</td>
+										<td class="w-28 px-3 py-3"></td>
+										<td class="w-28 whitespace-nowrap px-3 py-3 text-right text-lg font-black text-primary">{formatMoney(invoiceTotal)}</td>
+									</tr>
+								</tfoot>
 						</table>
 						</div>
 					{/if}
 				</div>
 
-				{#if invoiceLines.length > 0}
-					<div class="card bg-base-100 shadow-sm p-5">
-						<label for="inv-memo" class="mb-2 block text-sm font-bold text-base-content/60">메모 (선택)</label>
-						<textarea id="inv-memo" bind:value={invoiceMemo} rows="2"
-							class="textarea textarea-bordered w-full resize-none"
-							placeholder="청구서에 표시할 메모를 입력하세요..."></textarea>
-					</div>
-				{/if}
 			</div>
 
-			<!-- 오른쪽: 요약 + 액션 -->
+			<!-- 오른쪽: 요약 + 메모 + 액션 -->
 			<div class="col-span-4 space-y-5">
-				{#if selectedClient}
-					<div class="card bg-base-100 shadow-sm p-5">
-						<p class="mb-3 text-xs font-bold uppercase tracking-wide text-base-content/40">거래처 정보</p>
-						<p class="text-lg font-extrabold">{selectedClient.name}</p>
-						{#if selectedClient.businessNo}<p class="mt-1 text-xs text-base-content/50">사업자 {selectedClient.businessNo}</p>{/if}
-						{#if selectedClient.ownerName}<p class="text-xs text-base-content/50">대표 {selectedClient.ownerName}</p>{/if}
-						{#if selectedClient.managerName}<p class="text-xs text-base-content/50">담당 {selectedClient.managerName}</p>{/if}
-						{#if selectedClient.phone}<p class="text-xs text-base-content/50">연락처 {selectedClient.phone}</p>{/if}
-					</div>
-				{/if}
-
 				<div class="card bg-primary/10 border border-primary/20 shadow-sm p-5">
 					<p class="mb-3 text-xs font-bold uppercase tracking-wide text-primary/70">청구 요약</p>
 					<div class="space-y-2">
@@ -1256,21 +1206,12 @@
 				</div>
 
 				{#if invoiceLines.length > 0}
-					<!-- 카테고리별 요약 -->
+					<!-- 메모 -->
 					<div class="card bg-base-100 shadow-sm p-5">
-						<p class="mb-3 text-xs font-bold uppercase tracking-wide text-base-content/40">카테고리별</p>
-						<div class="space-y-2">
-							{#each (['towel', 'sheet', 'uniform'] as const) as cat (cat)}
-								{#if invoiceByCategory[cat]}
-									<div class="flex items-center gap-2">
-										<div class="h-2.5 w-2.5 shrink-0 rounded-full {categoryColor[cat]}"></div>
-										<span class="flex-1 text-xs font-medium">{CATEGORY_LABELS[cat]}</span>
-										<span class="text-xs text-base-content/50">{invoiceByCategory[cat].qty.toLocaleString()}개</span>
-										<span class="w-24 shrink-0 text-right text-xs font-bold">{formatMoney(invoiceByCategory[cat].amount)}</span>
-									</div>
-								{/if}
-							{/each}
-						</div>
+						<label for="inv-memo" class="mb-2 block text-xs font-bold uppercase tracking-wide text-base-content/40">메모 (선택)</label>
+						<textarea id="inv-memo" bind:value={invoiceMemo} rows="2"
+							class="textarea textarea-bordered w-full resize-none text-sm"
+							placeholder="청구서에 표시할 메모..."></textarea>
 					</div>
 
 					<!-- 액션 버튼 -->
@@ -1283,37 +1224,31 @@
 							<Icon icon="lucide:file-spreadsheet" class="h-4 w-4" />
 							청구서 엑셀 저장
 						</button>
-						</div>
-					{/if}
-				</div>
+					</div>
+				{/if}
 			</div>
+		</div>
 
 	<!-- ── 거래내역서 탭 ── -->
 	{:else if tabState.active === 'statement'}
 		<div class="space-y-4">
 			<!-- 조회 기간 + 뷰 모드 + 액션 버튼 -->
 			<div class="card bg-base-100 shadow-sm p-4">
-				<div class="flex flex-wrap items-end gap-3">
-					<div class="flex flex-col gap-1">
-						<label for="stmt-from" class="text-xs font-semibold text-base-content/50">시작일</label>
-						<input id="stmt-from" type="date" bind:value={periodFrom} class="input input-bordered input-sm" />
-					</div>
-					<span class="mb-1 text-base-content/40">~</span>
-					<div class="flex flex-col gap-1">
-						<label for="stmt-to" class="text-xs font-semibold text-base-content/50">종료일</label>
-						<input id="stmt-to" type="date" bind:value={periodTo} class="input input-bordered input-sm" />
-					</div>
+				<div class="flex flex-wrap items-center gap-3">
+					<input id="stmt-from" type="date" bind:value={periodFrom} class="input input-bordered input-sm" />
+					<span class="text-base-content/40">~</span>
+					<input id="stmt-to" type="date" bind:value={periodTo} class="input input-bordered input-sm" />
 					<!-- 뷰 모드 전환 -->
 					<div class="tabs tabs-boxed gap-0">
 						<button type="button"
 							class="tab {stmtViewMode === 'pivot' ? 'tab-active' : ''}"
 							onclick={() => stmtViewMode = 'pivot'}>
-							📊 피벗표
+							피벗표
 						</button>
 						<button type="button"
 							class="tab {stmtViewMode === 'daily' ? 'tab-active' : ''}"
 							onclick={() => stmtViewMode = 'daily'}>
-							📅 일별상세
+							일별상세
 						</button>
 					</div>
 					{#if statementData}
@@ -1590,34 +1525,22 @@
 				{@const expiredCount  = contracts.filter(c => getContractStatus(c.startDate, c.endDate) === 'expired').length}
 				{@const upcomingCount = contracts.filter(c => getContractStatus(c.startDate, c.endDate) === 'upcoming').length}
 
-				<!-- 상단 배너 -->
-				<div class="card bg-secondary text-secondary-content p-5 shadow">
-					<div class="flex items-center justify-between">
-						<div>
-							<h3 class="text-lg font-extrabold tracking-tight">🗓️ 계약기간 관리</h3>
-							<p class="mt-0.5 text-sm opacity-70">{selectedClient?.name} · 총 {contracts.length}건</p>
-						</div>
-						<div class="flex items-center gap-3">
-							{#if activeCount > 0}
-								<div class="badge badge-success gap-1 px-3 py-3">
-									<span>진행중</span>
-									<span class="font-black">{activeCount}</span>
-								</div>
-							{/if}
-							{#if upcomingCount > 0}
-								<div class="badge badge-info gap-1 px-3 py-3">
-									<span>예정</span>
-									<span class="font-black">{upcomingCount}</span>
-								</div>
-							{/if}
-							{#if expiredCount > 0}
-								<div class="badge badge-ghost gap-1 px-3 py-3">
-									<span>만료</span>
-									<span class="font-black">{expiredCount}</span>
-								</div>
-							{/if}
-						</div>
+				<!-- 상단 헤더: 코드 현황 + 추가 버튼 -->
+				<div class="flex items-center gap-3 mb-1">
+					<div class="flex items-center gap-2">
+						{#if activeCount > 0}
+							<span class="badge badge-success gap-1">진행중 <span class="font-black">{activeCount}</span></span>
+						{/if}
+						{#if upcomingCount > 0}
+							<span class="badge badge-info gap-1">예정 <span class="font-black">{upcomingCount}</span></span>
+						{/if}
+						{#if expiredCount > 0}
+							<span class="badge badge-ghost gap-1">만료 <span class="font-black">{expiredCount}</span></span>
+						{/if}
 					</div>
+					<button type="button" class="btn btn-secondary btn-sm ml-auto" onclick={openAddContract}>
+						+ 계약 추가
+					</button>
 				</div>
 
 				<!-- 메인 레이아웃 -->
@@ -1706,11 +1629,6 @@
 
 					<!-- 오른쪽: 요약 패널 -->
 					<div class="col-span-4 space-y-4">
-						<!-- 추가 버튼 -->
-						<button type="button" class="btn btn-secondary w-full" onclick={openAddContract}>
-							+ 계약기간 추가
-						</button>
-
 						<!-- 요약 통계 -->
 						{#if contracts.length > 0}
 							{@const ac = contracts.filter(c => getContractStatus(c.startDate, c.endDate) === 'active').length}
@@ -1747,14 +1665,6 @@
 								</div>
 							</div>
 						{/if}
-
-						<!-- 안내 카드 -->
-						<div class="card bg-secondary/10 border border-secondary/20 p-4">
-							<p class="mb-1.5 text-xs font-bold text-secondary">💡 계약기간 활용하기</p>
-							<p class="text-xs leading-relaxed text-base-content/50">
-								계약기간을 등록하면 청구서 탭에서 빠르게 기간을 적용할 수 있습니다.
-							</p>
-						</div>
 					</div>
 				</div>
 			{/if}
