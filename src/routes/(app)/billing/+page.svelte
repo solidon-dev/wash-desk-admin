@@ -5,6 +5,7 @@
 	import jsPDF from 'jspdf';
 	import autoTable, { type CellHookData, type HookData } from 'jspdf-autotable';
 	import type { Cell, Sheet, MergeRegion, ColumnDef } from './excel.js';
+	import DatePicker from '../stats/_components/DatePicker.svelte';
 
 	const CATEGORY_LABELS: Record<string, string> = { towel: '타월', sheet: '시트', uniform: '유니폼', all: '전체' };
 
@@ -78,6 +79,25 @@
 	// ── 기간 설정 (공통) ──
 	let periodFrom = $state('');
 	let periodTo   = $state('');
+
+	// ── DatePicker 상태 ──
+	let pickerShow   = $state(false);
+	let pickerTarget = $state<'from' | 'to'>('from');
+	function openPicker(t: 'from' | 'to') { pickerTarget = t; pickerShow = true; }
+	function onPickerSelect(_t: 'from' | 'to' | 'single', ymd: string) {
+		if (pickerTarget === 'from') periodFrom = ymd;
+		else periodTo = ymd;
+		pickerShow = false;
+	}
+
+	let contractPickerShow   = $state(false);
+	let contractPickerTarget = $state<'from' | 'to'>('from');
+	function openContractPicker(t: 'from' | 'to') { contractPickerTarget = t; contractPickerShow = true; }
+	function onContractPickerSelect(_t: 'from' | 'to' | 'single', ymd: string) {
+		if (contractPickerTarget === 'from') contractFrom = ymd;
+		else contractTo = ymd;
+		contractPickerShow = false;
+	}
 
 	// ── 청구서 미리보기 데이터 ──
 	const invoiceLines = $derived.by((): InvoiceLine[] => {
@@ -1080,9 +1100,15 @@
 					<!-- 컨트롤 바: 기간 picker + 계약기간 빠른 적용 + 카드 헤더 -->
 					<div class="flex flex-wrap items-center gap-3 border-b border-base-200 px-5 py-3">
 						<h3 class="text-base font-bold mr-2">품목별 청구 내역</h3>
-						<input id="inv-from" type="date" bind:value={periodFrom} class="input input-bordered input-sm" />
+						<button type="button" class="btn btn-sm btn-outline gap-1.5" onclick={() => openPicker('from')}>
+							<Icon icon="lucide:calendar" class="h-3.5 w-3.5" />
+							{periodFrom || '시작일'}
+						</button>
 						<span class="text-base-content/40">~</span>
-						<input id="inv-to" type="date" bind:value={periodTo} class="input input-bordered input-sm" />
+						<button type="button" class="btn btn-sm btn-outline gap-1.5" onclick={() => openPicker('to')}>
+							<Icon icon="lucide:calendar" class="h-3.5 w-3.5" />
+							{periodTo || '종료일'}
+						</button>
 						{#if contracts.length > 0}
 							<span class="text-[11px] font-bold text-base-content/40 ml-1">계약:</span>
 							{#each contracts.slice(0, 4) as c (c.id)}
@@ -1235,9 +1261,15 @@
 			<!-- 조회 기간 + 뷰 모드 + 액션 버튼 -->
 			<div class="card bg-base-100 shadow-sm p-4">
 				<div class="flex flex-wrap items-center gap-3">
-					<input id="stmt-from" type="date" bind:value={periodFrom} class="input input-bordered input-sm" />
+					<button type="button" class="btn btn-sm btn-outline gap-1.5" onclick={() => openPicker('from')}>
+						<Icon icon="lucide:calendar" class="h-3.5 w-3.5" />
+						{periodFrom || '시작일'}
+					</button>
 					<span class="text-base-content/40">~</span>
-					<input id="stmt-to" type="date" bind:value={periodTo} class="input input-bordered input-sm" />
+					<button type="button" class="btn btn-sm btn-outline gap-1.5" onclick={() => openPicker('to')}>
+						<Icon icon="lucide:calendar" class="h-3.5 w-3.5" />
+						{periodTo || '종료일'}
+					</button>
 					<!-- 뷰 모드 전환 -->
 					<div class="tabs tabs-boxed gap-0">
 						<button type="button"
@@ -1682,6 +1714,26 @@
 
 
 <!-- ═══════════════ 청구서 PDF 미리보기 모달 ═══════════════ -->
+<!-- DatePicker: 기간 선택 (청구서 / 거래내역서 공통) -->
+<DatePicker
+	show={pickerShow}
+	target={pickerTarget}
+	fromDate={periodFrom}
+	toDate={periodTo}
+	onselect={onPickerSelect}
+	onclose={() => (pickerShow = false)}
+/>
+
+<!-- DatePicker: 계약 모달용 -->
+<DatePicker
+	show={contractPickerShow}
+	target={contractPickerTarget}
+	fromDate={contractFrom}
+	toDate={contractTo}
+	onselect={onContractPickerSelect}
+	onclose={() => (contractPickerShow = false)}
+/>
+
 {#if showSupplierModal}
 <dialog class="modal modal-open" aria-modal="true">
 	<div class="modal-box w-full max-w-lg">
@@ -1799,11 +1851,17 @@
 			<div class="space-y-4">
 				<div class="form-control">
 					<label for="contract-from" class="label label-text text-xs font-semibold">시작일</label>
-					<input id="contract-from" type="date" bind:value={contractFrom} class="input input-bordered w-full" />
+					<button id="contract-from" type="button" class="btn btn-outline w-full justify-start gap-2" onclick={() => openContractPicker('from')}>
+						<Icon icon="lucide:calendar" class="h-4 w-4" />
+						{contractFrom || '시작일 선택'}
+					</button>
 				</div>
 				<div class="form-control">
 					<label for="contract-to" class="label label-text text-xs font-semibold">종료일</label>
-					<input id="contract-to" type="date" bind:value={contractTo} class="input input-bordered w-full" />
+					<button id="contract-to" type="button" class="btn btn-outline w-full justify-start gap-2" onclick={() => openContractPicker('to')}>
+						<Icon icon="lucide:calendar" class="h-4 w-4" />
+						{contractTo || '종료일 선택'}
+					</button>
 				</div>
 				<div class="form-control">
 					<label for="contract-memo" class="label label-text text-xs font-semibold">메모 <span class="font-normal text-base-content/40">(선택)</span></label>
