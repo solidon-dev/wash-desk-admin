@@ -139,13 +139,43 @@
 		pickerShow = false;
 	}
 
-	let contractPickerShow   = $state(false);
-	let contractPickerTarget = $state<'from' | 'to'>('from');
-	function openContractPicker(t: 'from' | 'to') { contractPickerTarget = t; contractPickerShow = true; }
-	function onContractPickerSelect(_t: 'from' | 'to' | 'single', ymd: string) {
-		if (contractPickerTarget === 'from') contractFrom = ymd;
-		else contractTo = ymd;
-		contractPickerShow = false;
+	// 계약 모달 인라인 달력
+	let contractCalTarget = $state<'from' | 'to'>('from'); // 현재 편집 중인 날짜
+	let contractCalYear   = $state(new Date().getFullYear());
+	let contractCalMonth  = $state(new Date().getMonth());
+
+	const CONTRACT_MONTH_NAMES = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+	const CONTRACT_DAY_NAMES   = ['일','월','화','수','목','금','토'];
+
+	function contractCalDays(): (number | null)[] {
+		const first = new Date(contractCalYear, contractCalMonth, 1).getDay();
+		const last  = new Date(contractCalYear, contractCalMonth + 1, 0).getDate();
+		const cells: (number | null)[] = Array(first).fill(null);
+		for (let d = 1; d <= last; d++) cells.push(d);
+		return cells;
+	}
+	function contractCalPrev() {
+		if (contractCalMonth === 0) { contractCalMonth = 11; contractCalYear -= 1; }
+		else contractCalMonth -= 1;
+	}
+	function contractCalNext() {
+		if (contractCalMonth === 11) { contractCalMonth = 0; contractCalYear += 1; }
+		else contractCalMonth += 1;
+	}
+	function contractCalSelectDay(day: number) {
+		function pad(n: number) { return String(n).padStart(2, '0'); }
+		const ymd = `${contractCalYear}-${pad(contractCalMonth + 1)}-${pad(day)}`;
+		if (contractCalTarget === 'from') { contractFrom = ymd; contractCalTarget = 'to'; }
+		else { contractTo = ymd; }
+	}
+	function openContractCal(t: 'from' | 'to') {
+		contractCalTarget = t;
+		const base = t === 'from' ? contractFrom : contractTo;
+		if (base) {
+			const d = new Date(base);
+			contractCalYear  = d.getFullYear();
+			contractCalMonth = d.getMonth();
+		}
 	}
 
 	// ── 청구서 미리보기 데이터 ──
@@ -1746,15 +1776,7 @@
 	onclose={() => (pickerShow = false)}
 />
 
-<!-- DatePicker: 계약 모달용 -->
-<DatePicker
-	show={contractPickerShow}
-	target={contractPickerTarget}
-	fromDate={contractFrom}
-	toDate={contractTo}
-	onselect={onContractPickerSelect}
-	onclose={() => (contractPickerShow = false)}
-/>
+
 
 {#if showSupplierModal}
 <dialog class="modal modal-open" aria-modal="true">
@@ -1863,44 +1885,115 @@
 	</dialog>
 {/if}
 
-<!-- ═══════════════ 계약기간 모달 ═══════════════ -->
+<!-- ═══════════════ 계약기간 모달 (인라인 달력) ═══════════════ -->
 {#if showContractModal}
-	<dialog class="modal modal-open" aria-modal="true">
-		<div class="modal-box w-full max-w-sm">
-			<h3 class="mb-4 text-base font-extrabold">
-				{editingContractId ? '계약기간 수정' : '계약기간 추가'}
-			</h3>
-			<div class="space-y-4">
-				<div class="form-control">
-					<label for="contract-from" class="label label-text text-xs font-semibold">시작일</label>
-					<button id="contract-from" type="button" class="btn btn-outline w-full justify-start gap-2" onclick={() => openContractPicker('from')}>
-						<Icon icon="lucide:calendar" class="h-4 w-4" />
-						{contractFrom || '시작일 선택'}
+	<div
+		class="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4"
+		role="button" tabindex="-1" aria-label="닫기"
+		onclick={() => (showContractModal = false)}
+		onkeydown={(e) => e.key === 'Escape' && (showContractModal = false)}
+	>
+		<div
+			class="bg-base-100 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
+			role="dialog" aria-modal="true"
+			onclick={(e) => e.stopPropagation()}
+			onkeydown={(e) => e.stopPropagation()}
+			tabindex="-1"
+		>
+			<!-- 헤더 -->
+			<div class="flex items-center justify-between border-b border-base-200 px-5 py-4">
+				<h3 class="text-base font-extrabold">{editingContractId ? '계약기간 수정' : '계약기간 추가'}</h3>
+				<button type="button" class="btn btn-ghost btn-sm btn-square" onclick={() => (showContractModal = false)} aria-label="닫기">
+					<Icon icon="lucide:x" class="h-4 w-4" />
+				</button>
+			</div>
+
+			<!-- 날짜 선택 탭 -->
+			<div class="flex border-b border-base-200">
+				<button
+					type="button"
+					class="flex-1 py-3 text-sm font-bold transition-colors {contractCalTarget === 'from' ? 'bg-secondary/10 text-secondary border-b-2 border-secondary' : 'text-base-content/50 hover:bg-base-200'}"
+					onclick={() => openContractCal('from')}
+				>
+					<div class="text-[10px] font-normal text-base-content/40 mb-0.5">시작일</div>
+					<div class="{contractFrom ? '' : 'text-base-content/30'}">{contractFrom || '선택 안됨'}</div>
+				</button>
+				<div class="flex items-center px-2 text-base-content/30">
+					<Icon icon="lucide:arrow-right" class="h-4 w-4" />
+				</div>
+				<button
+					type="button"
+					class="flex-1 py-3 text-sm font-bold transition-colors {contractCalTarget === 'to' ? 'bg-secondary/10 text-secondary border-b-2 border-secondary' : 'text-base-content/50 hover:bg-base-200'}"
+					onclick={() => openContractCal('to')}
+				>
+					<div class="text-[10px] font-normal text-base-content/40 mb-0.5">종료일</div>
+					<div class="{contractTo ? '' : 'text-base-content/30'}">{contractTo || '선택 안됨'}</div>
+				</button>
+			</div>
+
+			<!-- 인라인 달력 -->
+			<div class="px-4 pt-4 pb-2 flex items-center justify-between">
+				<div class="flex items-center gap-1">
+					<button type="button" class="btn btn-ghost btn-xs btn-square" onclick={() => contractCalYear -= 1}>
+						<Icon icon="heroicons:chevron-double-left" class="h-3.5 w-3.5" />
+					</button>
+					<button type="button" class="btn btn-ghost btn-xs btn-square" onclick={contractCalPrev}>
+						<Icon icon="heroicons:chevron-left" class="h-3.5 w-3.5" />
 					</button>
 				</div>
-				<div class="form-control">
-					<label for="contract-to" class="label label-text text-xs font-semibold">종료일</label>
-					<button id="contract-to" type="button" class="btn btn-outline w-full justify-start gap-2" onclick={() => openContractPicker('to')}>
-						<Icon icon="lucide:calendar" class="h-4 w-4" />
-						{contractTo || '종료일 선택'}
+				<span class="text-sm font-black">{contractCalYear}년 {CONTRACT_MONTH_NAMES[contractCalMonth]}</span>
+				<div class="flex items-center gap-1">
+					<button type="button" class="btn btn-ghost btn-xs btn-square" onclick={contractCalNext}>
+						<Icon icon="heroicons:chevron-right" class="h-3.5 w-3.5" />
 					</button>
-				</div>
-				<div class="form-control">
-					<label for="contract-memo" class="label label-text text-xs font-semibold">메모 <span class="font-normal text-base-content/40">(선택)</span></label>
-					<input id="contract-memo" type="text" bind:value={contractMemo}
-						placeholder="예: 상반기 계약"
-						class="input input-bordered w-full" />
+					<button type="button" class="btn btn-ghost btn-xs btn-square" onclick={() => contractCalYear += 1}>
+						<Icon icon="heroicons:chevron-double-right" class="h-3.5 w-3.5" />
+					</button>
 				</div>
 			</div>
-			<div class="modal-action">
-				<button type="button" class="btn btn-ghost" onclick={() => (showContractModal = false)}>취소</button>
-				<button type="button" class="btn btn-secondary"
+			<div class="grid grid-cols-7 px-3 pb-1">
+				{#each CONTRACT_DAY_NAMES as dn, i (dn)}
+					<div class="text-center text-xs font-bold py-1 {i === 0 ? 'text-error' : i === 6 ? 'text-info' : 'text-base-content/30'}">{dn}</div>
+				{/each}
+			</div>
+			<div class="grid grid-cols-7 px-3 pb-4 gap-y-0.5">
+				{#each contractCalDays() as cell, i (i)}
+					{#if cell === null}
+						<div></div>
+					{:else}
+						{@const pad2 = (n: number) => String(n).padStart(2, '0')}
+						{@const ymd = `${contractCalYear}-${pad2(contractCalMonth + 1)}-${pad2(cell)}`}
+						{@const isFrom = contractFrom === ymd}
+						{@const isTo = contractTo === ymd}
+						{@const inRange = contractFrom && contractTo && ymd > contractFrom && ymd < contractTo}
+						{@const dow = new Date(contractCalYear, contractCalMonth, cell).getDay()}
+						<button
+							type="button"
+							class="h-9 w-full rounded-lg text-sm font-bold transition-colors
+								{isFrom || isTo
+									? 'bg-secondary text-secondary-content'
+									: inRange
+										? 'bg-secondary/20 text-secondary'
+										: dow === 0
+											? 'text-error hover:bg-base-200'
+											: dow === 6
+												? 'text-info hover:bg-base-200'
+												: 'text-base-content hover:bg-base-200'}"
+							onclick={() => contractCalSelectDay(cell)}
+						>{cell}</button>
+					{/if}
+				{/each}
+			</div>
+
+			<!-- 하단 버튼 -->
+			<div class="flex gap-2 border-t border-base-200 px-5 py-4">
+				<button type="button" class="btn btn-ghost flex-1" onclick={() => (showContractModal = false)}>취소</button>
+				<button type="button" class="btn btn-secondary flex-1"
 					disabled={!contractFrom || !contractTo}
 					onclick={saveContract}>저장</button>
 			</div>
 		</div>
-		<form method="dialog" class="modal-backdrop"><button onclick={() => (showContractModal = false)}>close</button></form>
-	</dialog>
+	</div>
 {/if}
 
 
