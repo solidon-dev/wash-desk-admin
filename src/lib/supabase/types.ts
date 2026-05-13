@@ -13,6 +13,12 @@ import type { Database, Tables, TablesInsert, TablesUpdate, Enums } from './data
 export type { Database, Tables, TablesInsert, TablesUpdate, Enums };
 
 // ----------------------------------------------------------------
+// Enum 타입
+// ----------------------------------------------------------------
+
+export type UserRole = Enums<'user_role'>; // 'super_admin' | 'factory_admin' | 'worker'
+
+// ----------------------------------------------------------------
 // 테이블 Row 타입 (SELECT 결과)
 // ----------------------------------------------------------------
 
