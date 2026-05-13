@@ -496,10 +496,7 @@
       const realId = (result.data as Record<string, unknown>)?.id as string | undefined;
       if (!realId) throw new Error('no id in response');
 
-      // 임시 id → 실제 id 로컈 직접 교체 (리렌더 최소화, 포커스 무영향)
-      localItems = localItems.map(i =>
-        i.id === tmpId ? { ...i, id: realId } : i
-      );
+      // localPrices 먼저 교체 — 이후 localItems key 변경 시 tr 재생성될 때 getPriceDate(realId)가 보장되어야 날짜 표시 가능
       if (price > 0) {
         localPrices = localPrices.map(p =>
           p.item_id === tmpId ? { ...p, item_id: realId } : p
@@ -509,6 +506,10 @@
           unit_price: String(price), effective_from: priceDate,
         }, () => { localPrices = localPrices.filter(p => p.item_id !== realId); });
       }
+      // localPrices 코에 후 localItems key 변경 (tr 재생성 시 이미 price 준비됨)
+      localItems = localItems.map(i =>
+        i.id === tmpId ? { ...i, id: realId } : i
+      );
       // key 변경으로 해당 tr이 재생성될 수 있으니 tick 후 포커스 복원
       await tick();
       const el = document.getElementById(savedFocusId) as HTMLInputElement | null;
@@ -1020,7 +1021,11 @@
                         priceDrafts[item.id] = numeric;
                       }}
                       onfocus={() => onCellFocus(i, 1)}
-                      onblur={() => commitPrice(item)}
+                      onblur={(e) => {
+                        const el = e.target as HTMLInputElement;
+                        if (!el.value.trim()) { el.value = '0'; priceDrafts[item.id] = '0'; }
+                        commitPrice(item);
+                      }}
                       onkeydown={(e) => handleCellKeydown(e, i, 1)}
                       placeholder="0"
                       class="h-full w-full bg-transparent px-3 text-right text-sm outline-none focus:bg-primary/5"
@@ -1137,6 +1142,10 @@
                         newPrice = numeric;
                       }}
                       onfocus={() => (activeRow = newRowIdx)}
+                      onblur={(e) => {
+                        const el = e.target as HTMLInputElement;
+                        if (!el.value.trim()) { el.value = '0'; newPrice = '0'; }
+                      }}
                       onkeydown={(e) => handleCellKeydown(e, newRowIdx, 1)}
                       class="h-full w-full bg-transparent px-3 text-right text-sm outline-none placeholder:opacity-30
                         {newRowSubmitTried && !newRowPriceOk ? 'ring-2 ring-inset ring-error' : ''}"
