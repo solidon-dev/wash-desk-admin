@@ -19,10 +19,10 @@
   const serverPrices     = $derived(data.itemPrices as Price[]);
   const serverCategories = $derived(data.categories);
 
-  // 서버 data가 바뀌면 로컈 상태도 동기화
-  let localItems      = $state<Item[]>([]);
-  let localPrices     = $state<Price[]>([]);
-  let localCategories = $state<typeof data.categories>([]);
+  // 서버 data가 바뀌면 로컈 상태도 동기화 — 초기값을 서버 데이터로 바로 설정
+  let localItems      = $state<Item[]>([...data.items]);
+  let localPrices     = $state<Price[]>((data.itemPrices as Price[]).map(p => ({ ...p })));
+  let localCategories = $state<typeof data.categories>([...data.categories]);
 
   $effect(() => { localItems      = [...serverItems]; });
   $effect(() => { localPrices     = serverPrices.map(p => ({ ...p })); });

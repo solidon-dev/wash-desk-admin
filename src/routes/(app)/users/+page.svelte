@@ -442,20 +442,20 @@
             <p class="text-xs font-bold text-base-content/50 uppercase tracking-wider">비밀번호 변경</p>
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="label pb-1"><span class="label-text text-xs font-bold text-base-content/60">새 비밀번호</span></label>
+                <label for="pw-new" class="label pb-1"><span class="label-text text-xs font-bold text-base-content/60">새 비밀번호</span></label>
                 <div class="relative">
-                  <input type={showPassword ? 'text' : 'password'} bind:value={formPassword} placeholder="비밀번호 입력" class="input input-bordered w-full text-sm pr-9" />
+                  <input id="pw-new" type={showPassword ? 'text' : 'password'} bind:value={formPassword} placeholder="비밀번호 입력" class="input input-bordered w-full text-sm pr-9" />
                   <button type="button" onclick={() => (showPassword = !showPassword)} class="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/40 hover:text-base-content/70">
                     <Icon icon={showPassword ? 'lucide:eye-off' : 'lucide:eye'} class="w-4 h-4" />
                   </button>
                 </div>
               </div>
               <div>
-                <label class="label pb-1">
+                <label for="pw-conf" class="label pb-1">
                   <span class="label-text text-xs font-bold text-base-content/60">비밀번호 확인{#if passwordMismatch}<span class="text-error ml-1">불일치</span>{/if}</span>
                 </label>
                 <div class="relative">
-                  <input type={showPasswordConf ? 'text' : 'password'} bind:value={formPasswordConf} placeholder="다시 입력" class="input input-bordered w-full text-sm pr-9 {passwordMismatch ? 'input-error' : ''}" />
+                  <input id="pw-conf" type={showPasswordConf ? 'text' : 'password'} bind:value={formPasswordConf} placeholder="다시 입력" class="input input-bordered w-full text-sm pr-9 {passwordMismatch ? 'input-error' : ''}" />
                   <button type="button" onclick={() => (showPasswordConf = !showPasswordConf)} class="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/40 hover:text-base-content/70">
                     <Icon icon={showPasswordConf ? 'lucide:eye-off' : 'lucide:eye'} class="w-4 h-4" />
                   </button>
