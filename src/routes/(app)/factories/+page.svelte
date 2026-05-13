@@ -85,11 +85,7 @@
   }
   function closeModal() { showModal = false; saveError = ''; }
 
-  // ── 숨기기 확인 ──
-  let hideTargetId   = $state<string | null>(null);
-  let hideTargetName = $state('');
-  function openHide(f: Factory) { hideTargetId = f.id; hideTargetName = f.name; closeModal(); }
-  function cancelHide() { hideTargetId = null; }
+
 </script>
 
 <div class="min-h-full bg-base-200 px-8 py-10">
@@ -110,7 +106,7 @@
       <input type="checkbox" checked={data.showHidden}
         onchange={(e) => navTo({ hidden: (e.target as HTMLInputElement).checked })}
         class="checkbox checkbox-sm" />
-      숨김 포함
+      비활성화 포함
     </label>
 
     <button onclick={openAdd} class="btn btn-primary btn-sm gap-2 whitespace-nowrap ml-auto sm:w-auto w-full">
@@ -148,7 +144,6 @@
             <tr class="hover:bg-base-200 transition-colors {isHidden ? 'opacity-40' : ''}">
               <td class="font-semibold text-base-content">
                 <span>{factory.name}</span>
-                {#if isHidden}<span class="badge badge-ghost badge-xs ml-1">숨김</span>{/if}
                 <div class="lg:hidden mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
                   {#if factory.phone}<span class="text-xs text-base-content/50">{factory.phone}</span>{/if}
                   {#if factory.address}<span class="text-xs text-base-content/40">{factory.address}</span>{/if}
@@ -184,21 +179,10 @@
   <dialog class="modal modal-open" onmousedown={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
     <div class="modal-box w-full max-w-lg rounded-2xl p-6 flex flex-col" style="max-height: 480px;">
       <div class="flex items-center justify-between mb-5 shrink-0">
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2 flex-wrap">
           <h3 class="text-lg font-extrabold text-base-content">{editingFactory ? '공장 수정' : '공장 등록'}</h3>
-          {#if editingFactory}
-            {#if editingFactory.deleted_at !== null}
-              <form method="POST" action="?/restore" use:enhance>
-                <input type="hidden" name="id" value={editingFactory.id} />
-                <button type="submit" class="btn btn-xs btn-success gap-1 font-bold">
-                  <Icon icon="lucide:eye" class="w-3.5 h-3.5" />복원
-                </button>
-              </form>
-            {:else}
-              <button type="button" onclick={() => openHide(editingFactory!)} class="btn btn-xs btn-outline btn-warning gap-1 font-bold">
-                <Icon icon="lucide:eye-off" class="w-3.5 h-3.5" />숨기기
-              </button>
-            {/if}
+          {#if editingFactory?.deleted_at !== null && editingFactory !== null}
+            <span class="badge badge-sm badge-error gap-1"><Icon icon="lucide:ban" class="w-3 h-3" />비활성화</span>
           {/if}
         </div>
         <button onclick={closeModal} class="btn btn-ghost btn-sm btn-circle">
@@ -238,32 +222,49 @@
             </div>
           {/if}
         </div>
-        <div class="modal-action mt-5 pt-4 border-t border-base-200 shrink-0">
-          <button type="button" onclick={closeModal} class="btn btn-ghost font-bold">취소</button>
-          <button type="submit" class="btn btn-primary font-bold" disabled={saving}>
-            {#if saving}<span class="loading loading-spinner loading-xs"></span>{/if}
-            {editingFactory ? '저장' : '등록'}
-          </button>
+        <div class="modal-action mt-5 pt-4 border-t border-base-200 shrink-0 flex justify-between">
+          <div>
+            {#if editingFactory}
+              {#if editingFactory.deleted_at !== null}
+                <button type="submit" form="form-factory-activate" class="btn btn-sm btn-success gap-1.5 font-bold">
+                  <Icon icon="lucide:circle-check" class="w-4 h-4" />활성화
+                </button>
+              {:else}
+                <button type="submit" form="form-factory-deactivate" class="btn btn-sm btn-error btn-outline gap-1.5 font-bold">
+                  <Icon icon="lucide:ban" class="w-4 h-4" />비활성화
+                </button>
+              {/if}
+            {/if}
+          </div>
+          <div class="flex gap-2">
+            <button type="button" onclick={closeModal} class="btn btn-ghost font-bold">취소</button>
+            <button type="submit" class="btn btn-primary font-bold" disabled={saving}>
+              {#if saving}<span class="loading loading-spinner loading-xs"></span>{/if}
+              {editingFactory ? '저장' : '등록'}
+            </button>
+          </div>
         </div>
       </form>
     </div>
   </dialog>
 {/if}
 
-<!-- 숨기기 확인 모달 -->
-{#if hideTargetId}
-  <dialog class="modal modal-open" onmousedown={(e) => { if (e.target === e.currentTarget) cancelHide(); }}>
-    <div class="modal-box w-full max-w-sm rounded-2xl p-6">
-      <h3 class="text-base font-extrabold text-base-content mb-2">공장 숨기기</h3>
-      <p class="text-sm text-base-content/70 mb-6">
-        <span class="font-bold text-warning">{hideTargetName}</span> 공장을 숨기시겠습니까?<br />
-        <span class="text-xs text-base-content/40">숨긴 공장은 셀렉터에 표시되지 않으며, 언제든 복원할 수 있습니다.</span>
-      </p>
-      <form method="POST" action="?/hide" use:enhance class="modal-action">
-        <input type="hidden" name="id" value={hideTargetId} />
-        <button type="button" onclick={cancelHide} class="btn btn-ghost font-bold">취소</button>
-        <button type="submit" class="btn btn-warning font-bold">숨기기</button>
-      </form>
-    </div>
-  </dialog>
+<!-- 비활성화 / 활성화 전용 form (모달 바깥, form 속성으로 연결) -->
+{#if editingFactory}
+  <form
+    id="form-factory-deactivate"
+    method="POST"
+    action="?/hide"
+    use:enhance={() => async ({ update }) => { await update(); closeModal(); }}
+  >
+    <input type="hidden" name="id" value={editingFactory.id} />
+  </form>
+  <form
+    id="form-factory-activate"
+    method="POST"
+    action="?/restore"
+    use:enhance={() => async ({ update }) => { await update(); closeModal(); }}
+  >
+    <input type="hidden" name="id" value={editingFactory.id} />
+  </form>
 {/if}

@@ -6,7 +6,7 @@
   import Pagination from '$lib/components/Pagination.svelte';
   import TableCard from '$lib/components/TableCard.svelte';
   import type { PageData } from './$types';
-  import { formatPhone, unformatPhone, displayPhone } from '$lib/utils/phone';
+  import { formatPhone, displayPhone } from '$lib/utils/phone';
 
   type Props = {
     data: PageData & { users: UserRow[]; allFactories: { id: string; name: string }[]; role: string; factory_id: string | null };
@@ -51,7 +51,6 @@
       invalidateAll().then(() => {
         users = data.users;
         closeModal();
-        deactivateTargetId = null;
       });
     }
   });
@@ -157,11 +156,6 @@
   }
 
   let showModal        = $state(false);
-
-  // ── 비활성화 확인 모달 ──
-  let deactivateTargetId = $state<string | null>(null);
-  function openDeactivate(id: string) { deactivateTargetId = id; }
-  function cancelDeactivate() { deactivateTargetId = null; }
 </script>
 
 <!-- ───────────────────────────── 메인 컨텐츠 ───────────────────────────── -->
@@ -177,7 +171,7 @@
     />
     <label class="flex items-center gap-2 cursor-pointer select-none text-sm text-base-content/60 font-semibold">
       <input type="checkbox" bind:checked={showDeleted} class="checkbox checkbox-sm" />
-      비활성 포함
+      비활성화 포함
     </label>
     {#if myRole === 'super_admin' || myRole === 'factory_admin'}
     <button onclick={openAdd} class="btn btn-primary btn-sm gap-2 whitespace-nowrap ml-auto sm:w-auto w-full">
@@ -221,9 +215,6 @@
             <tr class="hover:bg-base-200 transition-colors {isDeleted ? 'opacity-40' : ''}">
               <td class="font-semibold text-base-content">
                 <span>{user.full_name ?? '—'}</span>
-                {#if isDeleted}
-                  <span class="badge badge-ghost badge-xs ml-1">비활성</span>
-                {/if}
                 <div class="lg:hidden mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
                   <span class="badge badge-xs font-bold {roleBadge[role] ?? 'badge-ghost'}">{roleLabel[role] ?? role}</span>
                   <span class="text-xs text-base-content/50 font-mono">{user.username}</span>
@@ -376,17 +367,10 @@
     <div class="modal-box w-full max-w-lg rounded-2xl p-6 flex flex-col" style="max-height: 620px;">
       {#key editingUser.id}
       <div class="flex items-center justify-between mb-5 shrink-0">
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2 flex-wrap">
           <h3 class="text-lg font-extrabold text-base-content">사용자 수정</h3>
-          {#if myRole === 'super_admin'}
-            {#if editingUser.deleted_at !== null}
-              <form method="POST" action="?/activate" use:enhance>
-                <input type="hidden" name="id" value={editingUser.id} />
-                <button type="submit" class="btn btn-xs btn-success font-bold">활성화</button>
-              </form>
-            {:else}
-              <button onclick={() => { closeModal(); openDeactivate(editingUser!.id); }} class="btn btn-xs btn-outline btn-warning font-bold">비활성화</button>
-            {/if}
+          {#if editingUser.deleted_at !== null}
+            <span class="badge badge-sm badge-error gap-1"><Icon icon="lucide:ban" class="w-3 h-3" />비활성화</span>
           {/if}
         </div>
         <button onclick={closeModal} class="btn btn-ghost btn-sm btn-circle"><Icon icon="lucide:x" class="w-5 h-5" /></button>
@@ -510,32 +494,49 @@
             </div>
           {/if}
         </div>
-        <div class="modal-action mt-5 pt-4 border-t border-base-200 shrink-0">
-          <button type="button" onclick={closeModal} class="btn btn-ghost font-bold">취소</button>
-          <button type="submit" disabled={saving || passwordMismatch} class="btn btn-primary font-bold disabled:opacity-50">
-            {#if saving}<span class="loading loading-spinner loading-xs"></span>{/if}
-            저장
-          </button>
+        <div class="modal-action mt-5 pt-4 border-t border-base-200 shrink-0 flex justify-between">
+          <div>
+            {#if myRole === 'super_admin'}
+              {#if editingUser.deleted_at !== null}
+                <button type="submit" form="form-user-activate" class="btn btn-sm btn-success gap-1.5 font-bold">
+                  <Icon icon="lucide:circle-check" class="w-4 h-4" />활성화
+                </button>
+              {:else}
+                <button type="submit" form="form-user-deactivate" class="btn btn-sm btn-error btn-outline gap-1.5 font-bold">
+                  <Icon icon="lucide:ban" class="w-4 h-4" />비활성화
+                </button>
+              {/if}
+            {/if}
+          </div>
+          <div class="flex gap-2">
+            <button type="button" onclick={closeModal} class="btn btn-ghost font-bold">취소</button>
+            <button type="submit" disabled={saving || passwordMismatch} class="btn btn-primary font-bold disabled:opacity-50">
+              {#if saving}<span class="loading loading-spinner loading-xs"></span>{/if}
+              저장
+            </button>
+          </div>
         </div>
       </form>
       {/key}
     </div>
   </dialog>
 {/if}
-{#if deactivateTargetId}
-  {@const target = users.find(u => u.id === deactivateTargetId)}
-  <dialog class="modal modal-open" onmousedown={(e) => { if (e.target === e.currentTarget) cancelDeactivate(); }}>
-    <div class="modal-box w-full max-w-sm rounded-2xl p-6">
-      <h3 class="text-base font-extrabold text-base-content mb-2">사용자 비활성화</h3>
-      <p class="text-sm text-base-content/70 mb-6">
-        <span class="font-bold text-warning">{target?.full_name ?? target?.username}</span> 계정을 비활성화하시겠습니까?<br />
-        <span class="text-xs text-base-content/40">로그인이 차단되며 언제든 다시 활성화할 수 있습니다.</span>
-      </p>
-      <form method="POST" action="?/deactivate" use:enhance class="flex gap-2 justify-end">
-        <input type="hidden" name="id" value={deactivateTargetId} />
-        <button type="button" onclick={cancelDeactivate} class="btn btn-ghost font-bold">취소</button>
-        <button type="submit" class="btn btn-warning font-bold">비활성화</button>
-      </form>
-    </div>
-  </dialog>
+<!-- 비활성화 / 활성화 전용 form (모달 바깥, form 속성으로 연결) -->
+{#if editingUser}
+  <form
+    id="form-user-deactivate"
+    method="POST"
+    action="?/deactivate"
+    use:enhance={() => async ({ update }) => { await update(); closeModal(); }}
+  >
+    <input type="hidden" name="id" value={editingUser.id} />
+  </form>
+  <form
+    id="form-user-activate"
+    method="POST"
+    action="?/activate"
+    use:enhance={() => async ({ update }) => { await update(); closeModal(); }}
+  >
+    <input type="hidden" name="id" value={editingUser.id} />
+  </form>
 {/if}

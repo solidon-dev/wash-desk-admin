@@ -164,7 +164,7 @@
       oninput={onSearchInput}
       onenter={(q) => navTo({ q })}
       initialValue={data.q}
-      class="w-56 sm:w-64"
+      class="w-60 sm:w-72"
     />
 
     <label class="flex items-center gap-2 cursor-pointer select-none text-sm text-base-content/60 font-semibold">
@@ -278,7 +278,7 @@
       onclick={closeModal}
       onkeydown={(e) => e.key === 'Escape' && closeModal()}
     ></div>
-    <div class="modal-box w-full max-w-lg rounded-2xl p-6 flex flex-col" style="max-height: 600px;">
+    <div class="modal-box max-w-lg rounded-2xl p-6 flex flex-col" style="max-height: 600px;">
 
       <!-- 헤더 -->
       <div class="flex items-center justify-between mb-5 shrink-0">
@@ -330,7 +330,7 @@
               <span class="label-text text-xs font-bold text-base-content/60">거래처명 <span class="text-error">*</span></span>
             </label>
             <input id="cName" name="name" type="text" bind:value={formName}
-              placeholder="거래처명 입력" required class="input input-bordered input-sm w-full" />
+              placeholder="거래처명 입력" required class="input input-bordered w-full text-sm" />
           </div>
 
           <div>
@@ -338,7 +338,7 @@
               <span class="label-text text-xs font-bold text-base-content/60">사업자번호</span>
             </label>
             <input id="cBizNo" name="business_number" type="text" bind:value={formBusinessNo}
-              placeholder="000-00-00000" class="input input-bordered input-sm w-full" />
+              placeholder="000-00-00000" class="input input-bordered w-full text-sm" />
           </div>
 
           <div>
@@ -346,7 +346,7 @@
               <span class="label-text text-xs font-bold text-base-content/60">이메일</span>
             </label>
             <input id="cEmail" name="email" type="email" bind:value={formEmail}
-              placeholder="example@email.com" class="input input-bordered input-sm w-full" />
+              placeholder="example@email.com" class="input input-bordered w-full text-sm" />
           </div>
 
           <div class="grid grid-cols-2 gap-4">
@@ -355,7 +355,7 @@
                 <span class="label-text text-xs font-bold text-base-content/60">담당자</span>
               </label>
               <input id="cMgrName" name="manager_name" type="text" bind:value={formManagerName}
-                placeholder="담당자명" class="input input-bordered input-sm w-full" />
+                placeholder="담당자명" class="input input-bordered w-full text-sm" />
             </div>
             <div>
               <label for="cMgrPhone" class="label pb-1">
@@ -363,7 +363,7 @@
               </label>
               <input id="cMgrPhone" name="manager_phone" type="tel" bind:value={formManagerPhone}
                 oninput={() => { formManagerPhone = formatPhone(formManagerPhone); }}
-                placeholder="010-0000-0000" class="input input-bordered input-sm w-full" />
+                placeholder="010-0000-0000" class="input input-bordered w-full text-sm" />
             </div>
           </div>
 
@@ -373,14 +373,14 @@
                 <span class="label-text text-xs font-bold text-base-content/60">거래 시작일</span>
               </label>
               <input id="cStartDate" name="contract_start_date" type="date" bind:value={formContractStart}
-                class="input input-bordered input-sm w-full" />
+                class="input input-bordered w-full text-sm" />
             </div>
             <div>
               <label for="cEndDate" class="label pb-1">
                 <span class="label-text text-xs font-bold text-base-content/60">거래 종료일</span>
               </label>
               <input id="cEndDate" name="contract_end_date" type="date" bind:value={formContractEnd}
-                class="input input-bordered input-sm w-full" />
+                class="input input-bordered w-full text-sm" />
             </div>
           </div>
 
@@ -389,7 +389,7 @@
               <label for="cFactory" class="label pb-1">
                 <span class="label-text text-xs font-bold text-base-content/60">소속 공장 <span class="text-error">*</span></span>
               </label>
-              <select id="cFactory" bind:value={formFactoryId} class="select select-bordered select-sm w-full">
+              <select id="cFactory" bind:value={formFactoryId} class="select select-bordered w-full text-sm">
                 {#each factories as f (f.id)}
                   <option value={f.id}>{f.name}</option>
                 {/each}
