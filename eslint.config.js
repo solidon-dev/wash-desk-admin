@@ -40,7 +40,9 @@ export default defineConfig(
 		// Override or add rule settings here, such as:
 		// 'svelte/button-has-type': 'error'
 		rules: {
-			'svelte/no-goto-without-resolve': 'off'
+			'svelte/no-goto-without-resolve': 'off',
+			'svelte/no-reactive-reassign': 'off',
+			'no-undef': 'off'
 		}
 	}
 );

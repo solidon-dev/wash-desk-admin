@@ -1,5 +1,12 @@
 {
 	"files.associations": {
 		"*.css": "tailwindcss"
+	},
+	"svelte.plugin.svelte.diagnostics.enable": true,
+	"svelte.plugin.svelte.lint": {
+		"enable": true
+	},
+	"[svelte]": {
+		"editor.defaultFormatter": "svelte.svelte-vscode"
 	}
 }
