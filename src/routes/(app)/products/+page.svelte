@@ -1116,7 +1116,7 @@
                   <td class="h-9 border-b border-dashed border-r border-base-300 px-2 text-center text-[11px] opacity-30 select-none">
                     {newRowIdx + 1}
                   </td>
-                  <td class="h-9 p-0 border-b border-dashed border-r border-base-300">
+                  <td class="h-9 p-0 border-b border-dashed border-r border-base-300 {newRowSubmitTried && !newRowNameOk ? 'bg-error/15' : ''}">
                     <input
                       id="cell-{newRowIdx}-0"
                       type="text"
@@ -1124,16 +1124,15 @@
                       bind:value={newName}
                       onfocus={() => (activeRow = newRowIdx)}
                       onkeydown={(e) => handleCellKeydown(e, newRowIdx, 0)}
-                      class="h-full w-full bg-transparent px-3 text-sm outline-none placeholder:opacity-30
-                        {newRowSubmitTried && !newRowNameOk ? 'ring-2 ring-inset ring-error' : ''}"
+                      class="h-full w-full bg-transparent px-3 text-sm outline-none placeholder:opacity-30"
                     />
                   </td>
-                  <td class="h-9 p-0 border-b border-dashed border-r border-base-300">
+                  <td class="h-9 p-0 border-b border-dashed border-r border-base-300 {newRowSubmitTried && !newRowPriceOk ? 'bg-error/15' : ''}">
                     <input
                       id="cell-{newRowIdx}-1"
                       type="text"
                       inputmode="numeric"
-                      placeholder="0"
+                      placeholder="필수"
                       value={newPrice}
                       oninput={(e) => {
                         const el = e.target as HTMLInputElement;
@@ -1147,11 +1146,10 @@
                         if (!el.value.trim()) { el.value = '0'; newPrice = '0'; }
                       }}
                       onkeydown={(e) => handleCellKeydown(e, newRowIdx, 1)}
-                      class="h-full w-full bg-transparent px-3 text-right text-sm outline-none placeholder:opacity-30
-                        {newRowSubmitTried && !newRowPriceOk ? 'ring-2 ring-inset ring-error' : ''}"
+                      class="h-full w-full bg-transparent px-3 text-right text-sm outline-none placeholder:opacity-30"
                     />
                   </td>
-                  <td class="h-9 p-0 border-b border-dashed border-r border-base-300">
+                  <td class="h-9 p-0 border-b border-dashed border-r border-base-300 {newRowSubmitTried && !newRowDateOk ? 'bg-error/15' : ''}">
                     <input
                       id="cell-{newRowIdx}-2"
                       type="text"
@@ -1167,8 +1165,7 @@
                       }}
                       onfocus={() => (activeRow = newRowIdx)}
                       onkeydown={(e) => handleCellKeydown(e, newRowIdx, 2)}
-                      class="h-full w-full bg-transparent px-3 text-center text-sm outline-none placeholder:opacity-30
-                        {newRowSubmitTried && !newRowDateOk ? 'ring-2 ring-inset ring-error' : ''}"
+                      class="h-full w-full bg-transparent px-3 text-center text-sm outline-none placeholder:opacity-30"
                     />
                   </td>
                   <td class="h-9 p-0 border-b border-dashed border-r border-base-300">
