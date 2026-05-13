@@ -52,7 +52,7 @@
 	const navItems = [
 		{ icon: 'lucide:building-2', label: '거래처 관리', path: '/clients', exact: true },
 		{ icon: 'lucide:users', label: '사용자 관리', path: '/users', exact: false },
-		{ icon: 'lucide:factory', label: '세탁공장 관리', path: '/factories', exact: false },
+		...(role === 'super_admin' ? [{ icon: 'lucide:factory', label: '세탁공장 관리', path: '/factories', exact: false }] : []),
 		{ icon: 'lucide:package', label: '상품 관리', path: '/products', exact: false },
 		{ icon: 'lucide:receipt', label: '청구서 관리', path: '/billing', exact: false },
 		{ icon: 'lucide:bar-chart-2', label: '입출고 · 통계', path: '/stats', exact: false },
@@ -100,6 +100,7 @@
 	>
 		<!-- 공장 셀렉터 -->
 		<div class="border-base-300 shrink-0 border-b px-3 py-3">
+			{#if role === 'super_admin'}
 			<button
 				class="btn btn-ghost w-full justify-start gap-2.5 rounded-xl px-3 py-2.5 text-left normal-case"
 				onclick={() => { factoryOpen = true; }}
@@ -113,6 +114,17 @@
 				</div>
 				<Icon icon="lucide:chevrons-up-down" class="text-base-content/50 h-4 w-4 shrink-0" />
 			</button>
+			{:else}
+			<div class="flex items-center gap-2.5 rounded-xl px-3 py-2.5">
+				<div class="bg-primary flex h-8 w-8 shrink-0 items-center justify-center rounded-lg">
+					<Icon icon="lucide:factory" class="text-primary-content h-4 w-4" />
+				</div>
+				<div class="min-w-0 flex-1">
+					<p class="text-base-content/50 mb-0.5 truncate text-[10px] font-bold uppercase leading-none tracking-wider">FACTORY</p>
+					<p class="text-base-content truncate text-sm font-bold leading-tight">{selectedFactory?.name ?? '—'}</p>
+				</div>
+			</div>
+			{/if}
 		</div>
 
 		<!-- 네비게이션 메뉴 -->

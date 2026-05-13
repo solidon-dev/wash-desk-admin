@@ -25,6 +25,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 export const actions: Actions = {
 	create: async ({ request, locals }) => {
+		if (locals.session?.role !== 'super_admin') return fail(403, { error: '권한이 없습니다.' });
 		const fd = await request.formData();
 		const name    = (fd.get('name')    as string)?.trim();
 		const address = (fd.get('address') as string)?.trim() || null;
@@ -36,6 +37,7 @@ export const actions: Actions = {
 	},
 
 	update: async ({ request, locals }) => {
+		if (locals.session?.role !== 'super_admin') return fail(403, { error: '권한이 없습니다.' });
 		const fd = await request.formData();
 		const id      = fd.get('id')      as string;
 		const name    = (fd.get('name')    as string)?.trim();
