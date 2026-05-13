@@ -5,8 +5,26 @@
 	import Icon from '@iconify/svelte';
 	import SearchBar from '$lib/components/SearchBar.svelte';
 	import { logout } from '$lib/api/auth';
+	import type { LayoutData } from './$types';
 
-	let { children } = $props();
+	type FactoryItem = { id: string; name: string };
+	type Props = { children: import('svelte').Snippet; data: LayoutData & { factories: FactoryItem[] } };
+	let { children, data }: Props = $props();
+
+	// 서버에서 받은 공장 목록
+	const factories = $derived(data.factories);
+	let selectedFactoryId = $state<string | null>(null);
+
+	// 첫 로드 시 첫 번째 공장 자동 선택
+	$effect(() => {
+		if (!selectedFactoryId && factories.length > 0) {
+			selectedFactoryId = factories[0].id;
+		}
+	});
+
+	const selectedFactory = $derived(
+		factories.find(f => f.id === selectedFactoryId) ?? factories[0] ?? null
+	);
 
 	onMount(() => {
 		const mq = window.matchMedia('(prefers-color-scheme: dark)');
@@ -24,7 +42,7 @@
 
 	afterNavigate(() => {
 		window.scrollTo({ top: 0 });
-		sidebarOpen = false; // 페이지 이동 시 모바일 사이드바 닫기
+		sidebarOpen = false;
 	});
 
 	const navItems = [
@@ -43,25 +61,11 @@
 		return pathname === nav.path || pathname.startsWith(nav.path + '/');
 	}
 
-	let factories = $state([
-		{ id: 'factory-001', name: '본사 세탁공장', isHidden: false },
-		{ id: 'factory-002', name: '부산 세탁공장', isHidden: false },
-		{ id: 'factory-003', name: '제주 세탁공장', isHidden: false },
-	]);
-	let selectedFactoryId = $state('factory-001');
 	const unreadMemoCount = 2;
 
 	let factoryOpen   = $state(false);
 	let sidebarOpen   = $state(false);
-
-	const selectedFactory = $derived(
-		factories.find(f => f.id === selectedFactoryId && !f.isHidden)
-			?? factories.find(f => !f.isHidden)
-			?? factories[0]
-	);
-
-	const currentNav = $derived(navItems.find(n => isActive(n)));
-
+	const currentNav  = $derived(navItems.find(n => isActive(n)));
 	let showLogoutModal = $state(false);
 
 	function confirmLogout() {
@@ -179,14 +183,14 @@
 				<div class="shrink-0 px-4 py-3">
 					<SearchBar
 						placeholder="공장 검색..."
-						items={factories.filter(f => !f.isHidden).map(f => ({ id: f.id, label: f.name }))}
+						items={factories.map(f => ({ id: f.id, label: f.name }))}
 						onselect={(id) => { if (id) { selectedFactoryId = id; factoryOpen = false; } }}
 					/>
 				</div>
 
 				<!-- 공장 리스트 (고정 높이 스크롤) -->
 				<ul class="flex-1 overflow-y-auto px-3 pb-3">
-					{#each factories.filter(f => !f.isHidden) as factory (factory.id)}
+					{#each factories as factory (factory.id)}
 						<li>
 							<button
 								type="button"

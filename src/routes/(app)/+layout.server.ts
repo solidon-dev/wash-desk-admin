@@ -15,8 +15,16 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 		redirect(302, '/?error=unauthorized');
 	}
 
+	// 공장 목록 (soft delete 제외) — 사이드바 셀렉터용
+	const { data: factories } = await locals.supabase
+		.from('factories')
+		.select('id, name')
+		.is('deleted_at', null)
+		.order('created_at', { ascending: true });
+
 	return {
 		user: locals.session.user,
-		role
+		role,
+		factories: factories ?? [],
 	};
 };
