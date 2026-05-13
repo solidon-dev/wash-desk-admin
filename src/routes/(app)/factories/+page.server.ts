@@ -48,6 +48,7 @@ export const actions: Actions = {
 	},
 
 	hide: async ({ request, locals }) => {
+		if (locals.session?.role !== 'super_admin') return fail(403, { error: '권한이 없습니다.' });
 		const fd = await request.formData();
 		const id = fd.get('id') as string;
 		if (!id) return fail(400, { error: 'id 누락' });
@@ -57,6 +58,7 @@ export const actions: Actions = {
 	},
 
 	restore: async ({ request, locals }) => {
+		if (locals.session?.role !== 'super_admin') return fail(403, { error: '권한이 없습니다.' });
 		const fd = await request.formData();
 		const id = fd.get('id') as string;
 		if (!id) return fail(400, { error: 'id 누락' });

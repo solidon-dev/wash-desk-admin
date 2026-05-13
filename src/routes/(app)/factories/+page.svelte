@@ -13,10 +13,12 @@
     phone: string | null; created_at: string; deleted_at: string | null;
   };
   type Props = {
-    data: PageData & { factories: Factory[]; total: number; page: number; PAGE_SIZE: number; showHidden: boolean; q: string };
+    data: PageData & { factories: Factory[]; total: number; page: number; PAGE_SIZE: number; showHidden: boolean; q: string; role: string };
     form: { success?: boolean; error?: string } | null;
   };
   let { data, form }: Props = $props();
+
+  const isSuperAdmin = $derived(data.role === 'super_admin');
 
   const totalPages = $derived(Math.max(1, Math.ceil(data.total / data.PAGE_SIZE)));
 
@@ -224,7 +226,7 @@
         </div>
         <div class="modal-action mt-5 pt-4 border-t border-base-200 shrink-0 flex justify-between">
           <div>
-            {#if editingFactory}
+            {#if editingFactory && isSuperAdmin}
               {#if editingFactory.deleted_at !== null}
                 <button type="submit" form="form-factory-activate" class="btn btn-sm btn-success gap-1.5 font-bold">
                   <Icon icon="lucide:circle-check" class="w-4 h-4" />활성화
@@ -249,8 +251,8 @@
   </dialog>
 {/if}
 
-<!-- 비활성화 / 활성화 전용 form (모달 바깥, form 속성으로 연결) -->
-{#if editingFactory}
+<!-- 비활성화 / 활성화 전용 form (모달 바깥, form 속성으로 연결) — super_admin 전용 -->
+{#if editingFactory && isSuperAdmin}
   <form
     id="form-factory-deactivate"
     method="POST"
