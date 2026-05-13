@@ -96,25 +96,15 @@
   <h2 class="text-2xl font-extrabold text-base-content mb-5">세탁공장 관리</h2>
 
   <div class="flex flex-wrap items-center gap-3 mb-5">
-    <div class="flex items-center gap-1.5">
-      <SearchBar
-        placeholder="공장명 검색..."
-        items={suggestions}
-        onselect={onSearchSelect}
-        oninput={onSearchInput}
-        onenter={(q) => navTo({ q })}
-        initialValue={data.q}
-        class="w-60 sm:w-72"
-      />
-      <button
-        type="button"
-        onclick={() => navTo({ q: '' })}
-        class="btn btn-sm btn-ghost text-base-content/50 hover:text-base-content gap-1.5 whitespace-nowrap"
-      >
-        <Icon icon="lucide:rotate-ccw" class="w-3.5 h-3.5" />
-        검색 초기화
-      </button>
-    </div>
+    <SearchBar
+      placeholder="공장명 검색..."
+      items={suggestions}
+      onselect={onSearchSelect}
+      oninput={onSearchInput}
+      onenter={(q) => navTo({ q })}
+      initialValue={data.q}
+      class="w-60 sm:w-72"
+    />
 
     <label class="flex items-center gap-2 cursor-pointer select-none text-sm text-base-content/60 font-semibold">
       <input type="checkbox" checked={data.showHidden}

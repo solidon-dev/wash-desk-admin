@@ -7,12 +7,11 @@
     onselect: (id: string) => void;
     oninput?: (value: string) => void;
     onenter?: (value: string) => void;
-    onclear?: () => void;
     initialValue?: string;
     class?: string;
   }
 
-  let { placeholder = '검색...', items, onselect, oninput, onenter, onclear, initialValue = '', class: className = '' }: Props = $props();
+  let { placeholder = '검색...', items, onselect, oninput, onenter, initialValue = '', class: className = '' }: Props = $props();
 
   let query     = $state('');
   let activeIdx = $state(-1);
@@ -78,52 +77,62 @@
     activeIdx = -1;
     Promise.resolve().then(() => { justConfirmed = false; });
     inputEl?.focus();
-    onclear?.();
+    onenter?.('');
   }
 
   export function reset() { clearQuery(); }
 </script>
 
-<div class="relative {className}">
-  <label class="input input-bordered input-sm flex items-center gap-2 bg-base-100 w-full">
-    <Icon icon="lucide:search" class="w-4 h-4 text-base-content/40 shrink-0" />
-    <input
-      bind:this={inputEl}
-      type="text"
-      {placeholder}
-      bind:value={query}
-      oninput={() => oninput?.(query)}
-      onkeydown={handleKeydown}
-      onblur={handleBlur}
-      onfocus={() => { if (!justConfirmed && suggestions.length > 0) open = true; }}
-      autocomplete="off"
-      class="grow text-sm bg-transparent outline-none"
-    />
-  </label>
+<div class="flex items-center gap-1.5 flex-nowrap">
+  <div class="relative {className}">
+    <label class="input input-bordered input-sm flex items-center gap-2 bg-base-100 w-full">
+      <Icon icon="lucide:search" class="w-4 h-4 text-base-content/40 shrink-0" />
+      <input
+        bind:this={inputEl}
+        type="text"
+        {placeholder}
+        bind:value={query}
+        oninput={() => oninput?.(query)}
+        onkeydown={handleKeydown}
+        onblur={handleBlur}
+        onfocus={() => { if (!justConfirmed && suggestions.length > 0) open = true; }}
+        autocomplete="off"
+        class="grow text-sm bg-transparent outline-none"
+      />
+    </label>
 
-  {#if open && suggestions.length > 0}
-    <ul
-      class="absolute top-full left-0 right-0 mt-1 bg-base-100 border border-base-300 rounded-xl shadow-lg z-50 overflow-hidden"
-      role="listbox"
-    >
-      {#each suggestions as item, i (item.id)}
-        <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <li
-          role="option"
-          aria-selected={i === activeIdx}
-          onmousedown={(e) => e.preventDefault()}
-          onclick={() => confirmItem(item.id)}
-          onmouseenter={() => (activeIdx = i)}
-          class="flex items-center gap-2 px-3 py-2 cursor-pointer text-sm transition-colors
-            {i === activeIdx ? 'bg-primary/10 text-primary' : 'hover:bg-base-200'}"
-        >
-          <Icon icon="lucide:search" class="w-3.5 h-3.5 shrink-0 text-base-content/30" />
-          <span class="font-semibold truncate shrink-0 max-w-[55%]">{item.label}</span>
-          {#if item.sub}
-            <span class="text-base-content/40 text-xs truncate min-w-0">{item.sub}</span>
-          {/if}
-        </li>
-      {/each}
-    </ul>
-  {/if}
+    {#if open && suggestions.length > 0}
+      <ul
+        class="absolute top-full left-0 right-0 mt-1 bg-base-100 border border-base-300 rounded-xl shadow-lg z-50 overflow-hidden"
+        role="listbox"
+      >
+        {#each suggestions as item, i (item.id)}
+          <!-- svelte-ignore a11y_click_events_have_key_events -->
+          <li
+            role="option"
+            aria-selected={i === activeIdx}
+            onmousedown={(e) => e.preventDefault()}
+            onclick={() => confirmItem(item.id)}
+            onmouseenter={() => (activeIdx = i)}
+            class="flex items-center gap-2 px-3 py-2 cursor-pointer text-sm transition-colors
+              {i === activeIdx ? 'bg-primary/10 text-primary' : 'hover:bg-base-200'}"
+          >
+            <Icon icon="lucide:search" class="w-3.5 h-3.5 shrink-0 text-base-content/30" />
+            <span class="font-semibold truncate shrink-0 max-w-[55%]">{item.label}</span>
+            {#if item.sub}
+              <span class="text-base-content/40 text-xs truncate min-w-0">{item.sub}</span>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  </div>
+  <button
+    type="button"
+    onclick={clearQuery}
+    class="btn btn-sm btn-ghost text-base-content/50 hover:text-base-content gap-1.5 whitespace-nowrap shrink-0"
+  >
+    <Icon icon="lucide:rotate-ccw" class="w-3.5 h-3.5" />
+    검색 초기화
+  </button>
 </div>
