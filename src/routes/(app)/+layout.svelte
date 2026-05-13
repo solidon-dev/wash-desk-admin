@@ -8,8 +8,12 @@
 	import type { LayoutData } from './$types';
 
 	type FactoryItem = { id: string; name: string };
-	type Props = { children: import('svelte').Snippet; data: LayoutData & { factories: FactoryItem[] } };
+	type Props = { children: import('svelte').Snippet; data: LayoutData & { factories: FactoryItem[]; role: string; user: { email?: string } | null } };
 	let { children, data }: Props = $props();
+
+	const role = $derived(data.role as 'super_admin' | 'factory_admin');
+	const roleLabel = $derived(role === 'super_admin' ? '최고관리자' : '공장관리자');
+	const roleBadgeClass = $derived(role === 'super_admin' ? 'badge-warning' : 'badge-primary');
 
 	// 서버에서 받은 공장 목록
 	const factories = $derived(data.factories);
@@ -133,6 +137,19 @@
 				{/each}
 			</ul>
 		</nav>
+
+		<!-- 접속자 정보 -->
+		<div class="shrink-0 border-t border-base-300 px-3 py-3">
+			<div class="flex items-center gap-2.5 px-1">
+				<div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-base-content/10">
+					<Icon icon="lucide:user" class="h-4 w-4 text-base-content/50" />
+				</div>
+				<div class="min-w-0 flex-1">
+					<p class="truncate text-xs font-semibold text-base-content/70 leading-tight">{data.user?.email?.replace('@mail.com', '') ?? '—'}</p>
+					<span class="badge badge-xs font-bold mt-0.5 {roleBadgeClass}">{roleLabel}</span>
+				</div>
+			</div>
+		</div>
 
 		<!-- 로그아웃 버튼 -->
 		<div class="shrink-0 border-t border-base-300 px-2 py-2">
