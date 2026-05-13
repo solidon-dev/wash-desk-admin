@@ -356,8 +356,9 @@
     delete priceDrafts[item.id];
     if (!selectedClientId) return;
     const price = parseInt(draft.replace(/[^0-9]/g, '') || '0', 10);
-    const date  = getPriceDate(item.id) || todayYMD();
     const prevPrice = getPrice(item.id);
+    if (price === prevPrice) return; // 변화 없으면 서버 요청 안 함
+    const date  = getPriceDate(item.id) || todayYMD();
     patchLocalPrice(item.id, { unit_price: price }, selectedClientId);
     submitBg('upsertPrice', {
       item_id: item.id, client_id: selectedClientId,
@@ -370,12 +371,11 @@
     if (draft === undefined) return;
     delete dateDrafts[item.id];
     if (!selectedClientId) return;
-    // 빈칸이면 오늘 날짜로 저장, 유효하지 않은 형식이면 무시
     const raw = draft.trim();
     if (raw && !isValidDate(raw)) return;
     const val = raw || todayYMD();
     const prevDate = getPriceDate(item.id);
-    // 기존 날짜 이하이면 저장 거부
+    if (val === prevDate) return; // 변화 없으면 서버 요청 안 함
     if (!isDateAfterMin(val, prevDate)) {
       showToast(`적용일은 현재 날짜(${prevDate})보다 이후여야 합니다.`);
       return;
