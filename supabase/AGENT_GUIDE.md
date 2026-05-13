@@ -1,20 +1,74 @@
 # Supabase 작업 에이전트 가이드
 
 이 문서는 AI 에이전트가 이 프로젝트의 Supabase DB 작업을 처음부터 끝까지 수행할 수 있도록 작성된 가이드입니다.
-작업 시작 전 사용자에게 아래 **"필요한 정보"** 항목만 받으면 됩니다.
 
 ---
 
-## 필요한 정보 (사용자에게 요청할 것)
+## ⚡ 에이전트 시작 프로토콜 (항상 맨 먼저 실행)
 
-| 항목 | 설명 | 예시 형식 |
-|------|------|-----------|
-| WSL sudo 패스워드 | WSL Ubuntu의 sudo 비밀번호 | `your_password` |
-| Supabase DB 패스워드 | Supabase 프로젝트 DB 비밀번호 | `your_db_password` |
-| Supabase Access Token | 대시보드에서 발급한 Personal Access Token | `sbp_xxxxxxxxxxxx` |
-| Supabase Project Ref | 프로젝트 고유 ID (URL에서 확인 가능) | `jmyxnyrhymqyqzyvknox` |
+작업 시작 전 아래 순서를 반드시 따른다.
 
-> **Access Token 발급 방법**: https://supabase.com/dashboard/account/tokens → "Generate new token"
+### 1단계. SECRETS.md 존재 여부 확인
+
+`supabase/SECRETS.md` 파일이 존재하는지 확인한다.
+
+- **파일이 있으면** → 파일을 읽어 시크릿 정보를 로드하고 바로 작업을 시작한다.
+- **파일이 없으면** → 2단계로 이동한다.
+
+### 2단계. 사용자에게 정보 요청 (SECRETS.md 없을 때만)
+
+아래 항목을 사용자에게 요청한다. 한꺼번에 달라고 한다.
+
+| 항목 | 설명 |
+|------|------|
+| WSL sudo 패스워드 | WSL Ubuntu의 sudo 비밀번호 |
+| Supabase DB 패스워드 | Supabase 프로젝트 DB 비밀번호 |
+| Supabase Access Token | 대시보드 발급 토큰 (`sbp_`로 시작) |
+| Supabase Anon Key | 대시보드 → Settings → API → anon public |
+
+> Access Token 발급: https://supabase.com/dashboard/account/tokens → "Generate new token"
+
+### 3단계. SECRETS.md 생성
+
+정보를 받으면 즉시 `supabase/SECRETS.md` 를 아래 형식으로 생성한다.
+이 파일은 `.gitignore`에 등록되어 있으므로 깃헙에 올라가지 않는다.
+
+```markdown
+# 프로젝트 시크릿 정보
+
+> ⚠️ 이 파일은 .gitignore에 등록되어 있습니다. 절대 커밋/푸시하지 마세요.
+
+## WSL
+
+| 항목 | 값 |
+|------|-----|
+| sudo 패스워드 | 입력값 |
+| WSL 유저 | winco |
+
+## Supabase
+
+| 항목 | 값 |
+|------|-----|
+| Project Ref | jmyxnyrhymqyqzyvknox |
+| DB 패스워드 | 입력값 |
+| Anon Key | 입력값 |
+| Access Token | 입력값 |
+| DB Host (Pooler) | aws-1-ap-northeast-2.pooler.supabase.com |
+| DB Host (Direct) | db.jmyxnyrhymqyqzyvknox.supabase.co (IPv6 전용) |
+| DB Port | 5432 |
+| DB Name | postgres |
+| DB User (Pooler) | postgres.jmyxnyrhymqyqzyvknox |
+| Dashboard URL | https://supabase.com/dashboard/project/jmyxnyrhymqyqzyvknox |
+
+## 프로젝트 경로
+
+| 항목 | 값 |
+|------|-----|
+| Windows 경로 | C:\Users\winco\OneDrive\Desktop\wash-desk-admin |
+| WSL 경로 | /mnt/c/Users/winco/OneDrive/Desktop/wash-desk-admin |
+```
+
+파일 생성 후 바로 작업을 시작한다.
 
 ---
 
