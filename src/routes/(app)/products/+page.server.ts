@@ -6,12 +6,12 @@ function getFactoryId(locals: App.Locals): string | null {
 	return (locals.session?.factory_id ?? null) as string | null;
 }
 
-function guardWorker(role: string | undefined) {
+function guardWorker(role: string | null | undefined) {
 	if (!role || role === 'worker') return fail(403, { error: '권한이 없습니다.' });
 	return null;
 }
 
-function guardFactory(role: string, myFactoryId: string | null, targetFactoryId: string) {
+function guardFactory(role: string, myFactoryId: string | null | undefined, targetFactoryId: string) {
 	if (role === 'factory_admin' && myFactoryId !== targetFactoryId)
 		return fail(403, { error: '본인 공장 데이터만 수정할 수 있습니다.' });
 	return null;
@@ -68,8 +68,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		.order('created_at', { ascending: true });
 
 	// item_prices for this client
-	const { data: itemPrices } = await locals.supabase
-		.from('item_prices')
+	const { data: itemPrices } = await (locals.supabase.from('item_prices') as any)
 		.select('id, item_id, unit_price, effective_from')
 		.eq('client_id', selectedClientId as string);
 
@@ -77,7 +76,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		clients:          clients   ?? [],
 		categories:       categories ?? [],
 		items:            items      ?? [],
-		itemPrices:       (itemPrices ?? []).map(p => ({ ...p, client_id: selectedClientId })),
+		itemPrices:       (itemPrices ?? []).map((p: Record<string, unknown>) => ({ ...p, client_id: selectedClientId })),
 		selectedClientId,
 	};
 };
@@ -88,7 +87,7 @@ export const actions: Actions = {
 	// ── 카테고리 생성/수정
 	upsertCategory: async ({ request, locals }) => {
 		const myRole      = locals.session?.role;
-		const myFactoryId = getFactoryId(locals);
+		const myFactoryId: string | null = getFactoryId(locals);
 		const g = guardWorker(myRole); if (g) return g;
 
 		const form       = await request.formData();
@@ -132,7 +131,7 @@ export const actions: Actions = {
 	// ── 카테고리 삭제
 	deleteCategory: async ({ request, locals }) => {
 		const myRole      = locals.session?.role;
-		const myFactoryId = getFactoryId(locals);
+		const myFactoryId: string | null = getFactoryId(locals);
 		const g = guardWorker(myRole); if (g) return g;
 
 		const form = await request.formData();
@@ -152,7 +151,7 @@ export const actions: Actions = {
 	// ── 카테고리 순서 변경
 	reorderCategories: async ({ request, locals }) => {
 		const myRole      = locals.session?.role;
-		const myFactoryId = getFactoryId(locals);
+		const myFactoryId: string | null = getFactoryId(locals);
 		const g = guardWorker(myRole); if (g) return g;
 
 		const form = await request.formData();
@@ -180,7 +179,7 @@ export const actions: Actions = {
 	// ── 품목 생성/수정
 	upsertItem: async ({ request, locals }) => {
 		const myRole      = locals.session?.role;
-		const myFactoryId = getFactoryId(locals);
+		const myFactoryId: string | null = getFactoryId(locals);
 		const g = guardWorker(myRole); if (g) return g;
 
 		const form        = await request.formData();
@@ -229,7 +228,7 @@ export const actions: Actions = {
 	// ── 품목 삭제
 	deleteItem: async ({ request, locals }) => {
 		const myRole      = locals.session?.role;
-		const myFactoryId = getFactoryId(locals);
+		const myFactoryId: string | null = getFactoryId(locals);
 		const g = guardWorker(myRole); if (g) return g;
 
 		const form = await request.formData();
@@ -249,7 +248,7 @@ export const actions: Actions = {
 	// ── 품목 순서 변경
 	reorderItems: async ({ request, locals }) => {
 		const myRole      = locals.session?.role;
-		const myFactoryId = getFactoryId(locals);
+		const myFactoryId: string | null = getFactoryId(locals);
 		const g = guardWorker(myRole); if (g) return g;
 
 		const form = await request.formData();
@@ -277,7 +276,7 @@ export const actions: Actions = {
 	// ── 거래처별 단가 upsert
 	upsertPrice: async ({ request, locals }) => {
 		const myRole      = locals.session?.role;
-		const myFactoryId = getFactoryId(locals);
+		const myFactoryId: string | null = getFactoryId(locals);
 		const g = guardWorker(myRole); if (g) return g;
 
 		const form           = await request.formData();
@@ -314,7 +313,7 @@ export const actions: Actions = {
 	// ── 단가 삭제
 	deletePrice: async ({ request, locals }) => {
 		const myRole      = locals.session?.role;
-		const myFactoryId = getFactoryId(locals);
+		const myFactoryId: string | null = getFactoryId(locals);
 		const g = guardWorker(myRole); if (g) return g;
 
 		const form = await request.formData();

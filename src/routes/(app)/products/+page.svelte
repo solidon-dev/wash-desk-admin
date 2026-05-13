@@ -2,13 +2,12 @@
   import Icon from '@iconify/svelte';
   import { tick } from 'svelte';
   import { flip } from 'svelte/animate';
-  import { goto, invalidateAll } from '$app/navigation';
-  import { page } from '$app/stores';
+  import { invalidateAll } from '$app/navigation';
   import SearchBar from '$lib/components/SearchBar.svelte';
-  import type { PageData } from './$types';
+  import type { PageProps, PageData } from './$types';
 
   // ── 서버 데이터 ───────────────────────────────────────────────
-  let { data }: { data: PageData } = $props();
+  let { data }: PageProps = $props();
 
   type Item = PageData['items'][number];
 
@@ -22,7 +21,8 @@
   function selectClient(id: string) {
     const url = new URL(window.location.href);
     url.searchParams.set('clientId', id);
-    goto(url.toString(), { replaceState: true });
+    history.replaceState(history.state, '', url.toString());
+    invalidateAll();
   }
 
   // 거래처 선택 모달
@@ -141,10 +141,10 @@
 
   // 단가/날짜 디스플레이 헬퍼
   function getPrice(itemId: string): number {
-    return data.itemPrices.find(p => p.item_id === itemId)?.unit_price ?? 0;
+    return (data.itemPrices as Array<{ item_id: string; unit_price: number; effective_from: string; id: string; client_id: string }>).find(p => p.item_id === itemId)?.unit_price ?? 0;
   }
   function getPriceDate(itemId: string): string {
-    return data.itemPrices.find(p => p.item_id === itemId)?.effective_from ?? '';
+    return (data.itemPrices as Array<{ item_id: string; unit_price: number; effective_from: string; id: string; client_id: string }>).find(p => p.item_id === itemId)?.effective_from ?? '';
   }
 
   function getDisplayName(item: Item)  { return nameDrafts[item.id]  ?? item.name_ko; }
@@ -708,12 +708,11 @@
                       class="w-7 text-center text-xs rounded border border-primary bg-base-100 text-base-content outline-none py-0.5"
                     />
                   {:else}
-                    <span
-                      class="text-[10px] font-bold opacity-40 cursor-pointer select-none w-7 text-center hover:opacity-80"
+                    <button
+                      type="button"
+                      class="text-[10px] font-bold opacity-40 cursor-pointer select-none w-7 text-center hover:opacity-80 bg-transparent border-none p-0"
                       onclick={() => startCatOrderEdit(ci)}
-                      role="button"
-                      tabindex="-1"
-                    >{ci + 1}</span>
+                    >{ci + 1}</button>
                   {/if}
                 </div>
                 <!-- 이름 버튼 -->
@@ -830,12 +829,11 @@
                         class="w-8 text-center text-xs rounded border border-primary bg-base-100 outline-none py-0.5"
                       />
                     {:else}
-                      <span
-                        class="text-[11px] opacity-40 cursor-pointer hover:opacity-80 select-none"
+                      <button
+                        type="button"
+                        class="text-[11px] opacity-40 cursor-pointer hover:opacity-80 select-none bg-transparent border-none p-0"
                         onclick={() => startOrderEdit(i)}
-                        role="button"
-                        tabindex="-1"
-                      >{i + 1}</span>
+                      >{i + 1}</button>
                     {/if}
                   </td>
 
