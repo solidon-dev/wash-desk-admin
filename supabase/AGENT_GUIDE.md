@@ -369,6 +369,80 @@ const { data } = await supabase.rpc('process_inventory_out', { p_inventory_id: '
 
 ---
 
+## Step 12. API 파일 컨벤션 (`src/lib/api/`)
+
+이 프로젝트의 Supabase 쿼리/돌연산 로직은 모두 `src/lib/api/` 하에 둥니다.
+
+**폴더 구조:**
+```
+src/lib/api/
+├── auth.ts          # Supabase Auth 세션/로그인/로그아웃 (테이블 아님, 예외)
+├── profiles.ts      # profiles 테이블 CRUD
+├── clients.ts       # clients 테이블 CRUD
+├── invoices.ts      # invoices 테이블 CRUD
+├── ...              # 테이블명과 1:1 매핑
+└── rpc.ts           # RPC 함수 모음 (커지면 주제별로 분리)
+```
+
+**파일 생성 규칙:**
+
+| 상황 | 파일명 |
+|------|--------|
+| 테이블 CRUD | 테이블명 그대로 (`profiles.ts`, `clients.ts` 등) |
+| Supabase Auth | `auth.ts` (고정) |
+| RPC 함수 | `rpc.ts` 에 모으다가 커지면 주제별 분리 |
+
+**`auth.ts` 기본 구조 (참고용):**
+```ts
+import { supabase } from '$lib/supabase/client';
+import type { Session, User } from '@supabase/supabase-js';
+
+export let session = $state<Session | null>(null);
+export let user = $state<User | null>(null);
+export let authReady = $state(false);
+
+export function initAuth() { ... }
+export async function login(username: string, password: string) {
+  // username + '@mail.com' 으로 이메일 조합
+  const email = `${username}@mail.com`;
+  return supabase.auth.signInWithPassword({ email, password });
+}
+export async function logout() { ... }
+```
+
+**테이블 CRUD 파일 기본 구조 (예: `profiles.ts`):**
+```ts
+import { supabase } from '$lib/supabase/client';
+import type { Profile, ProfileInsert, ProfileUpdate } from '$lib/supabase/types';
+
+export async function getProfile(id: string) {
+  return supabase.from('profiles').select('*').eq('id', id).single();
+}
+
+export async function updateProfile(id: string, data: ProfileUpdate) {
+  return supabase.from('profiles').update(data).eq('id', id);
+}
+```
+
+**`rpc.ts` 기본 구조:**
+```ts
+import { supabase } from '$lib/supabase/client';
+import type { ProcessInventoryOutArgs } from '$lib/supabase/types';
+
+export async function processInventoryOut(args: ProcessInventoryOutArgs) {
+  return supabase.rpc('process_inventory_out', args);
+}
+```
+
+**임포트 방식:**
+```ts
+import { login, logout, session } from '$lib/api/auth';
+import { getProfile, updateProfile } from '$lib/api/profiles';
+import { processInventoryOut } from '$lib/api/rpc';
+```
+
+---
+
 ## 기타 유용한 명령어
 
 ### 마이그레이션 목록 확인

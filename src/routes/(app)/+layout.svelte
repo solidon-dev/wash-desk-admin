@@ -4,7 +4,7 @@
 	import { onMount } from 'svelte';
 	import Icon from '@iconify/svelte';
 	import SearchBar from '$lib/components/SearchBar.svelte';
-	import { session, authReady, logout } from '$lib/stores/auth';
+	import { session, authReady, logout } from '$lib/api/auth';
 
 	let { children } = $props();
 

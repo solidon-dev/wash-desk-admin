@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import Icon from '@iconify/svelte';
-	import { login, session, authReady } from '$lib/stores/auth';
+	import { login, session, authReady } from '$lib/api/auth';
 
 	let username = $state('');
 	let password = $state('');
