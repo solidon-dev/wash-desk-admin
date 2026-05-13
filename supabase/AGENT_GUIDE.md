@@ -52,6 +52,7 @@
 | Project Ref | jmyxnyrhymqyqzyvknox |
 | DB 패스워드 | 입력값 |
 | Anon Key | 입력값 |
+| Service Role Key | 입력값 |
 | Access Token | 입력값 |
 | DB Host (Pooler) | aws-1-ap-northeast-2.pooler.supabase.com |
 | DB Host (Direct) | db.jmyxnyrhymqyqzyvknox.supabase.co (IPv6 전용) |
@@ -335,9 +336,11 @@ src/lib/supabase/
 ```
 PUBLIC_SUPABASE_URL=https://jmyxnyrhymqyqzyvknox.supabase.co
 PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+PRIVATE_SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ```
 
-> Anon Key는 Supabase 대시보드 → Settings → API → `anon public` 키에서 확인
+> `PRIVATE_` 접두사가 붙은 변수는 SvelteKit 서버에서만 접근 가능. 클라이언트에 절대 노출되지 않음.
+> Service Role Key 는 Supabase 대시보드 → Settings → API → `service_role secret` 에서 확인.
 
 **`client.ts` 내용:**
 ```
@@ -383,6 +386,42 @@ src/lib/api/
 ├── ...              # 테이블명과 1:1 매핑
 └── rpc.ts           # RPC 함수 모음 (커지면 주제별로 분리)
 ```
+
+**서버 전용 Admin API 구조:**
+
+유저 생성/밴/삭제 등 `service_role` 이 필요한 작업은 반드시 서버에서만 처리한다.
+
+```
+src/routes/(app)/users/
+└── +page.server.ts   # form actions — createUser, updateUser, banUser, unbanUser
+```
+
+서버 액션 내부에서 Admin 클라이언트를 이렇게 초기화한다:
+```ts
+import { PRIVATE_SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
+import { PUBLIC_SUPABASE_URL } from '$env/static/public';
+import { createClient } from '@supabase/supabase-js';
+
+const adminClient = createClient(PUBLIC_SUPABASE_URL, PRIVATE_SUPABASE_SERVICE_ROLE_KEY, {
+  auth: { autoRefreshToken: false, persistSession: false }
+});
+
+// 유저 생성
+await adminClient.auth.admin.createUser({
+  email: `${username}@mail.com`,
+  password,
+  email_confirm: true,
+  user_metadata: { full_name: name }
+});
+
+// 밴 (876600h = 100년)
+await adminClient.auth.admin.updateUser(userId, { ban_duration: '876600h' });
+
+// 밴 해제
+await adminClient.auth.admin.updateUser(userId, { ban_duration: 'none' });
+```
+
+> `adminClient` 는 절대 `src/lib/supabase/client.ts` 에 넣지 않는다. 서버 파일(`+page.server.ts`, `+server.ts`) 안에서만 초기화해서 사용한다.
 
 **파일 생성 규칙:**
 
