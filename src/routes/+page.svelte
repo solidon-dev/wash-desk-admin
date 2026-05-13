@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import Icon from '@iconify/svelte';
+	import { login, session, authReady } from '$lib/stores/auth';
 
 	let username = $state('');
 	let password = $state('');
@@ -15,23 +16,25 @@
 			document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
 		apply(mq.matches);
 		mq.addEventListener('change', (e) => apply(e.matches));
+	});
 
-		const token = localStorage.getItem('auth_token');
-		if (token) goto('/clients');
+	// 이미 로그인된 경우 리다이렉트
+	$effect(() => {
+		if (authReady && session) goto('/clients');
 	});
 
 	async function handleLogin(e: Event) {
 		e.preventDefault();
 		errorMsg = '';
 		isLoading = true;
-		await new Promise((r) => setTimeout(r, 450));
 
-		if (username === 'admin' && password === 'admin1234') {
-			localStorage.setItem('auth_token', 'dummy-token');
-			goto('/clients');
-		} else {
+		const error = await login(username.trim(), password);
+
+		if (error) {
 			errorMsg = '아이디 또는 비밀번호가 올바르지 않습니다.';
 			isLoading = false;
+		} else {
+			goto('/clients');
 		}
 	}
 </script>

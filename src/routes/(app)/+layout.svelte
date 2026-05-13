@@ -4,23 +4,28 @@
 	import { onMount } from 'svelte';
 	import Icon from '@iconify/svelte';
 	import SearchBar from '$lib/components/SearchBar.svelte';
+	import { session, authReady, logout } from '$lib/stores/auth';
 
 	let { children } = $props();
 
 	onMount(() => {
-		// 인증 체크
-		const token = localStorage.getItem('auth_token');
-		if (!token) {
-			goto('/');
-			return;
-		}
-
 		const mq = window.matchMedia('(prefers-color-scheme: dark)');
 		const apply = (dark: boolean) =>
 			document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
 		apply(mq.matches);
 		mq.addEventListener('change', e => apply(e.matches));
 	});
+
+	// 세션 없으면 로그인 페이지로
+	$effect(() => {
+		if (authReady && !session) goto('/');
+	});
+
+	async function handleLogout() {
+		showLogoutModal = false;
+		await logout();
+		goto('/');
+	}
 
 	afterNavigate(() => {
 		window.scrollTo({ top: 0 });
@@ -65,9 +70,7 @@
 	let showLogoutModal = $state(false);
 
 	function confirmLogout() {
-		showLogoutModal = false;
-		localStorage.removeItem('auth_token');
-		goto('/');
+		handleLogout();
 	}
 </script>
 
