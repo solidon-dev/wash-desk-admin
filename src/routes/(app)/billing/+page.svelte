@@ -120,14 +120,28 @@
 			{ laundryItemId: 'item-016', itemName: '주방앞치마',   category: 'uniform', quantity: 12  },
 		], driverId: 'driver-002', shippedAt: '2026-05-11T10:00:00', createdAt: '2026-05-11T10:00:00' },
 		{ id: 'ship-015', clientId: 'client-001', items: [
-			{ laundryItemId: 'item-001', itemName: '대형타올',     category: 'towel',   quantity: 130 },
-			{ laundryItemId: 'item-012', itemName: '중형타올',     category: 'towel',   quantity: 75  },
-			{ laundryItemId: 'item-019', itemName: '발매트',       category: 'towel',   quantity: 58  },
-			{ laundryItemId: 'item-002', itemName: '싱글시트',     category: 'sheet',   quantity: 72  },
-			{ laundryItemId: 'item-014', itemName: '베개커버',     category: 'sheet',   quantity: 115 },
-			{ laundryItemId: 'item-018', itemName: '매트리스커버', category: 'sheet',   quantity: 20  },
-			{ laundryItemId: 'item-020', itemName: '조리복',       category: 'uniform', quantity: 22  },
+			{ laundryItemId: 'item-001', itemName: '대형타올',     category: 'towel',     quantity: 130 },
+			{ laundryItemId: 'item-012', itemName: '중형타올',     category: 'towel',     quantity: 75  },
+			{ laundryItemId: 'item-019', itemName: '발매트',       category: 'towel',     quantity: 58  },
+			{ laundryItemId: 'item-002', itemName: '싱글시트',     category: 'sheet',     quantity: 72  },
+			{ laundryItemId: 'item-014', itemName: '베개커버',     category: 'sheet',     quantity: 115 },
+			{ laundryItemId: 'item-018', itemName: '매트리스커버', category: 'sheet',     quantity: 20  },
+			{ laundryItemId: 'item-020', itemName: '조리복',       category: 'uniform',   quantity: 22  },
 		], driverId: 'driver-001', shippedAt: '2026-05-13T09:00:00', createdAt: '2026-05-13T09:00:00' },
+		{ id: 'ship-016', clientId: 'client-001', items: [
+			{ laundryItemId: 'item-c1a', itemName: '카테고1 품목A', category: 'category1',  quantity: 30  },
+			{ laundryItemId: 'item-c1b', itemName: '카테고1 품목B', category: 'category1',  quantity: 45  },
+			{ laundryItemId: 'item-c2a', itemName: '카테고2 품목A', category: 'category2',  quantity: 20  },
+			{ laundryItemId: 'item-c2b', itemName: '카테고2 품목B', category: 'category2',  quantity: 18  },
+			{ laundryItemId: 'item-c3a', itemName: '카테고3 품목A', category: 'category3',  quantity: 15  },
+			{ laundryItemId: 'item-c4a', itemName: '카테고4 품목A', category: 'category4',  quantity: 10  },
+			{ laundryItemId: 'item-c5a', itemName: '카테고5 품목A', category: 'category5',  quantity: 8   },
+			{ laundryItemId: 'item-c6a', itemName: '카테고6 품목A', category: 'category6',  quantity: 25  },
+			{ laundryItemId: 'item-c7a', itemName: '카테고7 품목A', category: 'category7',  quantity: 12  },
+			{ laundryItemId: 'item-c8a', itemName: '카테고8 품목A', category: 'category8',  quantity: 9   },
+			{ laundryItemId: 'item-c9a', itemName: '카테고9 품목A', category: 'category9',  quantity: 7   },
+			{ laundryItemId: 'item-c10', itemName: '카테고10 품목A', category: 'category10', quantity: 5   },
+		], driverId: 'driver-001', shippedAt: '2026-05-01T09:00:00', createdAt: '2026-05-01T09:00:00' },
 		// client-002 (오션뷰펜션)
 		{ id: 'ship-101', clientId: 'client-002', items: [{ laundryItemId: 'item-004', itemName: '소형타올', category: 'towel', quantity: 45 }], driverId: 'driver-001', shippedAt: '2026-04-15T14:00:00', createdAt: '2026-04-15T14:00:00' },
 		{ id: 'ship-102', clientId: 'client-002', items: [{ laundryItemId: 'item-004', itemName: '소형타올', category: 'towel', quantity: 60 }, { laundryItemId: 'item-007', itemName: '퀘시트', category: 'sheet', quantity: 20 }], driverId: 'driver-001', shippedAt: '2026-04-21T13:00:00', createdAt: '2026-04-21T13:00:00' },
@@ -1431,23 +1445,23 @@
 
 				<!-- 카테고리별 소계 -->
 				{#if invoiceLines.length > 0}
-					<div class="card bg-base-100 shadow-sm p-4 space-y-2 shrink-0">
-						<p class="text-[10px] font-bold uppercase tracking-widest text-base-content/40">카테고리별 소계</p>
-						{#each (['towel', 'sheet', 'uniform'] as const) as cat (cat)}
-							{@const catData = invoiceByCategory[cat]}
-							{#if catData}
+					<div class="card bg-base-100 shadow-sm flex flex-col flex-1 min-h-0 overflow-hidden">
+						<p class="shrink-0 border-b border-base-200 px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-base-content/40">카테고리별 소계</p>
+						<div class="flex-1 overflow-y-auto p-4 space-y-2">
+							{#each Object.keys(invoiceByCategory) as cat (cat)}
+								{@const catData = invoiceByCategory[cat]}
 								<div class="flex items-center justify-between">
 									<div class="flex items-center gap-2">
-										<span class="h-2 w-2 rounded-full {categoryColor[cat]}"></span>
-										<span class="text-sm">{CATEGORY_LABELS[cat]}</span>
+										<span class="h-2 w-2 rounded-full {categoryColor[cat] ?? 'bg-base-content/30'}"></span>
+										<span class="text-sm">{CATEGORY_LABELS[cat] ?? cat}</span>
 									</div>
 									<div class="text-right">
 										<span class="text-xs text-base-content/40 tabular-nums">{catData.qty.toLocaleString()}개 · </span>
 										<span class="text-sm font-bold tabular-nums">{catData.amount.toLocaleString()}원</span>
 									</div>
 								</div>
-							{/if}
-						{/each}
+							{/each}
+						</div>
 					</div>
 
 					<!-- 액션 버튼 -->
