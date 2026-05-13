@@ -508,10 +508,14 @@
 
     try {
       const res = await fetch('/products?/upsertItem', { method: 'POST', body: form });
-      if (!res.ok) throw new Error('server error');
+      const text = await res.text();
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-      const result = deserialize(await res.text());
-      if (result.type !== 'success') throw new Error('server error');
+      const result = deserialize(text);
+      if (result.type !== 'success') {
+        const errMsg = (result as { data?: { error?: string } }).data?.error ?? '서버 오류';
+        throw new Error(errMsg);
+      }
       const realId = (result.data as Record<string, unknown>)?.id as string | undefined;
       if (!realId) throw new Error('no id in response');
 
@@ -528,11 +532,12 @@
       await tick();
       const el = document.getElementById(savedFocusId) as HTMLInputElement | null;
       if (el) { el.focus(); el.select?.(); }
-    } catch {
-      // 실패 → 로컈 롤백
+    } catch (err) {
+      // 실패 → 로컬 롤백
       localItems = localItems.filter(i => i.id !== tmpId);
       localPrices = localPrices.filter(p => p.item_id !== tmpId);
-      showToast('품목 추가 실패 — 다시 시도해주세요.');
+      const msg = err instanceof Error ? err.message : String(err);
+      showToast(`품목 추가 실패 — ${msg}`);
     }
   }
 
