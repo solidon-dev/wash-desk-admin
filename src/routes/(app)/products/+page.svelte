@@ -1116,7 +1116,7 @@
                   <td class="h-9 border-b border-dashed border-r border-base-300 px-2 text-center text-[11px] opacity-30 select-none">
                     {newRowIdx + 1}
                   </td>
-                  <td class="h-9 p-0 border-b border-dashed border-r border-base-300" style={newRowSubmitTried && !newRowNameOk ? 'background:hsl(var(--er)/.15)' : ''}>
+                  <td class="h-9 p-0 border-b border-dashed border-r border-base-300">
                     <input
                       id="cell-{newRowIdx}-0"
                       type="text"
@@ -1124,16 +1124,18 @@
                       bind:value={newName}
                       onfocus={() => (activeRow = newRowIdx)}
                       onkeydown={(e) => handleCellKeydown(e, newRowIdx, 0)}
+                      style={newRowSubmitTried && !newRowNameOk ? 'box-shadow: inset 0 0 0 2px #f87272' : ''}
                       class="h-full w-full bg-transparent px-3 text-sm outline-none placeholder:opacity-30"
                     />
                   </td>
-                  <td class="h-9 p-0 border-b border-dashed border-r border-base-300" style={newRowSubmitTried && !newRowPriceOk ? 'background:hsl(var(--er)/.15)' : ''}>
+                  <td class="h-9 p-0 border-b border-dashed border-r border-base-300">
                     <input
                       id="cell-{newRowIdx}-1"
                       type="text"
                       inputmode="numeric"
                       placeholder="필수"
                       value={newPrice}
+                      style={newRowSubmitTried && !newRowPriceOk ? 'box-shadow: inset 0 0 0 2px #f87272' : ''}
                       oninput={(e) => {
                         const el = e.target as HTMLInputElement;
                         const numeric = el.value.replace(/[^0-9]/g, '');
@@ -1149,13 +1151,14 @@
                       class="h-full w-full bg-transparent px-3 text-right text-sm outline-none placeholder:opacity-30"
                     />
                   </td>
-                  <td class="h-9 p-0 border-b border-dashed border-r border-base-300" style={newRowSubmitTried && !newRowDateOk ? 'background:hsl(var(--er)/.15)' : ''}>
+                  <td class="h-9 p-0 border-b border-dashed border-r border-base-300">
                     <input
                       id="cell-{newRowIdx}-2"
                       type="text"
                       inputmode="numeric"
                       placeholder="YYYY-MM-DD"
                       value={newPriceDate}
+                      style={newRowSubmitTried && !newRowDateOk ? 'box-shadow: inset 0 0 0 2px #f87272' : ''}
                       oninput={(e) => {
                         const el = e.target as HTMLInputElement;
                         const formatted = formatDateInput(el.value);
