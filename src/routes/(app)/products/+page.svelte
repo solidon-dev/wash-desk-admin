@@ -439,43 +439,73 @@
     if (!name || !selectedClientId || !effectiveCategoryId) return;
     if (!newRowPriceOk || !newRowDateOk) return;
 
-    const price = parseInt(newPrice.trim(), 10);
+    const price    = parseInt(newPrice.trim(), 10);
     const priceDate = newPriceDate;
-    const catId = effectiveCategoryId;
-    const cliId = selectedClientId;
+    const catId    = effectiveCategoryId;
+    const cliId    = selectedClientId;
+    const alias    = newAlias.trim();
+    const cn       = newCn.trim();
+    const en       = newEn.trim();
 
+    // 입력칬 즉시 쒈기
     newName = ''; newAlias = ''; newCn = ''; newEn = '';
     newPrice = '0'; newPriceDate = todayYMD();
     newRowSubmitTried = false;
 
-    // 서버에 품목 추가 → reload (새 id 필요)
-    const ok = await submitAndReload('upsertItem', {
+    // 임시 ID로 로컬에 리스트 먼저 추가
+    const tmpId = `tmp-${Date.now()}`;
+    const maxSort = localItems.filter(i => i.category_id === catId)
+      .reduce((m, i) => Math.max(m, i.sort_order), -1) + 1;
+    const tmpItem: Item = {
+      id: tmpId,
       category_id: catId,
+      factory_id: selectedClient!.factory_id,
       name_ko: name,
-      name_en: newEn.trim(),
-      name_zh: newCn.trim(),
-      nickname: newAlias.trim(),
-    });
-    if (!ok) return;
-
-    // data.items 갱신 후 새 item 찾아서 단가 저장
-    if (price > 0) {
-      await tick();
-      const newItem = data.items.find(i => i.name_ko === name && i.category_id === catId);
-      if (newItem) {
-        // 낙관적으로 localPrices에 추가
-        patchLocalPrice(newItem.id, { unit_price: price, effective_from: priceDate }, cliId);
-        submitBg('upsertPrice', {
-          item_id: newItem.id, client_id: cliId,
-          unit_price: String(price), effective_from: priceDate,
-        }, () => {
-          localPrices = localPrices.filter(p => p.item_id !== newItem.id);
-        });
-      }
-    }
+      name_en: en || null,
+      name_zh: cn || null,
+      nickname: alias || null,
+      sort_order: maxSort,
+    };
+    localItems = [...localItems, tmpItem];
+    if (price > 0) patchLocalPrice(tmpId, { unit_price: price, effective_from: priceDate }, cliId);
 
     await tick();
-    moveFocus(currentItems.length, 0);
+    moveFocus(currentItems.length - 1, 0); // 방금 추가된 행으로
+
+    // 백그라운드로 서버에 저장
+    const form = new FormData();
+    form.append('category_id', catId);
+    form.append('name_ko', name);
+    form.append('name_en', en);
+    form.append('name_zh', cn);
+    form.append('nickname', alias);
+
+    try {
+      const res = await fetch('?/upsertItem', { method: 'POST', body: form });
+      if (!res.ok) throw new Error('server error');
+
+      // 서버에서 실제 ID 받아서 임시 ID 교체
+      // invalidateAll로 서버 data 동기화 (실제 id 필요)
+      await invalidateAll();
+      await tick();
+
+      // 임시 id 제거하고 실제 id로 단가 다시 패치
+      const realItem = data.items.find(i => i.name_ko === name && i.category_id === catId);
+      if (realItem && price > 0) {
+        // 임시 id 단가 제거, 실제 id로 추가
+        localPrices = localPrices.filter(p => p.item_id !== tmpId);
+        patchLocalPrice(realItem.id, { unit_price: price, effective_from: priceDate }, cliId);
+        submitBg('upsertPrice', {
+          item_id: realItem.id, client_id: cliId,
+          unit_price: String(price), effective_from: priceDate,
+        }, () => { localPrices = localPrices.filter(p => p.item_id !== realItem.id); });
+      }
+    } catch {
+      // 실패 → 로캘 롤백
+      localItems = localItems.filter(i => i.id !== tmpId);
+      localPrices = localPrices.filter(p => p.item_id !== tmpId);
+      showToast('품목 추가 실패 — 다시 시도해주세요.');
+    }
   }
 
   // 날짜 모달
