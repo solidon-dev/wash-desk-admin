@@ -1,15 +1,13 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
+	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import Icon from '@iconify/svelte';
-	import type { ActionData } from './$types';
-
-	let { form }: { form: ActionData } = $props();
+	import { login } from '$lib/api/auth';
 
 	let isLoading = $state(false);
 	let showPassword = $state(false);
+	let errorMsg = $state('');
 
-	// 다크모드
-	import { onMount } from 'svelte';
 	onMount(() => {
 		const mq = window.matchMedia('(prefers-color-scheme: dark)');
 		const apply = (dark: boolean) =>
@@ -17,6 +15,22 @@
 		apply(mq.matches);
 		mq.addEventListener('change', (e) => apply(e.matches));
 	});
+
+	async function handleLogin(e: Event) {
+		e.preventDefault();
+		errorMsg = '';
+		isLoading = true;
+		const form = e.target as HTMLFormElement;
+		const username = (form.elements.namedItem('username') as HTMLInputElement).value.trim();
+		const password = (form.elements.namedItem('password') as HTMLInputElement).value;
+		const error = await login(username, password);
+		if (error) {
+			errorMsg = '아이디 또는 비밀번호가 올바르지 않습니다.';
+			isLoading = false;
+		} else {
+			goto('/clients');
+		}
+	}
 </script>
 
 <svelte:head>
@@ -52,13 +66,7 @@
 			<div class="card-body gap-0 px-8 py-8">
 				<h2 class="mb-6 text-lg font-extrabold text-base-content">로그인</h2>
 
-				<form method="POST" action="?/login" use:enhance={() => {
-					isLoading = true;
-					return async ({ update }) => {
-						isLoading = false;
-						await update();
-					};
-				}} class="flex flex-col gap-5">
+				<form onsubmit={handleLogin} class="flex flex-col gap-5">
 
 					<!-- 아이디 -->
 					<div class="form-control gap-2">
@@ -108,10 +116,10 @@
 					</div>
 
 					<!-- 에러 메시지 -->
-					{#if form?.error}
+					{#if errorMsg}
 						<div class="alert alert-error gap-2 rounded-xl py-3 px-4 text-sm font-semibold">
 							<Icon icon="lucide:circle-alert" class="h-4 w-4 shrink-0" />
-							<span>{form.error}</span>
+							<span>{errorMsg}</span>
 						</div>
 					{/if}
 
