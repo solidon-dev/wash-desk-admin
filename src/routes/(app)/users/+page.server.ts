@@ -69,7 +69,8 @@ export const actions: Actions = {
 		}
 
 		// trigger 가 worker role로 profiles row 생성 → role/factory_id/phone 업데이트
-		const { error: profileErr } = await locals.supabase
+		const adminDb = getAdminClient();
+		const { error: profileErr } = await adminDb
 			.from('profiles')
 			.update({ role: role as 'factory_admin' | 'worker', factory_id, phone })
 			.eq('id', created.user.id);

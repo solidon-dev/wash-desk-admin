@@ -14,7 +14,7 @@
   };
   let { data, form }: Props = $props();
 
-  type UserRole = 'factory_admin' | 'worker';
+  type UserRole = 'super_admin' | 'factory_admin' | 'worker';
 
   type UserRow = {
     id: string;
@@ -29,10 +29,12 @@
   };
 
   const roleLabel: Record<UserRole, string> = {
+    super_admin:   '최고관리자',
     factory_admin: '공장관리자',
     worker:        '실무자',
   };
   const roleBadge: Record<UserRole, string> = {
+    super_admin:   'badge-warning',
     factory_admin: 'badge-primary',
     worker:        'badge-ghost',
   };
@@ -66,6 +68,7 @@
 
   const filteredUsers = $derived(
     users.filter(u => {
+      if (u.role === 'super_admin') return false;  // 최고관리자는 목록에서 제외
       if (!showDeleted && u.deleted_at !== null) return false;
       if (selectedId) return u.id === selectedId;
       return true;
@@ -204,16 +207,16 @@
   {/if}
 
   <TableCard>
-    <table class="table table-sm w-full" style="table-layout: fixed;">
+    <table class="table table-sm w-full">
       <thead class="bg-base-200 text-base-content/60">
         <tr>
-          <th class="text-xs font-bold w-[30%] lg:w-[16%]">이름</th>
-          <th class="text-xs font-bold hidden lg:table-cell lg:w-[9%]">역할</th>
-          <th class="text-xs font-bold hidden lg:table-cell lg:w-[14%]">아이디</th>
-          <th class="text-xs font-bold hidden lg:table-cell lg:w-[18%]">소속 공장</th>
-          <th class="text-xs font-bold hidden xl:table-cell w-[14%]">연락처</th>
-          <th class="text-xs font-bold hidden lg:table-cell whitespace-nowrap lg:w-[9%]">등록일</th>
-          <th class="text-xs font-bold text-center whitespace-nowrap w-[70%] lg:w-[20%]">액션</th>
+          <th class="text-xs font-bold">이름</th>
+          <th class="text-xs font-bold hidden lg:table-cell">역할</th>
+          <th class="text-xs font-bold hidden lg:table-cell">아이디</th>
+          <th class="text-xs font-bold hidden lg:table-cell">소속 공장</th>
+          <th class="text-xs font-bold hidden lg:table-cell">연락처</th>
+          <th class="text-xs font-bold hidden lg:table-cell whitespace-nowrap">등록일</th>
+          <th class="text-xs font-bold text-center whitespace-nowrap">액션</th>
         </tr>
       </thead>
       <tbody>
@@ -237,6 +240,7 @@
                   <span class="badge badge-xs font-bold {roleBadge[role] ?? 'badge-ghost'}">{roleLabel[role] ?? role}</span>
                   <span class="text-xs text-base-content/50 font-mono">{user.username}</span>
                   {#if user.factory_name}<span class="text-xs text-base-content/40">{user.factory_name}</span>{/if}
+                  {#if user.phone}<span class="text-xs text-base-content/40">{user.phone}</span>{/if}
                   <span class="text-xs text-base-content/30">{formatDate(user.created_at)}</span>
                 </div>
               </td>
@@ -245,20 +249,10 @@
               </td>
               <td class="text-base-content/70 text-sm font-mono hidden lg:table-cell">{user.username}</td>
               <td class="text-base-content/70 text-sm hidden lg:table-cell">{user.factory_name ?? '—'}</td>
-              <td class="text-base-content/70 text-sm hidden xl:table-cell">{user.phone ?? '—'}</td>
+              <td class="text-base-content/70 text-sm hidden lg:table-cell">{user.phone ?? '—'}</td>
               <td class="text-base-content/50 text-xs whitespace-nowrap hidden lg:table-cell">{formatDate(user.created_at)}</td>
-              <td>
-                <div class="flex items-center justify-center gap-1">
-                  <button onclick={() => openEdit(user)} class="btn btn-ghost btn-xs text-primary font-semibold">수정</button>
-                  {#if isDeleted}
-                    <form method="POST" action="?/activate" use:enhance>
-                      <input type="hidden" name="id" value={user.id} />
-                      <button type="submit" class="btn btn-ghost btn-xs text-success font-semibold">활성화</button>
-                    </form>
-                  {:else}
-                    <button onclick={() => openDeactivate(user.id)} class="btn btn-ghost btn-xs text-warning font-semibold">비활성화</button>
-                  {/if}
-                </div>
+              <td class="text-center">
+                <button onclick={() => openEdit(user)} class="btn btn-ghost btn-xs text-primary font-semibold">수정</button>
               </td>
             </tr>
           {/each}
@@ -312,25 +306,6 @@
               <input id="cUsername" name="username" type="text" bind:value={formUsername} placeholder="user_id" class="input input-bordered w-full text-sm" required />
             </div>
           </div>
-          <!-- 역할 + 공장 -->
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <p class="label-text text-xs font-bold text-base-content/60 mb-2">역할 *</p>
-              <div class="flex gap-1.5">
-                {#each (['factory_admin', 'worker'] as UserRole[]) as r (r)}
-                  <button type="button" onclick={() => (formRole = r)} class="btn btn-xs font-bold flex-1 {formRole === r ? 'btn-primary' : 'btn-outline btn-ghost'}">{roleLabel[r]}</button>
-                {/each}
-              </div>
-              <input type="hidden" name="role" value={formRole} />
-            </div>
-            <div>
-              <label for="cFactory" class="label pb-1"><span class="label-text text-xs font-bold text-base-content/60">소속 공장 *</span></label>
-              <select id="cFactory" name="factory_id" bind:value={formFactoryId} class="select select-bordered w-full text-sm" required>
-                <option value="">공장 선택</option>
-                {#each factories as f (f.id)}<option value={f.id}>{f.name}</option>{/each}
-              </select>
-            </div>
-          </div>
           <!-- 비밀번호 -->
           <div class="grid grid-cols-2 gap-4">
             <div>
@@ -354,10 +329,29 @@
               </div>
             </div>
           </div>
+          <!-- 역할 + 공장 -->
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <p class="label-text text-xs font-bold text-base-content/60 mb-2">역할 *</p>
+              <div class="flex gap-1.5">
+                {#each (['factory_admin', 'worker'] as UserRole[]) as r (r)}
+                  <button type="button" onclick={() => (formRole = r)} class="btn btn-sm font-bold flex-1 {formRole === r ? 'btn-primary' : 'btn-outline btn-ghost'}">{roleLabel[r]}</button>
+                {/each}
+              </div>
+              <input type="hidden" name="role" value={formRole} />
+            </div>
+            <div>
+              <label for="cFactory" class="label pb-1"><span class="label-text text-xs font-bold text-base-content/60">소속 공장 *</span></label>
+              <select id="cFactory" name="factory_id" bind:value={formFactoryId} class="select select-bordered w-full text-sm" required>
+                <option value="">공장 선택</option>
+                {#each factories as f (f.id)}<option value={f.id}>{f.name}</option>{/each}
+              </select>
+            </div>
+          </div>
           <!-- 연락처 -->
           <div>
-            <label for="cPhone" class="label pb-1"><span class="label-text text-xs font-bold text-base-content/60">연락처</span></label>
-            <input id="cPhone" name="phone" type="text" bind:value={formPhone} placeholder="010-0000-0000" class="input input-bordered w-full text-sm" />
+            <label for="cPhone" class="label pb-1"><span class="label-text text-xs font-bold text-base-content/60">연락처 <span class="text-base-content/30 font-normal">(선택)</span></span></label>
+            <input id="cPhone" name="phone" type="text" bind:value={formPhone} placeholder="01012341234" maxlength="11" class="input input-bordered w-full text-sm" />
           </div>
           {#if saveError}
             <div class="alert alert-error gap-2 rounded-xl py-3 px-4 text-sm font-semibold">
@@ -379,7 +373,17 @@
   <dialog class="modal modal-open" onmousedown={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
     <div class="modal-box w-full max-w-lg rounded-2xl p-6 flex flex-col" style="max-height: 620px;">
       <div class="flex items-center justify-between mb-5 shrink-0">
-        <h3 class="text-lg font-extrabold text-base-content">사용자 수정</h3>
+        <div class="flex items-center gap-3">
+          <h3 class="text-lg font-extrabold text-base-content">사용자 수정</h3>
+          {#if editingUser?.deleted_at !== null}
+            <form method="POST" action="?/activate" use:enhance>
+              <input type="hidden" name="id" value={editingUser?.id} />
+              <button type="submit" class="btn btn-xs btn-success font-bold">활성화</button>
+            </form>
+          {:else}
+            <button onclick={() => { closeModal(); openDeactivate(editingUser!.id); }} class="btn btn-xs btn-outline btn-warning font-bold">비활성화</button>
+          {/if}
+        </div>
         <button onclick={closeModal} class="btn btn-ghost btn-sm btn-circle"><Icon icon="lucide:x" class="w-5 h-5" /></button>
       </div>
 
