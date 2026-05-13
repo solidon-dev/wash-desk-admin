@@ -60,9 +60,10 @@
   onMount(() => {
     if (!data.selectedClientId) {
       const saved = localStorage.getItem(LS_KEY);
-      if (saved && data.clients.some(c => c.id === saved)) {
-        selectClient(saved);
-      }
+      const target = (saved && data.clients.some(c => c.id === saved))
+        ? saved
+        : data.clients[0]?.id ?? null;
+      if (target) selectClient(target);
     }
   });
 
