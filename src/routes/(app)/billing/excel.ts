@@ -549,7 +549,7 @@ export function buildXlsx(sheets: Sheet[]): Blob {
   ];
 
   const zipBytes = buildZip(files);
-  return new Blob([zipBytes], {
+  return new Blob([zipBytes.buffer as ArrayBuffer], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   });
 }
