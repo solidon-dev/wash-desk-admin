@@ -241,9 +241,9 @@
     const form = new FormData();
     for (const [k, v] of Object.entries(payload)) form.append(k, v);
     try {
-      const res = await fetch(`?/${action}`, { method: 'POST', body: form });
-      if (!res.ok) {
-        onRollback?.();
+      const res = await fetch(`/products?/${action}`, { method: 'POST', body: form });
+        if (!res.ok) {
+          onRollback?.();
         showToast('저장 실패 — 변경사항이 취소됐습니다.');
         return false;
       }
@@ -260,7 +260,7 @@
     const form = new FormData();
     for (const [k, v] of Object.entries(payload)) form.append(k, v);
     try {
-      const res = await fetch(`?/${action}`, { method: 'POST', body: form });
+      const res = await fetch(`/products?/${action}`, { method: 'POST', body: form });
       if (!res.ok) { showToast('저장 실패'); return false; }
       await invalidateAll();
       return true;
@@ -507,7 +507,7 @@
     form.append('effective_from', priceDate);
 
     try {
-      const res = await fetch('?/upsertItem', { method: 'POST', body: form });
+      const res = await fetch('/products?/upsertItem', { method: 'POST', body: form });
       if (!res.ok) throw new Error('server error');
 
       const result = deserialize(await res.text());
