@@ -4,6 +4,7 @@
   import { onMount, tick } from 'svelte';
   import { flip } from 'svelte/animate';
   import { SvelteSet } from 'svelte/reactivity';
+  import SearchBar from '$lib/components/SearchBar.svelte';
 
   // ── 카테고리 레이블 ────────────────────────────────────────────
   const CATEGORY_LABELS: Record<string, string> = {
@@ -209,18 +210,12 @@
 
   // ── 거래처 선택 모달 ───────────────────────────────────────────────
   let showClientModal = $state(false);
-  let clientSearch    = $state('');
 
-  const filteredClients = $derived(
-    clientSearch.trim()
-      ? clients.filter(c =>
-          c.name.toLowerCase().includes(clientSearch.trim().toLowerCase())
-        )
-      : clients
+  const clientSearchItems = $derived(
+    clients.map(c => ({ id: c.id, label: c.name, sub: typeLabel[c.type] ?? c.type }))
   );
 
   function openClientModal() {
-    clientSearch   = '';
     showClientModal = true;
   }
 
@@ -233,20 +228,14 @@
   let showCopyModal = $state(false);
   let showCopyConfirmModal = $state(false);
   let copySourceClientId = $state<string | null>(null);
-  let copySourceSearch = $state('');
 
-  const filteredClientsForCopy = $derived(
-    copySourceSearch.trim()
-      ? clients
-          .filter(c => c.id !== selectedClientId)
-          .filter(c =>
-            c.name.toLowerCase().includes(copySourceSearch.trim().toLowerCase())
-          )
-      : clients.filter(c => c.id !== selectedClientId)
+  const copySearchItems = $derived(
+    clients
+      .filter(c => c.id !== selectedClientId)
+      .map(c => ({ id: c.id, label: c.name, sub: typeLabel[c.type] ?? c.type }))
   );
 
   function openCopyModal() {
-    copySourceSearch = '';
     copySourceClientId = null;
     showCopyModal = true;
   }
@@ -950,7 +939,7 @@
     class="modal modal-open"
     onkeydown={(e) => e.key === 'Escape' && (showClientModal = false)}
   >
-    <div class="modal-box flex w-full max-w-2xl flex-col overflow-hidden p-0" style="max-height: min(600px, 90vh);">
+    <div class="modal-box flex w-full max-w-lg flex-col overflow-hidden p-0" style="height: min(520px, 90vh);">
       <!-- header -->
       <div class="flex shrink-0 items-center justify-between border-b border-base-200 px-5 py-4">
         <h3 class="text-base font-bold">거래처 선택</h3>
@@ -964,32 +953,29 @@
       </div>
       <!-- search -->
       <div class="shrink-0 px-4 py-3 border-b border-base-200">
-        <label class="input input-sm w-full flex items-center gap-2">
-          <Icon icon="lucide:search" class="h-4 w-4 opacity-50" />
-          <input
-            type="text"
-            placeholder="거래처 검색..."
-            bind:value={clientSearch}
-            class="grow"
-          />
-        </label>
+        <SearchBar
+          placeholder="거래처 검색..."
+          items={clientSearchItems}
+          onselect={(id) => handleSelectClient(id)}
+          class="w-full"
+        />
       </div>
       <!-- list -->
       <div class="min-h-0 flex-1 overflow-y-auto">
-        {#if filteredClients.length === 0}
-          <p class="py-10 text-center text-sm opacity-50">검색 결과 없음</p>
-        {:else}
-          {#each filteredClients as client (client.id)}
-            <button
-              onclick={() => handleSelectClient(client.id)}
-              class="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-base-200 {selectedClientId === client.id ? 'bg-primary/10 font-semibold text-primary' : ''}"
-            >
-              <span class="min-w-0 flex-1 truncate text-sm">{client.name}</span>
-              {#if selectedClientId === client.id}
-                <Icon icon="lucide:check" class="h-4 w-4 shrink-0 text-primary" />
-              {/if}
-            </button>
-          {/each}
+        {#each clients as client (client.id)}
+          <button
+            onclick={() => handleSelectClient(client.id)}
+            class="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-base-200 {selectedClientId === client.id ? 'bg-primary/10 font-semibold text-primary' : ''}"
+          >
+            <span class="min-w-0 flex-1 truncate text-sm">{client.name}</span>
+            <span class="badge badge-sm {typeBadge[client.type] ?? 'badge-ghost'} shrink-0">{typeLabel[client.type] ?? client.type}</span>
+            {#if selectedClientId === client.id}
+              <Icon icon="lucide:check" class="h-4 w-4 shrink-0 text-primary" />
+            {/if}
+          </button>
+        {/each}
+        {#if clients.length === 0}
+          <p class="py-10 text-center text-sm opacity-50">거래처 없음</p>
         {/if}
       </div>
     </div>
@@ -1005,7 +991,7 @@
     class="modal modal-open"
     onkeydown={(e) => e.key === 'Escape' && cancelCopy()}
   >
-    <div class="modal-box flex w-full max-w-2xl flex-col overflow-hidden p-0" style="max-height: min(600px, 90vh);">
+    <div class="modal-box flex w-full max-w-lg flex-col overflow-hidden p-0" style="height: min(520px, 90vh);">
       <div class="flex shrink-0 items-center justify-between border-b border-base-200 px-5 py-4">
         <h3 class="text-base font-bold">복사할 거래처 선택</h3>
         <button
@@ -1017,28 +1003,25 @@
         </button>
       </div>
       <div class="shrink-0 px-4 py-3 border-b border-base-200">
-        <label class="input input-sm w-full flex items-center gap-2">
-          <Icon icon="lucide:search" class="h-4 w-4 opacity-50" />
-          <input
-            type="text"
-            placeholder="거래처 검색..."
-            bind:value={copySourceSearch}
-            class="grow"
-          />
-        </label>
+        <SearchBar
+          placeholder="거래처 검색..."
+          items={copySearchItems}
+          onselect={(id) => selectSourceForCopy(id)}
+          class="w-full"
+        />
       </div>
       <div class="min-h-0 flex-1 overflow-y-auto">
-        {#if filteredClientsForCopy.length === 0}
-          <p class="py-10 text-center text-sm opacity-50">검색 결과 없음</p>
-        {:else}
-          {#each filteredClientsForCopy as client (client.id)}
-            <button
-              onclick={() => selectSourceForCopy(client.id)}
-              class="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-base-200"
-            >
-              <span class="min-w-0 flex-1 truncate text-sm">{client.name}</span>
-            </button>
-          {/each}
+        {#each clients.filter(c => c.id !== selectedClientId) as client (client.id)}
+          <button
+            onclick={() => selectSourceForCopy(client.id)}
+            class="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-base-200"
+          >
+            <span class="min-w-0 flex-1 truncate text-sm">{client.name}</span>
+            <span class="badge badge-sm {typeBadge[client.type] ?? 'badge-ghost'} shrink-0">{typeLabel[client.type] ?? client.type}</span>
+          </button>
+        {/each}
+        {#if clients.filter(c => c.id !== selectedClientId).length === 0}
+          <p class="py-10 text-center text-sm opacity-50">다른 거래처 없음</p>
         {/if}
       </div>
     </div>
