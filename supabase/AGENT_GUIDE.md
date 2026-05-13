@@ -148,7 +148,99 @@ wsl bash -c "cd /mnt/c/Users/winco/OneDrive/Desktop/wash-desk-admin && SUPABASE_
 
 ---
 
-## Step 8. TypeScript 타입 생성 (type gen)
+## Step 8. 리모트 DB 변경 워크플로우 (마이그레이션 push)
+
+> ✅ Docker 불필요 — 리모트에 즉시 반영됩니다.
+
+RPC 추가, RLS 변경, 테이블 수정 등 DB 스키마를 바꿀 때 사용합니다.
+히스토리가 남아 추적이 가능하므로 psql 직접 실행보다 이 방법을 권장합니다.
+
+**1) 마이그레이션 파일 생성**
+```
+wsl -e bash -c "cd /mnt/c/Users/winco/OneDrive/Desktop/wash-desk-admin && SUPABASE_ACCESS_TOKEN='SB_ACCESS_TOKEN' supabase migration new MIGRATION_NAME"
+```
+→ `supabase/migrations/TIMESTAMP_MIGRATION_NAME.sql` 파일이 생성됩니다.
+
+**2) SQL 작성**
+
+생성된 파일에 실행할 SQL을 작성합니다.
+
+```sql
+-- 예: RPC 추가
+CREATE OR REPLACE FUNCTION public.my_function(p_id uuid)
+RETURNS json
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  -- ...
+END;
+$$;
+
+-- 예: RLS 정책 추가
+CREATE POLICY "factory_member_only" ON public.invoices
+  FOR ALL USING (is_factory_member(factory_id));
+
+-- 예: 컬럼 추가
+ALTER TABLE public.clients ADD COLUMN memo text;
+```
+
+**3) 리모트에 push**
+```
+wsl -e bash -c "cd /mnt/c/Users/winco/OneDrive/Desktop/wash-desk-admin && SUPABASE_ACCESS_TOKEN='SB_ACCESS_TOKEN' supabase db push --password 'DB_PASSWORD' --linked"
+```
+
+**4) 타입 재생성**
+
+DB 스키마가 바뀌었으므로 Step 9 타입 생성을 반드시 실행하세요.
+
+---
+
+## Step 9. Edge Function 배포
+
+> ✅ Docker 불필요 — 리모트에 즉시 배포됩니다.
+> ❌ 로컬 실행(serve)은 Docker 필요
+
+**1) 함수 파일 생성 (신규일 때)**
+```
+wsl -e bash -c "cd /mnt/c/Users/winco/OneDrive/Desktop/wash-desk-admin && SUPABASE_ACCESS_TOKEN='SB_ACCESS_TOKEN' supabase functions new FUNCTION_NAME"
+```
+→ `supabase/functions/FUNCTION_NAME/index.ts` 파일이 생성됩니다.
+
+**2) 함수 코드 작성**
+
+`supabase/functions/FUNCTION_NAME/index.ts` 에 Deno 기반 TypeScript로 작성합니다.
+
+```ts
+import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
+
+serve(async (req) => {
+  const { name } = await req.json();
+  return new Response(JSON.stringify({ message: `Hello ${name}` }), {
+    headers: { 'Content-Type': 'application/json' },
+  });
+});
+```
+
+**3) 리모트에 배포**
+```
+wsl -e bash -c "cd /mnt/c/Users/winco/OneDrive/Desktop/wash-desk-admin && SUPABASE_ACCESS_TOKEN='SB_ACCESS_TOKEN' supabase functions deploy FUNCTION_NAME"
+```
+
+**4) 배포된 함수 목록 확인**
+```
+wsl -e bash -c "cd /mnt/c/Users/winco/OneDrive/Desktop/wash-desk-admin && SUPABASE_ACCESS_TOKEN='SB_ACCESS_TOKEN' supabase functions list"
+```
+
+**5) 클라이언트에서 호출**
+```ts
+const { data, error } = await supabase.functions.invoke('FUNCTION_NAME', {
+  body: { name: 'world' },
+});
+```
+
+---
+
+## Step 10. TypeScript 타입 생성 (type gen)
 
 DB 스키마 변경 후 타입을 최신화할 때 실행합니다.
 
@@ -175,7 +267,7 @@ wsl -e bash -c "cd /mnt/c/Users/winco/OneDrive/Desktop/wash-desk-admin && SUPABA
 
 ---
 
-## Step 9. Supabase 클라이언트 초기화 구조
+## Step 11. Supabase 클라이언트 초기화 구조
 
 **파일 위치:**
 ```
