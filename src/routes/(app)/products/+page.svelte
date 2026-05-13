@@ -494,36 +494,34 @@
     await tick();
     moveFocus(currentItems.length - 1, 0); // 방금 추가된 행으로
 
-    // 백그라운드로 서버에 저장
-    const savedFocusId = `cell-${currentItems.length - 1}-0`; // ID 교체 후 포커스 복원용
+    // 백그라운드로 서버에 저장 (RPC가 item + price 한 트랜잭션으로 처리)
+    const savedFocusId = `cell-${currentItems.length - 1}-0`;
     const form = new FormData();
     form.append('category_id', catId);
     form.append('name_ko', name);
     form.append('name_en', en);
     form.append('name_zh', cn);
     form.append('nickname', alias);
+    // RPC에 price 정보도 같이 전달
+    form.append('client_id', cliId);
+    form.append('unit_price', String(price));
+    form.append('effective_from', priceDate);
 
     try {
       const res = await fetch('?/upsertItem', { method: 'POST', body: form });
       if (!res.ok) throw new Error('server error');
 
-      // 응답 JSON에서 실제 id 직접 파싱 — SvelteKit action 응답은 devalue 형식이라 deserialize 필수
       const result = deserialize(await res.text());
       if (result.type !== 'success') throw new Error('server error');
       const realId = (result.data as Record<string, unknown>)?.id as string | undefined;
       if (!realId) throw new Error('no id in response');
 
-      // localPrices 먼저 교체 — 이후 localItems key 변경 시 tr 재생성될 때 getPriceDate(realId)가 보장되어야 날짜 표시 가능
-      if (price > 0) {
-        localPrices = localPrices.map(p =>
-          p.item_id === tmpId ? { ...p, item_id: realId } : p
-        );
-        submitBg('upsertPrice', {
-          item_id: realId, client_id: cliId,
-          unit_price: String(price), effective_from: priceDate,
-        }, () => { localPrices = localPrices.filter(p => p.item_id !== realId); });
-      }
-      // localPrices 코에 후 localItems key 변경 (tr 재생성 시 이미 price 준비됨)
+      // RPC가 price도 이미 저장했으므로 별도 upsertPrice 불필요
+      // localPrices 먼저 교체 → localItems key 변경 시 getPriceDate(realId) 보장
+      localPrices = localPrices.map(p =>
+        p.item_id === tmpId ? { ...p, item_id: realId } : p
+      );
+      // localItems key 교체 (tr 재생성)
       localItems = localItems.map(i =>
         i.id === tmpId ? { ...i, id: realId } : i
       );

@@ -96,3 +96,6 @@ export type MyRoleReturns             = RpcReturns<'my_role'>;
 
 export type ProcessInventoryOutArgs    = RpcArgs<'process_inventory_out'>;
 export type ProcessInventoryOutReturns = RpcReturns<'process_inventory_out'>;
+
+export type CreateItemWithPriceArgs    = RpcArgs<'create_item_with_price'>;
+export type CreateItemWithPriceReturns = RpcReturns<'create_item_with_price'>;

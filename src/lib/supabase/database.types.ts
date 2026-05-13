@@ -52,6 +52,7 @@ export type Database = {
           contract_end_date: string | null
           contract_start_date: string | null
           created_at: string
+          deleted_at: string | null
           email: string | null
           factory_id: string
           id: string
@@ -64,6 +65,7 @@ export type Database = {
           contract_end_date?: string | null
           contract_start_date?: string | null
           created_at?: string
+          deleted_at?: string | null
           email?: string | null
           factory_id: string
           id?: string
@@ -76,6 +78,7 @@ export type Database = {
           contract_end_date?: string | null
           contract_start_date?: string | null
           created_at?: string
+          deleted_at?: string | null
           email?: string | null
           factory_id?: string
           id?: string
@@ -446,6 +449,7 @@ export type Database = {
       }
       item_prices: {
         Row: {
+          client_id: string
           created_at: string
           effective_from: string
           id: string
@@ -453,6 +457,7 @@ export type Database = {
           unit_price: number
         }
         Insert: {
+          client_id: string
           created_at?: string
           effective_from: string
           id?: string
@@ -460,6 +465,7 @@ export type Database = {
           unit_price?: number
         }
         Update: {
+          client_id?: string
           created_at?: string
           effective_from?: string
           id?: string
@@ -467,6 +473,13 @@ export type Database = {
           unit_price?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "item_prices_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "item_prices_item_id_fkey"
             columns: ["item_id"]
@@ -570,6 +583,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_item_with_price: {
+        Args: {
+          p_category_id: string
+          p_client_id: string
+          p_effective_from: string
+          p_factory_id: string
+          p_name_en: string
+          p_name_ko: string
+          p_name_zh: string
+          p_nickname: string
+          p_sort_order: number
+          p_unit_price: number
+        }
+        Returns: Json
+      }
       get_unit_price: {
         Args: { p_date: string; p_item_id: string }
         Returns: number
@@ -588,6 +616,8 @@ export type Database = {
         }
         Returns: Json
       }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
     }
     Enums: {
       log_type: "in" | "out"

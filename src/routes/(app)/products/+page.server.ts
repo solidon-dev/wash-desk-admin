@@ -186,9 +186,9 @@ export const actions: Actions = {
 		const id          = (form.get('id') as string) || null;
 		const category_id = (form.get('category_id') as string);
 		const name_ko     = (form.get('name_ko') as string)?.trim();
-		const name_en     = (form.get('name_en') as string)?.trim() || undefined;
-		const name_zh     = (form.get('name_zh') as string)?.trim() || undefined;
-		const nickname    = (form.get('nickname') as string)?.trim() || undefined;
+		const name_en     = (form.get('name_en') as string)?.trim() || '';
+		const name_zh     = (form.get('name_zh') as string)?.trim() || '';
+		const nickname    = (form.get('nickname') as string)?.trim() || '';
 
 		if (!category_id) return fail(400, { error: 'category_id 누락' });
 		if (!name_ko)     return fail(400, { error: '품목명을 입력해주세요.' });
@@ -200,14 +200,25 @@ export const actions: Actions = {
 		const fg = guardFactory(myRole!, myFactoryId, cat.factory_id); if (fg) return fg;
 
 		if (id) {
-			// 수정
+			// ── 수정 (기존 로직 유지)
 			const { error } = await locals.supabase
 				.from('items')
-				.update({ category_id, name_ko, name_en: name_en ?? null, name_zh: name_zh ?? null, nickname: nickname ?? null })
+				.update({ category_id, name_ko, name_en: name_en || null, name_zh: name_zh || null, nickname: nickname || null })
 				.eq('id', id);
 			if (error) return fail(500, { error: error.message });
+			return { success: true };
 		} else {
-			// 생성 — sort_order max+1
+			// ── 신규 생성: RPC create_item_with_price 로 item + price 한 트랜잭션
+			const client_id      = (form.get('client_id') as string);
+			const unit_price_raw = (form.get('unit_price') as string);
+			const effective_from = (form.get('effective_from') as string);
+
+			if (!client_id)      return fail(400, { error: 'client_id 누락' });
+			if (!effective_from) return fail(400, { error: '적용일 누락' });
+			const unit_price = parseInt(unit_price_raw?.replace(/[^0-9]/g, '') || '0', 10);
+			if (unit_price <= 0) return fail(400, { error: '단가는 0보다 커야 합니다.' });
+
+			// sort_order: 카테고리 내 현재 최대 + 1
 			const { data: maxRow } = await locals.supabase
 				.from('items')
 				.select('sort_order')
@@ -217,13 +228,30 @@ export const actions: Actions = {
 				.single();
 			const sort_order = (maxRow?.sort_order ?? -1) + 1;
 
-			const { data: inserted, error } = await locals.supabase
-				.from('items')
-				.insert({ category_id, factory_id: cat.factory_id, name_ko, name_en: name_en ?? null, name_zh: name_zh ?? null, nickname: nickname ?? null, sort_order })
-				.select('id, sort_order')
-				.single();
+			// factory_admin 권한 검증: client도 자기 공장인지 확인
+			if (myRole === 'factory_admin') {
+				const { data: client } = await locals.supabase
+					.from('clients').select('factory_id').eq('id', client_id).single();
+				if (!client || client.factory_id !== myFactoryId)
+					return fail(403, { error: '권한이 없습니다.' });
+			}
+
+			const { data: result, error } = await locals.supabase.rpc('create_item_with_price', {
+				p_category_id:    category_id,
+				p_factory_id:     cat.factory_id,
+				p_name_ko:        name_ko,
+				p_name_en:        name_en,
+				p_name_zh:        name_zh,
+				p_nickname:       nickname,
+				p_sort_order:     sort_order,
+				p_client_id:      client_id,
+				p_unit_price:     unit_price,
+				p_effective_from: effective_from,
+			});
 			if (error) return fail(500, { error: error.message });
-			return { success: true, id: inserted.id, sort_order: inserted.sort_order };
+
+			const parsed = result as { id: string; sort_order: number };
+			return { success: true, id: parsed.id, sort_order: parsed.sort_order };
 		}
 	},
 
