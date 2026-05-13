@@ -132,12 +132,12 @@
   let newAlias     = $state('');
   let newCn        = $state('');
   let newEn        = $state('');
-  let newPrice     = $state('0');
+  let newPrice     = $state('');
   let newPriceDate = $state(todayYMD());
 
   let newRowSubmitTried = $state(false);
   const newRowNameOk  = $derived(newName.trim().length > 0);
-  const newRowPriceOk = $derived(/^\d+$/.test(newPrice.trim()));
+  const newRowPriceOk = $derived(/^[1-9]\d*$/.test(newPrice.trim())); // 1 이상 필수
   // 날짜 빈칸이면 오늘 날짜로 대체하니 유효성 체크 제외
   const newRowDateOk  = $derived(!newPriceDate.trim() || isValidDate(newPriceDate));
 
@@ -157,7 +157,7 @@
     nameDrafts = {}; aliasDrafts = {}; cnDrafts = {}; enDrafts = {};
     priceDrafts = {}; dateDrafts = {};
     newName = ''; newAlias = ''; newCn = ''; newEn = '';
-    newPrice = '0'; newPriceDate = todayYMD();
+    newPrice = ''; newPriceDate = todayYMD();
     newRowSubmitTried = false;
     showDateModal = false; dateModalRow = null; dateModalValue = '';
   }
@@ -454,10 +454,10 @@
 
     // 입력칬 즉시 쒈기
     newName = ''; newAlias = ''; newCn = ''; newEn = '';
-    newPrice = '0'; newPriceDate = todayYMD();
+    newPrice = ''; newPriceDate = todayYMD();
     newRowSubmitTried = false;
 
-    // 임시 ID로 로컬에 리스트 먼저 추가
+    // 임시 ID로 로컈에 리스트 먼저 추가
     const tmpId = `tmp-${Date.now()}`;
     const maxSort = localItems.filter(i => i.category_id === catId)
       .reduce((m, i) => Math.max(m, i.sort_order), -1) + 1;
