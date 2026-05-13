@@ -2,7 +2,7 @@
   import Icon from '@iconify/svelte';
   import { tick } from 'svelte';
   import { flip } from 'svelte/animate';
-  import { invalidateAll } from '$app/navigation';
+  import { goto } from '$app/navigation';
   import { deserialize } from '$app/forms';
   import SearchBar from '$lib/components/SearchBar.svelte';
   import type { PageProps, PageData } from './$types';
@@ -48,8 +48,8 @@
   function selectClient(id: string) {
     const url = new URL(window.location.href);
     url.searchParams.set('clientId', id);
-    history.replaceState(history.state, '', url.toString());
-    invalidateAll();
+    showClientModal = false;
+    goto(url.toString(), { replaceState: true });
   }
 
   // 거래처 선택 모달
@@ -725,14 +725,14 @@
         <SearchBar
           placeholder="거래처 검색..."
           items={clientSearchItems}
-          onselect={(id) => { selectClient(id); showClientModal = false; }}
+          onselect={(id) => selectClient(id)}
           class="w-full"
         />
       </div>
       <div class="min-h-0 flex-1 overflow-y-auto">
         {#each data.clients as client (client.id)}
           <button
-            onclick={() => { selectClient(client.id); showClientModal = false; }}
+            onclick={() => selectClient(client.id)}
             class="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-base-200 {selectedClientId === client.id ? 'bg-primary/10 font-semibold text-primary' : ''}"
           >
             <span class="min-w-0 flex-1 truncate text-sm">{client.name}</span>
