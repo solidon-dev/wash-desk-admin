@@ -5,86 +5,69 @@
     placeholder?: string;
     items: { id: string; label: string; sub?: string }[];
     onselect: (id: string) => void;
+    oninput?: (value: string) => void;
+    onenter?: (value: string) => void;
+    onclear?: () => void;
+    initialValue?: string;
     class?: string;
   }
 
-  let { placeholder = '검색...', items, onselect, class: className = '' }: Props = $props();
+  let { placeholder = '검색...', items, onselect, oninput, onenter, onclear, initialValue = '', class: className = '' }: Props = $props();
 
   let query     = $state('');
   let activeIdx = $state(-1);
   let open      = $state(false);
   let inputEl   = $state<HTMLInputElement | null>(null);
-  // confirm() 직후 effect가 다시 open시키지 못하도록 guard
   let justConfirmed = false;
+
+  $effect(() => {
+    if (!justConfirmed) query = initialValue ?? '';
+  });
 
   const suggestions = $derived(
     query.trim() === ''
       ? []
       : items
-          .filter(
-            (it) =>
-              it.label.toLowerCase().includes(query.trim().toLowerCase()) ||
-              (it.sub ?? '').toLowerCase().includes(query.trim().toLowerCase())
+          .filter(it =>
+            it.label.toLowerCase().includes(query.trim().toLowerCase()) ||
+            (it.sub ?? '').toLowerCase().includes(query.trim().toLowerCase())
           )
           .slice(0, 8)
   );
 
-  // query가 바뀌면 인덱스 리셋 + 드롭다운 열기
-  // (단, confirm 직후에는 건너뜀)
   $effect(() => {
     const q = query;
     if (justConfirmed) return;
     activeIdx = -1;
-    if (q.trim() === '') {
-      open = false;
-      onselect('');
-    } else if (suggestions.length === 0) {
-      open = false;
-      onselect('');
-    } else {
-      open = true;
-    }
+    open = q.trim() !== '' && suggestions.length > 0;
   });
 
   function handleKeydown(e: KeyboardEvent) {
-    if (e.key === 'Escape') {
-      open = false;
-      activeIdx = -1;
-      return;
-    }
+    if (e.key === 'Escape') { open = false; activeIdx = -1; return; }
     if (!open || suggestions.length === 0) {
-      if (e.key === 'Enter' && suggestions.length > 0) {
+      if (e.key === 'Enter') {
         e.preventDefault();
-        confirm(suggestions[0].id);
+        if (suggestions.length > 0) confirmItem(suggestions[0].id);
+        else onenter?.(query);
       }
       return;
     }
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      activeIdx = Math.min(activeIdx + 1, suggestions.length - 1);
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      activeIdx = Math.max(activeIdx - 1, -1);
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      confirm(activeIdx >= 0 ? suggestions[activeIdx].id : suggestions[0].id);
-    }
+    if (e.key === 'ArrowDown') { e.preventDefault(); activeIdx = Math.min(activeIdx + 1, suggestions.length - 1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); activeIdx = Math.max(activeIdx - 1, -1); }
+    else if (e.key === 'Enter') { e.preventDefault(); confirmItem(activeIdx >= 0 ? suggestions[activeIdx].id : suggestions[0].id); }
   }
 
-  function confirm(id: string) {
-    const found = items.find((it) => it.id === id);
-    // guard 세우고 query 변경 → effect가 open을 켜지 못하도록
+  function confirmItem(id: string) {
+    const found = items.find(it => it.id === id);
     justConfirmed = true;
     open = false;
     activeIdx = -1;
     if (found) query = found.label;
     onselect(id);
-    // 다음 마이크로태스크에서 guard 해제
     Promise.resolve().then(() => { justConfirmed = false; });
   }
 
   function handleBlur() {
-    // 리스트 항목 클릭이 먼저 처리되도록 한 프레임 대기
     setTimeout(() => { open = false; }, 100);
   }
 
@@ -93,15 +76,12 @@
     query = '';
     open = false;
     activeIdx = -1;
-    onselect('');
     Promise.resolve().then(() => { justConfirmed = false; });
     inputEl?.focus();
+    onclear?.();
   }
 
-  // onselect('') 외부 호출 시 query 클리어 (selectedId 외부에서 리셋될 때)
-  export function reset() {
-    clearQuery();
-  }
+  export function reset() { clearQuery(); }
 </script>
 
 <div class="relative {className}">
@@ -112,23 +92,13 @@
       type="text"
       {placeholder}
       bind:value={query}
+      oninput={() => oninput?.(query)}
       onkeydown={handleKeydown}
       onblur={handleBlur}
       onfocus={() => { if (!justConfirmed && suggestions.length > 0) open = true; }}
       autocomplete="off"
       class="grow text-sm bg-transparent outline-none"
     />
-    {#if query}
-      <button
-        type="button"
-        onmousedown={(e) => e.preventDefault()}
-        onclick={clearQuery}
-        class="text-error/60 hover:text-error transition-colors"
-        aria-label="검색 초기화"
-      >
-        <Icon icon="lucide:x" class="w-3.5 h-3.5" />
-      </button>
-    {/if}
   </label>
 
   {#if open && suggestions.length > 0}
@@ -142,7 +112,7 @@
           role="option"
           aria-selected={i === activeIdx}
           onmousedown={(e) => e.preventDefault()}
-          onclick={() => confirm(item.id)}
+          onclick={() => confirmItem(item.id)}
           onmouseenter={() => (activeIdx = i)}
           class="flex items-center gap-2 px-3 py-2 cursor-pointer text-sm transition-colors
             {i === activeIdx ? 'bg-primary/10 text-primary' : 'hover:bg-base-200'}"
