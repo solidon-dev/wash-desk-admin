@@ -141,6 +141,18 @@
   // 날짜 빈칸이면 오늘 날짜로 대체하니 유효성 체크 제외
   const newRowDateOk  = $derived(!newPriceDate.trim() || isValidDate(newPriceDate));
 
+  // 특정 품목의 현재 저장된 최신 적용일 반환 (새 날짜는 이보다 커야 함)
+  function getMinDate(itemId: string): string {
+    return getPriceDate(itemId); // 현재 저장된 effective_from
+  }
+
+  // 날짜가 기존 최신 적용일보다 큰지 검사
+  // minDate가 없으면(최초 등록) 제한 없음
+  function isDateAfterMin(date: string, minDate: string): boolean {
+    if (!minDate) return true;
+    return date > minDate;
+  }
+
   let editingOrderRow  = $state<number | null>(null);
   let orderInputValue  = $state('');
 
@@ -362,8 +374,13 @@
     const raw = draft.trim();
     if (raw && !isValidDate(raw)) return;
     const val = raw || todayYMD();
-    const price = getPrice(item.id);
     const prevDate = getPriceDate(item.id);
+    // 기존 날짜 이하이면 저장 거부
+    if (!isDateAfterMin(val, prevDate)) {
+      showToast(`적용일은 현재 날짜(${prevDate})보다 이후여야 합니다.`);
+      return;
+    }
+    const price = getPrice(item.id);
     patchLocalPrice(item.id, { effective_from: val }, selectedClientId);
     submitBg('upsertPrice', {
       item_id: item.id, client_id: selectedClientId,
