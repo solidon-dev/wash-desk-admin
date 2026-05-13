@@ -22,12 +22,9 @@
   // eslint-disable-next-line svelte/prefer-writable-derived
   let localCategories = $state<typeof data.categories>(data.categories.map(c => ({ ...c })));
 
-  // 낙관적 업데이트 중 invalidateAll이 일어나도 $effect를 데이터로 겹어쓰지 않도로
-  let _suppressSync = false;
-
-  $effect(() => { if (!_suppressSync) localItems      = [...data.items]; });
-  $effect(() => { if (!_suppressSync) localPrices     = (data.itemPrices as Price[]).map(p => ({ ...p })); });
-  $effect(() => { if (!_suppressSync) localCategories = [...data.categories]; });
+  $effect(() => { localItems      = [...data.items]; });
+  $effect(() => { localPrices     = (data.itemPrices as Price[]).map(p => ({ ...p })); });
+  $effect(() => { localCategories = [...data.categories]; });
 
   // ── 토스트 ────────────────────────────────────────────────────
   type Toast = { id: number; msg: string; type: 'error' | 'success' };
@@ -487,30 +484,28 @@
       const res = await fetch('?/upsertItem', { method: 'POST', body: form });
       if (!res.ok) throw new Error('server error');
 
-      // invalidateAll 전후 $effect 동기화 억제 — 포커스/로컈 상태 귀작 방지
-      _suppressSync = true;
-      await invalidateAll();
-      await tick();
+      // 응답 JSON에서 실제 id 직접 파싱 — invalidateAll 불필요
+      const json = await res.json();
+      const realId: string | undefined = json?.data?.id;
+      if (!realId) throw new Error('no id in response');
 
-      // 임시 id → 실제 id 로컬 직접 교체
-      const realItem = data.items.find(i => i.name_ko === name && i.category_id === catId);
-      if (realItem) {
-        localItems = localItems.map(i => i.id === tmpId ? { ...realItem } : i);
-        if (price > 0) {
-          localPrices = localPrices.filter(p => p.item_id !== tmpId);
-          patchLocalPrice(realItem.id, { unit_price: price, effective_from: priceDate }, cliId);
-          submitBg('upsertPrice', {
-            item_id: realItem.id, client_id: cliId,
-            unit_price: String(price), effective_from: priceDate,
-          }, () => { localPrices = localPrices.filter(p => p.item_id !== realItem.id); });
-        }
+      // 임시 id → 실제 id 로컈 직접 교체 (리렌더 최소화, 포커스 무영향)
+      localItems = localItems.map(i =>
+        i.id === tmpId ? { ...i, id: realId } : i
+      );
+      if (price > 0) {
+        localPrices = localPrices.map(p =>
+          p.item_id === tmpId ? { ...p, item_id: realId } : p
+        );
+        submitBg('upsertPrice', {
+          item_id: realId, client_id: cliId,
+          unit_price: String(price), effective_from: priceDate,
+        }, () => { localPrices = localPrices.filter(p => p.item_id !== realId); });
       }
-      _suppressSync = false;
     } catch {
       // 실패 → 로컈 롤백
       localItems = localItems.filter(i => i.id !== tmpId);
       localPrices = localPrices.filter(p => p.item_id !== tmpId);
-      _suppressSync = false;
       showToast('품목 추가 실패 — 다시 시도해주세요.');
     }
   }

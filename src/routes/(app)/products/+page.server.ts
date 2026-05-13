@@ -217,12 +217,14 @@ export const actions: Actions = {
 				.single();
 			const sort_order = (maxRow?.sort_order ?? -1) + 1;
 
-			const { error } = await locals.supabase
+			const { data: inserted, error } = await locals.supabase
 				.from('items')
-				.insert({ category_id, factory_id: cat.factory_id, name_ko, name_en: name_en ?? null, name_zh: name_zh ?? null, nickname: nickname ?? null, sort_order });
+				.insert({ category_id, factory_id: cat.factory_id, name_ko, name_en: name_en ?? null, name_zh: name_zh ?? null, nickname: nickname ?? null, sort_order })
+				.select('id, sort_order')
+				.single();
 			if (error) return fail(500, { error: error.message });
+			return { success: true, id: inserted.id, sort_order: inserted.sort_order };
 		}
-		return { success: true };
 	},
 
 	// ── 품목 삭제
