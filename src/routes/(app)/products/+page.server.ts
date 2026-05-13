@@ -59,24 +59,35 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		.order('sort_order', { ascending: true })
 		.order('created_at', { ascending: true });
 
-	// items (sort_order ASC)
-	const { data: items } = await locals.supabase
-		.from('items')
-		.select('id, category_id, factory_id, name_ko, name_en, name_zh, nickname, sort_order')
-		.eq('factory_id', targetFactoryId)
-		.order('sort_order', { ascending: true })
-		.order('created_at', { ascending: true });
-
-	// item_prices for this client
-	const { data: itemPrices } = await (locals.supabase.from('item_prices') as any)
+	// items: 해당 거래처(client_id)에 item_prices row가 있는 품목만
+	// item_prices를 먼저 가져온 뒤, 그 item_id 목록으로 items 조회
+	const { data: itemPricesRaw } = await (locals.supabase.from('item_prices') as any)
 		.select('id, item_id, unit_price, effective_from')
 		.eq('client_id', selectedClientId as string);
 
+	const priceList = (itemPricesRaw ?? []) as Array<{ id: string; item_id: string; unit_price: number; effective_from: string }>;
+	const itemIds = priceList.map(p => p.item_id);
+
+	let items: Array<{ id: string; category_id: string; factory_id: string; name_ko: string; name_en: string | null; name_zh: string | null; nickname: string | null; sort_order: number }> = [];
+	if (itemIds.length > 0) {
+		const { data } = await locals.supabase
+			.from('items')
+			.select('id, category_id, factory_id, name_ko, name_en, name_zh, nickname, sort_order')
+			.in('id', itemIds)
+			.order('sort_order', { ascending: true })
+			.order('created_at', { ascending: true });
+		items = data ?? [];
+	}
+
+	// 사용된 category_id만 추려서 categories도 필터링
+	const usedCategoryIds = new Set(items.map(i => i.category_id));
+	const filteredCategories = (categories ?? []).filter(c => usedCategoryIds.has(c.id));
+
 	return {
 		clients:          clients   ?? [],
-		categories:       categories ?? [],
-		items:            items      ?? [],
-		itemPrices:       (itemPrices ?? []).map((p: Record<string, unknown>) => ({ ...p, client_id: selectedClientId })),
+		categories:       filteredCategories,
+		items:            items,
+		itemPrices:       priceList.map(p => ({ ...p, client_id: selectedClientId })),
 		selectedClientId,
 	};
 };
