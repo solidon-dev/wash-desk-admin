@@ -25,6 +25,7 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 	return {
 		user: locals.session.user,
 		role,
+		factory_id: locals.session.factory_id ?? null,
 		factories: factories ?? [],
 	};
 };
