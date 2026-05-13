@@ -3,6 +3,7 @@
   import { tick } from 'svelte';
   import { flip } from 'svelte/animate';
   import { invalidateAll } from '$app/navigation';
+  import { deserialize } from '$app/forms';
   import SearchBar from '$lib/components/SearchBar.svelte';
   import type { PageProps, PageData } from './$types';
 
@@ -12,19 +13,20 @@
   type Item = PageData['items'][number];
   type Price = { id: string; item_id: string; client_id: string; unit_price: number; effective_from: string };
 
-  // ── 낙관적 로컬 상태 ──────────────────────────────────────────
-  // 서버 data가 바뀌면 로컬 상태도 동기화
-  // (svelte lint 업데이트: $state + $effect로 쓰기 가능한 로컈 상태 유지)
-  // eslint-disable-next-line svelte/prefer-writable-derived
-  let localItems      = $state<Item[]>(data.items.map(i => ({ ...i })));
-  // eslint-disable-next-line svelte/prefer-writable-derived
-  let localPrices     = $state<Price[]>((data.itemPrices as Price[]).map(p => ({ ...p })));
-  // eslint-disable-next-line svelte/prefer-writable-derived
-  let localCategories = $state<typeof data.categories>(data.categories.map(c => ({ ...c })));
+  // ── 낙관적 로컈 상태 ──────────────────────────────────────────
+  // $derived로 맨저 래핑해서 $effect가 정확히 추적하게 함 (state_referenced_locally 경고 해결)
+  const serverItems      = $derived(data.items);
+  const serverPrices     = $derived(data.itemPrices as Price[]);
+  const serverCategories = $derived(data.categories);
 
-  $effect(() => { localItems      = [...data.items]; });
-  $effect(() => { localPrices     = (data.itemPrices as Price[]).map(p => ({ ...p })); });
-  $effect(() => { localCategories = [...data.categories]; });
+  // 서버 data가 바뀌면 로컈 상태도 동기화
+  let localItems      = $state<Item[]>([]);
+  let localPrices     = $state<Price[]>([]);
+  let localCategories = $state<typeof data.categories>([]);
+
+  $effect(() => { localItems      = [...serverItems]; });
+  $effect(() => { localPrices     = serverPrices.map(p => ({ ...p })); });
+  $effect(() => { localCategories = [...serverCategories]; });
 
   // ── 토스트 ────────────────────────────────────────────────────
   type Toast = { id: number; msg: string; type: 'error' | 'success' };
@@ -484,9 +486,10 @@
       const res = await fetch('?/upsertItem', { method: 'POST', body: form });
       if (!res.ok) throw new Error('server error');
 
-      // 응답 JSON에서 실제 id 직접 파싱 — invalidateAll 불필요
-      const json = await res.json();
-      const realId: string | undefined = json?.data?.id;
+      // 응답 JSON에서 실제 id 직접 파싱 — SvelteKit action 응답은 devalue 형식이라 deserialize 필수
+      const result = deserialize(await res.text());
+      if (result.type !== 'success') throw new Error('server error');
+      const realId = (result.data as Record<string, unknown>)?.id as string | undefined;
       if (!realId) throw new Error('no id in response');
 
       // 임시 id → 실제 id 로컈 직접 교체 (리렌더 최소화, 포커스 무영향)

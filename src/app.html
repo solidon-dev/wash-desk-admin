@@ -12,6 +12,23 @@
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">
+		<script>
+			// 입력 자동완성 전역 비활성화
+			(function() {
+				function off(el) {
+					if (el.tagName === 'INPUT') el.setAttribute('autocomplete', 'off');
+					if (el.querySelectorAll) el.querySelectorAll('input').forEach(function(i) { i.setAttribute('autocomplete', 'off'); });
+				}
+				document.addEventListener('DOMContentLoaded', function() {
+					off(document.body);
+					new MutationObserver(function(muts) {
+						muts.forEach(function(m) {
+							m.addedNodes.forEach(function(n) { if (n.nodeType === 1) off(n); });
+						});
+					}).observe(document.body, { childList: true, subtree: true });
+				});
+			})();
+		</script>
 		<div style="display: contents">%sveltekit.body%</div>
 	</body>
 </html>

@@ -49,7 +49,7 @@
 		sidebarOpen = false;
 	});
 
-	const navItems = [
+	const navItems = $derived([
 		{ icon: 'lucide:building-2', label: '거래처 관리', path: '/clients', exact: true },
 		{ icon: 'lucide:users', label: '사용자 관리', path: '/users', exact: false },
 		...(role === 'super_admin' ? [{ icon: 'lucide:factory', label: '세탁공장 관리', path: '/factories', exact: false }] : []),
@@ -57,7 +57,7 @@
 		{ icon: 'lucide:receipt', label: '청구서 관리', path: '/billing', exact: false },
 		{ icon: 'lucide:bar-chart-2', label: '입출고 · 통계', path: '/stats', exact: false },
 		{ icon: 'lucide:message-square', label: '메모 확인', path: '/memos', exact: false, badge: true },
-	];
+	]);
 
 	function isActive(nav: { path: string; exact: boolean }): boolean {
 		const pathname = page.url.pathname;

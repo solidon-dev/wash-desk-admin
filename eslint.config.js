@@ -42,6 +42,9 @@ export default defineConfig(
 		rules: {
 			'svelte/no-goto-without-resolve': 'off',
 			'svelte/no-reactive-reassign': 'off',
+			// 낙관적 업데이트 패턴($state + $effect)을 위해 비활성화
+			'svelte/prefer-writable-derived': 'off',
+			'svelte/state-referenced-locally': 'off',
 			'no-undef': 'off'
 		}
 	}
