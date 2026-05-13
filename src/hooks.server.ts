@@ -9,14 +9,17 @@ export const handle: Handle = async ({ event, resolve }) => {
 	const { data: { user } } = await supabase.auth.getUser();
 
 	if (user) {
-		// profiles 테이블에서 role 조회
 		const { data: profile } = await supabase
 			.from('profiles')
-			.select('role')
+			.select('role, factory_id')
 			.eq('id', user.id)
 			.single();
 
-		event.locals.session = { user, role: profile?.role ?? null };
+		event.locals.session = {
+			user,
+			role: profile?.role ?? null,
+			factory_id: profile?.factory_id ?? null,
+		};
 	} else {
 		event.locals.session = null;
 	}

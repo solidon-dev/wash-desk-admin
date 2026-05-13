@@ -8,7 +8,7 @@ declare global {
 		// interface Error {}
 		interface Locals {
 			supabase: SupabaseClient<Database>;
-			session: { user: User; role: string | null } | null;
+			session: { user: User; role: string | null; factory_id: string | null } | null;
 		}
 		// interface PageData {}
 		// interface PageState {}

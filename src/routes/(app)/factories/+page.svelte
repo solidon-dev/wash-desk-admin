@@ -1,54 +1,39 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import Icon from '@iconify/svelte';
   import SearchBar from '$lib/components/SearchBar.svelte';
   import Pagination from '$lib/components/Pagination.svelte';
   import TableCard from '$lib/components/TableCard.svelte';
+  import {
+    getFactories,
+    createFactory,
+    updateFactory,
+    hideFactory,
+    restoreFactory,
+    type Factory,
+  } from '$lib/api/factories';
 
-  interface Factory {
-    id: string;
-    name: string;
-    address?: string;
-    phone?: string;
-    isHidden: boolean;
-    createdAt: string;
-  }
+  // ── 데이터 ──
+  let factories = $state<Factory[]>([]);
+  let loading   = $state(true);
+  let saveError = $state('');
 
-  let factories = $state<Factory[]>([
-    { id: 'factory-001', name: '본사 세탁공장',     address: '서울시 강남구 테헤란로 123',         phone: '02-1234-5678',  isHidden: false, createdAt: '2024-01-01' },
-    { id: 'factory-002', name: '부산 세탁공장',     address: '부산시 해운대구 해운대로 56',         phone: '051-9876-5432', isHidden: false, createdAt: '2024-01-01' },
-    { id: 'factory-003', name: '제주 세탁공장',     address: '제주시 노형동 첨단로 17',             phone: '064-111-2222',  isHidden: false, createdAt: '2024-03-01' },
-    { id: 'factory-004', name: '대구 세탁공장',     address: '대구시 달서구 성서로 88',             phone: '053-333-4444',  isHidden: false, createdAt: '2024-05-01' },
-    { id: 'factory-005', name: '광주 세탁공장',     address: '광주시 서구 상무대로 45',             phone: '062-555-6666',  isHidden: true,  createdAt: '2024-06-15' },
-    { id: 'factory-006', name: '인천 세탁공장',     address: '인천시 남동구 논현로 200',            phone: '032-777-8888',  isHidden: false, createdAt: '2024-08-01' },
-    { id: 'factory-007', name: '대전 세탁공장',     address: '대전시 유성구 대학로 99',             phone: '042-999-0000',  isHidden: false, createdAt: '2024-09-10' },
-    { id: 'factory-008', name: '울산 세탁공장',     address: '울산시 남구 삼산로 34',               phone: '052-111-3333',  isHidden: true,  createdAt: '2024-10-01' },
-    { id: 'factory-009', name: '수원 세탁공장',     address: '경기도 수원시 팔달구 중부대로 55',    phone: '031-222-4444',  isHidden: false, createdAt: '2024-11-01' },
-    { id: 'factory-010', name: '청주 세탁공장',     address: '충북 청주시 상당구 상당로 10',        phone: '043-444-5555',  isHidden: false, createdAt: '2024-12-01' },
-    { id: 'factory-011', name: '전주 세탁공장',     address: '전북 전주시 완산구 기린대로 7',       phone: '063-666-7777',  isHidden: false, createdAt: '2025-01-05' },
-    { id: 'factory-012', name: '창원 세탁공장',     address: '경남 창원시 성산구 공단로 50',        phone: '055-888-9999',  isHidden: false, createdAt: '2025-02-01' },
-    { id: 'factory-013', name: '성남 세탁공장',     address: '경기도 성남시 분당구 판교로 235',     phone: '031-100-2200',  isHidden: false, createdAt: '2025-02-10' },
-    { id: 'factory-014', name: '고양 세탁공장',     address: '경기도 고양시 일산동구 중앙로 1256', phone: '031-200-3300',  isHidden: false, createdAt: '2025-02-20' },
-    { id: 'factory-015', name: '용인 세탁공장',     address: '경기도 용인시 기흥구 동백죽전대로 2', phone: '031-300-4400',  isHidden: false, createdAt: '2025-03-01' },
-    { id: 'factory-016', name: '안양 세탁공장',     address: '경기도 안양시 만안구 만안로 38',      phone: '031-400-5500',  isHidden: false, createdAt: '2025-03-05' },
-    { id: 'factory-017', name: '포항 세탁공장',     address: '경북 포항시 남구 지곡로 39',          phone: '054-500-6600',  isHidden: false, createdAt: '2025-03-10' },
-    { id: 'factory-018', name: '춘천 세탁공장',     address: '강원도 춘천시 중앙로 1',              phone: '033-600-7700',  isHidden: false, createdAt: '2025-03-12' },
-    { id: 'factory-019', name: '천안 세탁공장',     address: '충남 천안시 서북구 성환읍 충절로 9',  phone: '041-700-8800',  isHidden: true,  createdAt: '2025-03-15' },
-    { id: 'factory-020', name: '목포 세탁공장',     address: '전남 목포시 해양대학로 91',           phone: '061-800-9900',  isHidden: false, createdAt: '2025-03-18' },
-    { id: 'factory-021', name: '여수 세탁공장',     address: '전남 여수시 돌산읍 우두리 12',        phone: '061-900-1100',  isHidden: false, createdAt: '2025-03-20' },
-    { id: 'factory-022', name: '순천 세탁공장',     address: '전남 순천시 팔마로 99',               phone: '061-010-2200',  isHidden: false, createdAt: '2025-03-22' },
-    { id: 'factory-023', name: '원주 세탁공장',     address: '강원도 원주시 중앙로 4',              phone: '033-020-3300',  isHidden: false, createdAt: '2025-03-24' },
-    { id: 'factory-024', name: '진주 세탁공장',     address: '경남 진주시 진주대로 501',            phone: '055-030-4400',  isHidden: false, createdAt: '2025-03-26' },
-    { id: 'factory-025', name: '제천 세탁공장',     address: '충북 제천시 의림대로 153',            phone: '043-040-5500',  isHidden: false, createdAt: '2025-03-28' },
-  ]);
+  onMount(async () => {
+    try {
+      factories = await getFactories();
+    } finally {
+      loading = false;
+    }
+  });
 
-  // ── 검색 ──
-  let selectedId = $state('');
-  let showHidden = $state(false);
+  // ── 검색 / 필터 ──
+  let selectedId  = $state('');
+  let showHidden  = $state(false);
 
   const searchItems = $derived(
     factories
-      .filter((f) => !f.isHidden)
-      .map((f) => ({ id: f.id, label: f.name, sub: f.address }))
+      .filter((f) => f.deleted_at === null)
+      .map((f) => ({ id: f.id, label: f.name, sub: f.address ?? undefined }))
   );
 
   // ── 페이지네이션 ──
@@ -57,13 +42,14 @@
 
   const filteredFactories = $derived(
     factories.filter((f) => {
-      if (!showHidden && f.isHidden) return false;
+      const isHidden = f.deleted_at !== null;
+      if (!showHidden && isHidden) return false;
       if (selectedId) return f.id === selectedId;
       return true;
     })
   );
 
-  $effect(() => { selectedId; showHidden; currentPage = 1; });
+  $effect(() => { void selectedId; void showHidden; currentPage = 1; });
 
   const totalPages       = $derived(Math.max(1, Math.ceil(filteredFactories.length / PAGE_SIZE)));
   const visibleFactories = $derived(filteredFactories.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE));
@@ -76,12 +62,14 @@
   let formName       = $state('');
   let formAddress    = $state('');
   let formPhone      = $state('');
+  let saving         = $state(false);
 
   function openAdd() {
     editingFactory = null;
     formName    = '';
     formAddress = '';
     formPhone   = '';
+    saveError   = '';
     showModal   = true;
   }
 
@@ -90,43 +78,71 @@
     formName    = f.name;
     formAddress = f.address ?? '';
     formPhone   = f.phone   ?? '';
+    saveError   = '';
     showModal   = true;
   }
 
   function closeModal() { showModal = false; }
 
-  function handleSave() {
+  async function handleSave() {
     if (!formName.trim()) return;
+    saving    = true;
+    saveError = '';
+
     const payload = {
       name:    formName.trim(),
-      address: formAddress.trim() || undefined,
-      phone:   formPhone.trim()   || undefined,
+      address: formAddress.trim() || null,
+      phone:   formPhone.trim()   || null,
     };
-    if (editingFactory) {
-      const idx = factories.findIndex((f) => f.id === editingFactory!.id);
-      if (idx !== -1) factories[idx] = { ...factories[idx], ...payload };
-    } else {
-      factories.push({ ...payload, id: crypto.randomUUID(), isHidden: false, createdAt: new Date().toISOString().slice(0, 10) });
+
+    try {
+      if (editingFactory) {
+        const updated = await updateFactory(editingFactory.id, payload);
+        const idx = factories.findIndex((f) => f.id === editingFactory!.id);
+        if (idx !== -1) factories[idx] = updated;
+      } else {
+        const created = await createFactory(payload);
+        factories.push(created);
+      }
+      closeModal();
+    } catch (e: unknown) {
+      saveError = e instanceof Error ? e.message : '저장 중 오류가 발생했습니다.';
+    } finally {
+      saving = false;
     }
-    closeModal();
   }
 
   // ── 숨기기 확인 ──
   let hideTargetId = $state<string | null>(null);
   function openHide(id: string) { hideTargetId = id; }
-  function confirmHide() {
-    if (hideTargetId) {
-      const idx = factories.findIndex((f) => f.id === hideTargetId);
-      if (idx !== -1) factories[idx].isHidden = true;
-      if (selectedId === hideTargetId) selectedId = '';
-    }
-    hideTargetId = null;
-  }
   function cancelHide() { hideTargetId = null; }
 
-  function restoreFactory(id: string) {
-    const idx = factories.findIndex((f) => f.id === id);
-    if (idx !== -1) factories[idx].isHidden = false;
+  async function confirmHide() {
+    if (!hideTargetId) return;
+    const id = hideTargetId;
+    hideTargetId = null;
+    try {
+      await hideFactory(id);
+      const idx = factories.findIndex((f) => f.id === id);
+      if (idx !== -1) factories[idx] = { ...factories[idx], deleted_at: new Date().toISOString() };
+      if (selectedId === id) selectedId = '';
+    } catch {
+      // 에러는 조용히 무시하지 않고 토스트 추가 예정
+    }
+  }
+
+  async function handleRestore(id: string) {
+    try {
+      await restoreFactory(id);
+      const idx = factories.findIndex((f) => f.id === id);
+      if (idx !== -1) factories[idx] = { ...factories[idx], deleted_at: null };
+      // 모달 내부에서 호출된 경우 editingFactory 도 갱신
+      if (editingFactory?.id === id) {
+        editingFactory = { ...editingFactory, deleted_at: null };
+      }
+    } catch {
+      // TODO: 에러 처리
+    }
   }
 </script>
 
@@ -167,7 +183,13 @@
         </tr>
       </thead>
       <tbody>
-        {#if filteredFactories.length === 0}
+        {#if loading}
+          <tr>
+            <td colspan="5" class="py-16 text-center">
+              <span class="loading loading-spinner loading-md text-primary"></span>
+            </td>
+          </tr>
+        {:else if filteredFactories.length === 0}
           <tr>
             <td colspan="5" class="py-16 text-center text-base-content/40 text-sm">
               {selectedId ? '선택된 공장이 없습니다.' : '등록된 공장이 없습니다.'}
@@ -175,19 +197,20 @@
           </tr>
         {:else}
           {#each visibleFactories as factory (factory.id)}
-            <tr class="hover:bg-base-200 transition-colors {factory.isHidden ? 'opacity-40' : ''}">
+            {@const isHidden = factory.deleted_at !== null}
+            <tr class="hover:bg-base-200 transition-colors {isHidden ? 'opacity-40' : ''}">
 
               <!-- 공장명 -->
               <td class="font-semibold text-base-content">
                 <span>{factory.name}</span>
-                {#if factory.isHidden}
+                {#if isHidden}
                   <span class="badge badge-ghost badge-xs ml-1">숨김</span>
                 {/if}
                 <!-- lg 미만 인라인 -->
                 <div class="lg:hidden mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
                   {#if factory.phone}<span class="text-xs text-base-content/50">{factory.phone}</span>{/if}
                   {#if factory.address}<span class="text-xs text-base-content/40">{factory.address}</span>{/if}
-                  <span class="text-xs text-base-content/30">{formatDate(factory.createdAt)}</span>
+                  <span class="text-xs text-base-content/30">{formatDate(factory.created_at)}</span>
                 </div>
               </td>
 
@@ -198,7 +221,7 @@
               <td class="text-base-content/70 text-sm hidden lg:table-cell">{factory.phone ?? '—'}</td>
 
               <!-- 등록일 -->
-              <td class="text-base-content/50 text-xs whitespace-nowrap hidden lg:table-cell">{formatDate(factory.createdAt)}</td>
+              <td class="text-base-content/50 text-xs whitespace-nowrap hidden lg:table-cell">{formatDate(factory.created_at)}</td>
 
               <!-- 액션 -->
               <td>
@@ -243,10 +266,10 @@
             {editingFactory ? '공장 수정' : '공장 등록'}
           </h3>
           {#if editingFactory}
-            {#if editingFactory.isHidden}
+            {#if editingFactory.deleted_at !== null}
               <button
                 type="button"
-                onclick={() => { restoreFactory(editingFactory!.id); editingFactory = { ...editingFactory!, isHidden: false }; }}
+                onclick={() => handleRestore(editingFactory!.id)}
                 class="btn btn-xs btn-success gap-1 font-bold"
               >
                 <Icon icon="lucide:eye" class="w-3.5 h-3.5" />
@@ -302,12 +325,23 @@
             <input id="fPhone" type="text" bind:value={formPhone} placeholder="02-0000-0000"
               class="input input-bordered w-full text-sm" />
           </div>
+
+          <!-- 에러 메시지 -->
+          {#if saveError}
+            <div class="alert alert-error gap-2 rounded-xl py-3 px-4 text-sm font-semibold">
+              <Icon icon="lucide:circle-alert" class="h-4 w-4 shrink-0" />
+              <span>{saveError}</span>
+            </div>
+          {/if}
         </div>
 
         <!-- 액션 버튼 -->
         <div class="modal-action mt-5 pt-4 border-t border-base-200 shrink-0">
           <button type="button" onclick={closeModal} class="btn btn-ghost font-bold">취소</button>
-          <button type="submit" class="btn btn-primary font-bold">
+          <button type="submit" class="btn btn-primary font-bold" disabled={saving}>
+            {#if saving}
+              <span class="loading loading-spinner loading-xs"></span>
+            {/if}
             {editingFactory ? '저장' : '등록'}
           </button>
         </div>

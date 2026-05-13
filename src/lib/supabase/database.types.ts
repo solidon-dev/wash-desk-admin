@@ -120,42 +120,6 @@ export type Database = {
         }
         Relationships: []
       }
-      factory_members: {
-        Row: {
-          created_at: string
-          factory_id: string
-          id: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          factory_id: string
-          id?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          factory_id?: string
-          id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "factory_members_factory_id_fkey"
-            columns: ["factory_id"]
-            isOneToOne: false
-            referencedRelation: "factories"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "factory_members_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       inventory: {
         Row: {
           client_id: string
@@ -566,23 +530,34 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string
+          factory_id: string | null
           full_name: string | null
           id: string
           role: Database["public"]["Enums"]["user_role"]
         }
         Insert: {
           created_at?: string
+          factory_id?: string | null
           full_name?: string | null
           id: string
           role?: Database["public"]["Enums"]["user_role"]
         }
         Update: {
           created_at?: string
+          factory_id?: string | null
           full_name?: string | null
           id?: string
           role?: Database["public"]["Enums"]["user_role"]
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_factory_id_fkey"
+            columns: ["factory_id"]
+            isOneToOne: false
+            referencedRelation: "factories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -593,7 +568,7 @@ export type Database = {
         Args: { p_date: string; p_item_id: string }
         Returns: number
       }
-      is_factory_member: { Args: { p_factory_id: string }; Returns: boolean }
+      my_factory_id: { Args: never; Returns: string }
       my_role: {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
