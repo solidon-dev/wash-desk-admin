@@ -5,14 +5,17 @@
   import SearchBar from '$lib/components/SearchBar.svelte';
   import Pagination from '$lib/components/Pagination.svelte';
   import TableCard from '$lib/components/TableCard.svelte';
-  import { supabase } from '$lib/supabase/client';
   import type { PageData } from './$types';
+  import { formatPhone, unformatPhone, displayPhone } from '$lib/utils/phone';
 
   type Props = {
-    data: PageData & { users: UserRow[]; factories: { id: string; name: string }[] };
+    data: PageData & { users: UserRow[]; allFactories: { id: string; name: string }[]; role: string; factory_id: string | null };
     form: { success?: boolean; error?: string } | null;
   };
   let { data, form }: Props = $props();
+
+  const myRole      = $derived(data.role as UserRole);
+  const myFactoryId = $derived(data.factory_id as string | null);
 
   type UserRole = 'super_admin' | 'factory_admin' | 'worker';
 
@@ -40,7 +43,7 @@
   };
 
   let users      = $state<UserRow[]>(data.users);
-  const factories = $derived(data.factories);
+  const factories = $derived(data.allFactories);
 
   // 서버 액션 성공 시 데이터 갱신
   $effect(() => {
@@ -68,7 +71,9 @@
 
   const filteredUsers = $derived(
     users.filter(u => {
-      if (u.role === 'super_admin') return false;  // 최고관리자는 목록에서 제외
+      if (u.role === 'super_admin') return false;
+      // factory_admin은 자기 공장 소속만 표시
+      if (myRole === 'factory_admin' && u.factory_id !== myFactoryId) return false;
       if (!showDeleted && u.deleted_at !== null) return false;
       if (selectedId) return u.id === selectedId;
       return true;
@@ -80,10 +85,17 @@
   const totalPages   = $derived(Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE)));
   const visibleUsers = $derived(filteredUsers.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE));
 
-  function formatDate(iso: string) { return iso.slice(0, 10); }
+  // super_admin: 모두 수정 가능
+  // factory_admin: 자기 공장 소속만
+  // worker: 불가
+  function canEdit(u: UserRow) {
+    if (myRole === 'super_admin') return true;
+    if (myRole === 'factory_admin') return u.factory_id === myFactoryId;
+    return false;
+  }
 
+  function formatDate(iso: string) { return iso.slice(0, 10); }
   // ── 등록/수정 모달 ──
-  let showModal        = $state(false);
   let editingUser      = $state<UserRow | null>(null);
   let formName         = $state('');
   let formUsername     = $state('');
@@ -101,14 +113,22 @@
     formPasswordConf.length > 0 && formPassword !== formPasswordConf
   );
 
+  // select bind:value는 options 렌더 전에 평가되므로 $effect(DOM 업데이트 후)로 세팅
+  $effect(() => {
+    if (showModal && editingUser) {
+      formFactoryId = editingUser.factory_id ?? '';
+    }
+  });
+
   function openAdd() {
     editingUser      = null;
     formName         = '';
     formUsername     = '';
     formPassword     = '';
     formPasswordConf = '';
-    formRole         = 'worker';
-    formFactoryId    = factories[0]?.id ?? '';
+    // factory_admin은 역할 고정 worker, 공장 고정 자기 공장
+    formRole         = myRole === 'factory_admin' ? 'worker' : 'worker';
+    formFactoryId    = myRole === 'factory_admin' ? (myFactoryId ?? '') : (factories[0]?.id ?? '');
     formPhone        = '';
     showPassword     = false;
     showPasswordConf = false;
@@ -124,7 +144,7 @@
     formPasswordConf = '';
     formRole         = (u.role as UserRole) ?? 'worker';
     formFactoryId    = u.factory_id ?? '';
-    formPhone        = u.phone ?? '';
+    formPhone        = u.phone ? displayPhone(u.phone) : '';
     showPassword     = false;
     showPasswordConf = false;
     saveError        = '';
@@ -136,41 +156,7 @@
     saveError   = '';
   }
 
-  // 수정은 클라이언트에서 직접 supabase update
-  async function handleUpdate() {
-    if (!editingUser) return;
-    saving    = true;
-    saveError = '';
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          full_name:  formName.trim(),
-          role:       formRole,
-          factory_id: formFactoryId || null,
-          phone:      formPhone.trim() || null,
-        })
-        .eq('id', editingUser.id);
-
-      if (error) { saveError = error.message; return; }
-
-      // 로컬 상태 즉시 갱신
-      const idx = users.findIndex(u => u.id === editingUser!.id);
-      if (idx !== -1) {
-        users[idx] = {
-          ...users[idx],
-          full_name:    formName.trim(),
-          role:         formRole,
-          factory_id:   formFactoryId || null,
-          factory_name: factories.find(f => f.id === formFactoryId)?.name ?? null,
-          phone:        formPhone.trim() || null,
-        };
-      }
-      closeModal();
-    } finally {
-      saving = false;
-    }
-  }
+  let showModal        = $state(false);
 
   // ── 비활성화 확인 모달 ──
   let deactivateTargetId = $state<string | null>(null);
@@ -193,10 +179,12 @@
       <input type="checkbox" bind:checked={showDeleted} class="checkbox checkbox-sm" />
       비활성 포함
     </label>
+    {#if myRole === 'super_admin' || myRole === 'factory_admin'}
     <button onclick={openAdd} class="btn btn-primary btn-sm gap-2 whitespace-nowrap ml-auto sm:w-auto w-full">
       <Icon icon="lucide:plus" class="w-4 h-4" />
       사용자 등록
     </button>
+    {/if}
   </div>
 
   {#if form?.error}
@@ -249,10 +237,14 @@
               </td>
               <td class="text-base-content/70 text-sm font-mono hidden lg:table-cell">{user.username}</td>
               <td class="text-base-content/70 text-sm hidden lg:table-cell">{user.factory_name ?? '—'}</td>
-              <td class="text-base-content/70 text-sm hidden lg:table-cell">{user.phone ?? '—'}</td>
+              <td class="text-base-content/70 text-sm hidden lg:table-cell">{displayPhone(user.phone)}</td>
               <td class="text-base-content/50 text-xs whitespace-nowrap hidden lg:table-cell">{formatDate(user.created_at)}</td>
               <td class="text-center">
-                <button onclick={() => openEdit(user)} class="btn btn-ghost btn-xs text-primary font-semibold">수정</button>
+                {#if canEdit(user)}
+                  <button onclick={() => openEdit(user)} class="btn btn-ghost btn-xs text-primary font-semibold">수정</button>
+                {:else}
+                  <span class="text-xs text-base-content/20">—</span>
+                {/if}
               </td>
             </tr>
           {/each}
@@ -333,25 +325,35 @@
           <div class="grid grid-cols-2 gap-4">
             <div>
               <p class="label-text text-xs font-bold text-base-content/60 mb-2">역할 *</p>
-              <div class="flex gap-1.5">
-                {#each (['factory_admin', 'worker'] as UserRole[]) as r (r)}
-                  <button type="button" onclick={() => (formRole = r)} class="btn btn-sm font-bold flex-1 {formRole === r ? 'btn-primary' : 'btn-outline btn-ghost'}">{roleLabel[r]}</button>
-                {/each}
-              </div>
+              {#if myRole === 'super_admin'}
+                <div class="flex gap-1.5">
+                  {#each (['factory_admin', 'worker'] as UserRole[]) as r (r)}
+                    <button type="button" onclick={() => (formRole = r)} class="btn btn-sm font-bold flex-1 {formRole === r ? 'btn-primary' : 'btn-outline btn-ghost'}">{roleLabel[r]}</button>
+                  {/each}
+                </div>
+              {:else}
+                <div class="input input-bordered flex items-center text-sm opacity-50 h-10 px-3">{roleLabel['worker']}</div>
+              {/if}
               <input type="hidden" name="role" value={formRole} />
             </div>
             <div>
               <label for="cFactory" class="label pb-1"><span class="label-text text-xs font-bold text-base-content/60">소속 공장 *</span></label>
-              <select id="cFactory" name="factory_id" bind:value={formFactoryId} class="select select-bordered w-full text-sm" required>
-                <option value="">공장 선택</option>
-                {#each factories as f (f.id)}<option value={f.id}>{f.name}</option>{/each}
-              </select>
+              {#if myRole === 'super_admin'}
+                <select id="cFactory" name="factory_id" bind:value={formFactoryId} class="select select-bordered w-full text-sm" required>
+                  <option value="">공장 선택</option>
+                  {#each factories as f (f.id)}<option value={f.id}>{f.name}</option>{/each}
+                </select>
+              {:else}
+                {@const myFactory = factories.find(f => f.id === myFactoryId)}
+                <div class="input input-bordered flex items-center text-sm opacity-50 h-10 px-3">{myFactory?.name ?? '—'}</div>
+                <input type="hidden" name="factory_id" value={myFactoryId ?? ''} />
+              {/if}
             </div>
           </div>
           <!-- 연락처 -->
           <div>
             <label for="cPhone" class="label pb-1"><span class="label-text text-xs font-bold text-base-content/60">연락처 <span class="text-base-content/30 font-normal">(선택)</span></span></label>
-            <input id="cPhone" name="phone" type="text" bind:value={formPhone} placeholder="01012341234" maxlength="11" class="input input-bordered w-full text-sm" />
+            <input id="cPhone" name="phone" type="text" value={formPhone} oninput={(e) => { formPhone = formatPhone((e.target as HTMLInputElement).value); }} placeholder="010-0000-0000" maxlength="13" class="input input-bordered w-full text-sm" />
           </div>
           {#if saveError}
             <div class="alert alert-error gap-2 rounded-xl py-3 px-4 text-sm font-semibold">
@@ -368,32 +370,53 @@
   </dialog>
 {/if}
 
-<!-- ───────────────────────── 수정 모달 (클라이언트 supabase) ──────────────── -->
+<!-- ───────────────────────── 수정 모달 ────────────────────────── -->
 {#if showModal && editingUser}
   <dialog class="modal modal-open" onmousedown={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
     <div class="modal-box w-full max-w-lg rounded-2xl p-6 flex flex-col" style="max-height: 620px;">
+      {#key editingUser.id}
       <div class="flex items-center justify-between mb-5 shrink-0">
         <div class="flex items-center gap-3">
           <h3 class="text-lg font-extrabold text-base-content">사용자 수정</h3>
-          {#if editingUser?.deleted_at !== null}
-            <form method="POST" action="?/activate" use:enhance>
-              <input type="hidden" name="id" value={editingUser?.id} />
-              <button type="submit" class="btn btn-xs btn-success font-bold">활성화</button>
-            </form>
-          {:else}
-            <button onclick={() => { closeModal(); openDeactivate(editingUser!.id); }} class="btn btn-xs btn-outline btn-warning font-bold">비활성화</button>
+          {#if myRole === 'super_admin'}
+            {#if editingUser.deleted_at !== null}
+              <form method="POST" action="?/activate" use:enhance>
+                <input type="hidden" name="id" value={editingUser.id} />
+                <button type="submit" class="btn btn-xs btn-success font-bold">활성화</button>
+              </form>
+            {:else}
+              <button onclick={() => { closeModal(); openDeactivate(editingUser!.id); }} class="btn btn-xs btn-outline btn-warning font-bold">비활성화</button>
+            {/if}
           {/if}
         </div>
         <button onclick={closeModal} class="btn btn-ghost btn-sm btn-circle"><Icon icon="lucide:x" class="w-5 h-5" /></button>
       </div>
 
-      <div class="flex flex-col flex-1 overflow-hidden">
+      <form
+        method="POST"
+        action="?/update"
+        use:enhance={() => {
+          saving = true; saveError = '';
+          return async ({ result, update }) => {
+            saving = false;
+            if (result.type === 'failure') saveError = (result.data as { error?: string })?.error ?? '오류';
+            await update();
+          };
+        }}
+        class="flex flex-col flex-1 overflow-hidden"
+      >
+        <input type="hidden" name="id" value={editingUser.id} />
+        {#if myRole === 'super_admin'}
+          <input type="hidden" name="role" value={formRole} />
+          <input type="hidden" name="factory_id" value={formFactoryId} />
+        {/if}
+
         <div class="flex flex-col gap-4 overflow-y-auto flex-1 pr-1">
-          <!-- 이름 + 아이디 (아이디 비활성) -->
+          <!-- 이름 + 아이디 -->
           <div class="grid grid-cols-2 gap-4">
             <div>
               <label for="eName" class="label pb-1"><span class="label-text text-xs font-bold text-base-content/60">이름 *</span></label>
-              <input id="eName" type="text" bind:value={formName} placeholder="홍길동" class="input input-bordered w-full text-sm" required />
+              <input id="eName" name="full_name" type="text" bind:value={formName} placeholder="홍길동" class="input input-bordered w-full text-sm" required />
             </div>
             <div>
               <label for="eUsername" class="label pb-1">
@@ -402,68 +425,85 @@
               <input id="eUsername" type="text" value={formUsername} class="input input-bordered w-full text-sm opacity-50" disabled />
             </div>
           </div>
-          <!-- 역할 + 공장 -->
+
+          <!-- 역할 + 공장 (super_admin만 편집 가능) -->
           <div class="grid grid-cols-2 gap-4">
             <div>
               <p class="label-text text-xs font-bold text-base-content/60 mb-2">역할 *</p>
-              <div class="flex gap-1.5">
-                {#each (['factory_admin', 'worker'] as UserRole[]) as r (r)}
-                  <button type="button" onclick={() => (formRole = r)} class="btn btn-xs font-bold flex-1 {formRole === r ? 'btn-primary' : 'btn-outline btn-ghost'}">{roleLabel[r]}</button>
-                {/each}
-              </div>
+              {#if myRole === 'super_admin'}
+                <div class="flex gap-1.5">
+                  {#each (['factory_admin', 'worker'] as UserRole[]) as r (r)}
+                    <button type="button" onclick={() => (formRole = r)} class="btn btn-sm font-bold flex-1 {formRole === r ? 'btn-primary' : 'btn-outline btn-ghost'}">{roleLabel[r]}</button>
+                  {/each}
+                </div>
+              {:else}
+                <div class="input input-bordered flex items-center text-sm opacity-50 h-10 px-3">{roleLabel[formRole as UserRole]}</div>
+              {/if}
             </div>
             <div>
               <label for="eFactory" class="label pb-1"><span class="label-text text-xs font-bold text-base-content/60">소속 공장 *</span></label>
-              <select id="eFactory" bind:value={formFactoryId} class="select select-bordered w-full text-sm">
-                <option value="">공장 선택</option>
-                {#each factories as f (f.id)}<option value={f.id}>{f.name}</option>{/each}
-              </select>
+              {#if myRole === 'super_admin'}
+                <select id="eFactory" bind:value={formFactoryId} class="select select-bordered w-full text-sm">
+                  <option value="">공장 선택</option>
+                  {#each factories as f (f.id)}<option value={f.id}>{f.name}</option>{/each}
+                </select>
+              {:else}
+                <div class="input input-bordered flex items-center text-sm opacity-50 h-10 px-3">{editingUser.factory_name ?? '—'}</div>
+              {/if}
             </div>
           </div>
-          <!-- 연락처 -->
-          <div>
-            <label for="ePhone" class="label pb-1"><span class="label-text text-xs font-bold text-base-content/60">연락처</span></label>
-            <input id="ePhone" type="text" bind:value={formPhone} placeholder="010-0000-0000" class="input input-bordered w-full text-sm" />
-          </div>
-          <!-- 비밀번호 변경 (서버 액션 별도 폼) -->
+
+          <!-- 비밀번호 변경 -->
           <div class="border border-base-300 rounded-xl p-4 flex flex-col gap-3">
             <p class="text-xs font-bold text-base-content/50 uppercase tracking-wider">비밀번호 변경</p>
             <div class="grid grid-cols-2 gap-4">
-              <div class="relative">
-                <input type={showPassword ? 'text' : 'password'} bind:value={formPassword} placeholder="새 비밀번호" class="input input-bordered w-full text-sm pr-9" />
-                <button type="button" onclick={() => (showPassword = !showPassword)} class="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/40 hover:text-base-content/70">
-                  <Icon icon={showPassword ? 'lucide:eye-off' : 'lucide:eye'} class="w-4 h-4" />
-                </button>
+              <div>
+                <label class="label pb-1"><span class="label-text text-xs font-bold text-base-content/60">새 비밀번호</span></label>
+                <div class="relative">
+                  <input type={showPassword ? 'text' : 'password'} bind:value={formPassword} placeholder="비밀번호 입력" class="input input-bordered w-full text-sm pr-9" />
+                  <button type="button" onclick={() => (showPassword = !showPassword)} class="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/40 hover:text-base-content/70">
+                    <Icon icon={showPassword ? 'lucide:eye-off' : 'lucide:eye'} class="w-4 h-4" />
+                  </button>
+                </div>
               </div>
-              <div class="relative">
-                <input type={showPasswordConf ? 'text' : 'password'} bind:value={formPasswordConf} placeholder="다시 입력" class="input input-bordered w-full text-sm pr-9 {passwordMismatch ? 'input-error' : ''}" />
-                <button type="button" onclick={() => (showPasswordConf = !showPasswordConf)} class="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/40 hover:text-base-content/70">
-                  <Icon icon={showPasswordConf ? 'lucide:eye-off' : 'lucide:eye'} class="w-4 h-4" />
-                </button>
+              <div>
+                <label class="label pb-1">
+                  <span class="label-text text-xs font-bold text-base-content/60">비밀번호 확인{#if passwordMismatch}<span class="text-error ml-1">불일치</span>{/if}</span>
+                </label>
+                <div class="relative">
+                  <input type={showPasswordConf ? 'text' : 'password'} bind:value={formPasswordConf} placeholder="다시 입력" class="input input-bordered w-full text-sm pr-9 {passwordMismatch ? 'input-error' : ''}" />
+                  <button type="button" onclick={() => (showPasswordConf = !showPasswordConf)} class="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/40 hover:text-base-content/70">
+                    <Icon icon={showPasswordConf ? 'lucide:eye-off' : 'lucide:eye'} class="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </div>
             {#if formPassword}
-              <form
-                method="POST"
-                action="?/setPassword"
-                use:enhance={({ cancel }) => {
-                  if (!formPassword || passwordMismatch) { cancel(); return; }
-                  return async ({ result, update }) => {
-                    if (result.type === 'failure') {
-                      saveError = (result.data as { error?: string })?.error ?? '비밀번호 변경 실패';
-                    }
-                    await update();
-                  };
+              <button
+                type="button"
+                disabled={passwordMismatch || !formPassword || saving}
+                onclick={async () => {
+                  if (!formPassword || passwordMismatch || !editingUser) return;
+                  saving = true; saveError = '';
+                  const fd = new FormData();
+                  fd.append('id', editingUser.id);
+                  fd.append('password', formPassword);
+                  const res = await fetch('?/setPassword', { method: 'POST', body: fd });
+                  saving = false;
+                  if (!res.ok) saveError = '비밀번호 변경 실패';
+                  else { formPassword = ''; formPasswordConf = ''; }
                 }}
-              >
-                <input type="hidden" name="id" value={editingUser.id} />
-                <input type="hidden" name="password" value={formPassword} />
-                <button type="submit" disabled={passwordMismatch || !formPassword} class="btn btn-sm btn-outline btn-primary font-bold disabled:opacity-50">
-                  비밀번호 변경
-                </button>
-              </form>
+                class="btn btn-sm btn-outline btn-primary font-bold disabled:opacity-50"
+              >비밀번호 변경</button>
             {/if}
           </div>
+
+          <!-- 연락처 -->
+          <div>
+            <label for="ePhone" class="label pb-1"><span class="label-text text-xs font-bold text-base-content/60">연락처 <span class="text-base-content/30 font-normal">(선택)</span></span></label>
+            <input id="ePhone" name="phone" type="text" value={formPhone} oninput={(e) => { formPhone = formatPhone((e.target as HTMLInputElement).value); }} placeholder="010-0000-0000" maxlength="13" class="input input-bordered w-full text-sm" />
+          </div>
+
           {#if saveError}
             <div class="alert alert-error gap-2 rounded-xl py-3 px-4 text-sm font-semibold">
               <Icon icon="lucide:circle-alert" class="h-4 w-4 shrink-0" /><span>{saveError}</span>
@@ -472,17 +512,16 @@
         </div>
         <div class="modal-action mt-5 pt-4 border-t border-base-200 shrink-0">
           <button type="button" onclick={closeModal} class="btn btn-ghost font-bold">취소</button>
-          <button type="button" onclick={handleUpdate} disabled={saving} class="btn btn-primary font-bold disabled:opacity-50">
+          <button type="submit" disabled={saving || passwordMismatch} class="btn btn-primary font-bold disabled:opacity-50">
             {#if saving}<span class="loading loading-spinner loading-xs"></span>{/if}
             저장
           </button>
         </div>
-      </div>
+      </form>
+      {/key}
     </div>
   </dialog>
 {/if}
-
-<!-- ───────────────────────────── 비활성화 확인 모달 ───────────────────────────── -->
 {#if deactivateTargetId}
   {@const target = users.find(u => u.id === deactivateTargetId)}
   <dialog class="modal modal-open" onmousedown={(e) => { if (e.target === e.currentTarget) cancelDeactivate(); }}>
