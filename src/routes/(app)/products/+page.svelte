@@ -1,297 +1,64 @@
 <script lang="ts">
-
   import Icon from '@iconify/svelte';
-  import { onMount, tick } from 'svelte';
+  import { tick } from 'svelte';
   import { flip } from 'svelte/animate';
-  import { SvelteSet } from 'svelte/reactivity';
+  import { goto, invalidateAll } from '$app/navigation';
+  import { page } from '$app/stores';
   import SearchBar from '$lib/components/SearchBar.svelte';
+  import type { PageData } from './$types';
 
-  // ── 카테고리 레이블 ────────────────────────────────────────────
-  const CATEGORY_LABELS: Record<string, string> = {
-    towel: '타월',
-    sheet: '시트',
-    uniform: '유니폼',
-  };
-  function catLabel(cat: string): string {
-    return CATEGORY_LABELS[cat] ?? cat;
+  // ── 서버 데이터 ───────────────────────────────────────────────
+  let { data }: { data: PageData } = $props();
+
+  type Item = PageData['items'][number];
+
+  // ── 거래처 선택 ────────────────────────────────────────────────
+  const selectedClientId = $derived(data.selectedClientId ?? null);
+
+  const selectedClient = $derived(
+    data.clients.find(c => c.id === selectedClientId) ?? null
+  );
+
+  function selectClient(id: string) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('clientId', id);
+    goto(url.toString(), { replaceState: true });
   }
 
-  // ── 타입 배지 ─────────────────────────────────────────────────
-  const typeBadge: Record<string, string> = {
-    hotel:   'badge-info',
-    pension: 'badge-success',
-    resort:  'badge-warning',
-    etc:     'badge-ghost',
-  };
-  const typeLabel: Record<string, string> = {
-    hotel: '호텔', pension: '펜션', resort: '리조트', etc: '기타',
-  };
+  // 거래처 선택 모달
+  let showClientModal = $state(false);
+  const clientSearchItems = $derived(
+    data.clients.map(c => ({ id: c.id, label: c.name, sub: '' }))
+  );
 
-  // ── 거래처 (로컬) ──────────────────────────────────────────────
-  const clients = [
-    { id: 'client-001', name: '그랜드호텔',    type: 'hotel'   },
-    { id: 'client-002', name: '오션뷰펜션',    type: 'pension' },
-    { id: 'client-003', name: '제주리조트',    type: 'resort'  },
-    { id: 'client-004', name: '힐사이드호텔',  type: 'hotel'   },
-    { id: 'client-005', name: '선셋펜션',      type: 'pension' },
-    { id: 'client-006', name: '블루라군리조트', type: 'resort' },
-  ].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+  // ── 카테고리 ───────────────────────────────────────────────────
+  let selectedCategoryId = $state<string | null>(null);
 
-  // ── 세탁물 품목 (로컈) ────────────────────────────────────────
-  let laundryItems = $state([
-    // 그랜드호텔 (client-001) – 타월/시트/유니폼
-    { id: 'item-001', clientId: 'client-001', category: 'towel',   name: '대형타월',      alias: 'BT' as string | undefined,   nameCn: '大浴巾' as string | undefined, nameEn: 'Bath Towel' as string | undefined,      counts: { received: 0, washing: 20, completed: 150, stock: 80,  shipped: 500 }, updatedAt: '2025-01-17' },
-    { id: 'item-002', clientId: 'client-001', category: 'towel',   name: '중형타웘',      alias: 'HT' as string | undefined,   nameCn: '浴巾'   as string | undefined, nameEn: 'Hand Towel' as string | undefined,      counts: { received: 0, washing: 10, completed:  90, stock: 45,  shipped: 300 }, updatedAt: '2025-01-17' },
-    { id: 'item-003', clientId: 'client-001', category: 'towel',   name: '소형타월',      alias: 'FT' as string | undefined,   nameCn: '小浴巾' as string | undefined, nameEn: 'Face Towel' as string | undefined,      counts: { received: 0, washing:  5, completed:  40, stock: 20,  shipped: 120 }, updatedAt: '2025-01-17' },
-    { id: 'item-004', clientId: 'client-001', category: 'sheet',   name: '싱글시트',      alias: 'SS' as string | undefined,   nameCn: '单人床单' as string | undefined, nameEn: 'Single Sheet' as string | undefined,   counts: { received: 0, washing: 10, completed:  80, stock: 40,  shipped: 300 }, updatedAt: '2025-01-17' },
-    { id: 'item-005', clientId: 'client-001', category: 'sheet',   name: '더블시트',      alias: 'DS' as string | undefined,   nameCn: '双人床单' as string | undefined, nameEn: 'Double Sheet' as string | undefined,   counts: { received: 0, washing:  8, completed:  60, stock: 30,  shipped: 200 }, updatedAt: '2025-01-17' },
-    { id: 'item-006', clientId: 'client-001', category: 'sheet',   name: '필로케이스',    alias: 'PC' as string | undefined,   nameCn: '枕头套' as string | undefined,   nameEn: 'Pillow Case' as string | undefined,     counts: { received: 0, washing:  6, completed:  50, stock: 25,  shipped: 180 }, updatedAt: '2025-01-17' },
-    { id: 'item-007', clientId: 'client-001', category: 'sheet',   name: '더블커버',      alias: undefined,                    nameCn: '被套'   as string | undefined, nameEn: 'Duvet Cover' as string | undefined,     counts: { received: 0, washing:  4, completed:  30, stock: 15,  shipped: 100 }, updatedAt: '2025-01-17' },
-    { id: 'item-008', clientId: 'client-001', category: 'uniform', name: '스태프유니폼',  alias: undefined,                    nameCn: '员工制服' as string | undefined, nameEn: 'Staff Uniform' as string | undefined,  counts: { received: 0, washing:  5, completed:  30, stock: 20,  shipped: 100 }, updatedAt: '2025-01-17' },
-    { id: 'item-009', clientId: 'client-001', category: 'uniform', name: '주방복',            alias: undefined,                    nameCn: '厨师服' as string | undefined, nameEn: 'Chef Uniform' as string | undefined,    counts: { received: 0, washing:  3, completed:  20, stock: 10,  shipped:  60 }, updatedAt: '2025-01-17' },
-    { id: 'item-010', clientId: 'client-001', category: 'uniform', name: '컴비네이션',    alias: undefined,                    nameCn: undefined,                          nameEn: 'Combination' as string | undefined,     counts: { received: 0, washing:  2, completed:  10, stock:  5,  shipped:  30 }, updatedAt: '2025-01-17' },
-    // 오션뷰펜션 (client-002)
-    { id: 'item-011', clientId: 'client-002', category: 'towel',   name: '소형타월',      alias: undefined as string | undefined, nameCn: undefined as string | undefined, nameEn: undefined as string | undefined, counts: { received: 0, washing: 15, completed:  90, stock: 50,  shipped: 200 }, updatedAt: '2025-01-16' },
-    { id: 'item-012', clientId: 'client-002', category: 'towel',   name: '대형타월',      alias: undefined as string | undefined, nameCn: undefined as string | undefined, nameEn: undefined as string | undefined, counts: { received: 0, washing:  8, completed:  60, stock: 30,  shipped: 150 }, updatedAt: '2025-01-16' },
-    { id: 'item-013', clientId: 'client-002', category: 'sheet',   name: '더블시트',      alias: undefined as string | undefined, nameCn: undefined as string | undefined, nameEn: undefined as string | undefined, counts: { received: 0, washing:  5, completed:  40, stock: 20,  shipped: 100 }, updatedAt: '2025-01-16' },
-    // 제주리조트 (client-003)
-    { id: 'item-014', clientId: 'client-003', category: 'towel',   name: '바스타월',      alias: undefined as string | undefined, nameCn: undefined as string | undefined, nameEn: undefined as string | undefined, counts: { received: 0, washing: 25, completed: 200, stock: 100, shipped: 800 }, updatedAt: '2025-01-15' },
-    { id: 'item-015', clientId: 'client-003', category: 'towel',   name: '핸드타월',      alias: undefined as string | undefined, nameCn: undefined as string | undefined, nameEn: undefined as string | undefined, counts: { received: 0, washing: 12, completed:  80, stock: 40,  shipped: 300 }, updatedAt: '2025-01-15' },
-    { id: 'item-016', clientId: 'client-003', category: 'sheet',   name: '킹사이즈시트',  alias: undefined as string | undefined, nameCn: undefined as string | undefined, nameEn: undefined as string | undefined, counts: { received: 0, washing:  6, completed:  50, stock: 25,  shipped: 150 }, updatedAt: '2025-01-15' },
-    { id: 'item-017', clientId: 'client-003', category: 'sheet',   name: '퀸사이즈시트',  alias: undefined as string | undefined, nameCn: undefined as string | undefined, nameEn: undefined as string | undefined, counts: { received: 0, washing:  4, completed:  30, stock: 15,  shipped: 100 }, updatedAt: '2025-01-15' },
-    { id: 'item-018', clientId: 'client-003', category: 'uniform', name: '가운',              alias: undefined as string | undefined, nameCn: undefined as string | undefined, nameEn: 'Gown' as string | undefined, counts: { received: 0, washing:  8, completed:  60, stock: 30,  shipped: 200 }, updatedAt: '2025-01-15' },
-  ]);
+  const effectiveCategoryId = $derived(
+    selectedCategoryId && data.categories.find(c => c.id === selectedCategoryId)
+      ? selectedCategoryId
+      : (data.categories[0]?.id ?? null)
+  );
 
-  // ── 가격 정보 (로컬) ──────────────────────────────────────────
-  let clientItemPrices = $state<{ clientId: string; category: string; itemName: string; unitPrice: number; priceEffectiveDate?: string; }[]>([]);
-
-  // ── 가격 헬퍼 함수 ────────────────────────────────────────────
-  function getClientItemPrices(clientId: string) {
-    return clientItemPrices.filter(p => p.clientId === clientId);
-  }
-
-  function getUnitPrice(clientId: string, category: string, itemName: string): number {
-    return clientItemPrices.find(
-      p => p.clientId === clientId && p.category === category && p.itemName === itemName
-    )?.unitPrice ?? 0;
-  }
-
-  function setClientItemPrice(clientId: string, category: string, itemName: string, price: number) {
-    const idx = clientItemPrices.findIndex(
-      p => p.clientId === clientId && p.category === category && p.itemName === itemName
-    );
-    if (idx >= 0) {
-      clientItemPrices[idx].unitPrice = price;
-    } else {
-      clientItemPrices.push({ clientId, category, itemName, unitPrice: price });
-    }
-  }
-
-  function saveClientItemPrices(clientId: string, prices: { category: string; itemName: string; unitPrice: number; priceEffectiveDate?: string; }[]) {
-    clientItemPrices = [
-      ...clientItemPrices.filter(p => p.clientId !== clientId),
-      ...prices.map(p => ({ ...p, clientId })),
-    ];
-  }
-
-  function getPriceEffectiveDate(clientId: string, category: string, itemName: string): string | undefined {
-    return clientItemPrices.find(
-      p => p.clientId === clientId && p.category === category && p.itemName === itemName
-    )?.priceEffectiveDate;
-  }
-
-  function setPriceEffectiveDate(clientId: string, category: string, itemName: string, date: string | null) {
-    const idx = clientItemPrices.findIndex(
-      p => p.clientId === clientId && p.category === category && p.itemName === itemName
-    );
-    if (idx >= 0) {
-      if (date) clientItemPrices[idx].priceEffectiveDate = date;
-      else delete clientItemPrices[idx].priceEffectiveDate;
-    } else if (date) {
-      clientItemPrices.push({ clientId, category, itemName, unitPrice: 0, priceEffectiveDate: date });
-    }
-  }
-
-  // ── 품목 헬퍼 함수 ────────────────────────────────────────────
-  function addLaundryItemType(clientId: string, category: string, name: string) {
-    const exists = laundryItems.some(
-      i => i.clientId === clientId && i.category === category && i.name === name
-    );
-    if (exists) return null;
-    const newItem = {
-      id: crypto.randomUUID(),
-      clientId,
-      category,
-      name,
-      alias: undefined as string | undefined,
-      nameCn: undefined as string | undefined,
-      nameEn: undefined as string | undefined,
-      counts: { received: 0, washing: 0, completed: 0, stock: 0, shipped: 0 },
-      updatedAt: new Date().toISOString().slice(0, 10),
-    };
-    laundryItems.push(newItem);
-    return newItem;
-  }
-
-  function removeLaundryItem(id: string) {
-    laundryItems = laundryItems.filter(i => i.id !== id);
-  }
-
-  function removeLaundryItemsByCategory(clientId: string, category: string) {
-    laundryItems = laundryItems.filter(
-      i => !(i.clientId === clientId && i.category === category)
-    );
-  }
-
-  function reorderLaundryItems(clientId: string, category: string, fromIdx: number, toIdx: number) {
-    const indices = laundryItems
-      .map((item, idx) => ({ item, idx }))
-      .filter(({ item }) => item.clientId === clientId && item.category === category)
-      .map(({ idx }) => idx);
-    if (fromIdx < 0 || fromIdx >= indices.length || toIdx < 0 || toIdx >= indices.length) return;
-    const globalFrom = indices[fromIdx];
-    const globalTo   = indices[toIdx];
-    const copy = [...laundryItems];
-    const [moved] = copy.splice(globalFrom, 1);
-    copy.splice(globalTo, 0, moved);
-    laundryItems = copy;
-  }
-
-  function updateLaundryItemMeta(
-    id: string,
-    meta: { alias?: string; nameCn?: string; nameEn?: string }
-  ) {
-    const idx = laundryItems.findIndex(i => i.id === id);
-    if (idx < 0) return;
-    if ('alias'  in meta) laundryItems[idx].alias  = meta.alias;
-    if ('nameCn' in meta) laundryItems[idx].nameCn = meta.nameCn;
-    if ('nameEn' in meta) laundryItems[idx].nameEn = meta.nameEn;
-    laundryItems[idx].updatedAt = new Date().toISOString().slice(0, 10);
-  }
-
-  function renameLaundryItem(
-    id: string,
-    newName: string,
-    clientId: string,
-    category: string
-  ): boolean {
-    const duplicate = laundryItems.some(
-      i => i.id !== id && i.clientId === clientId && i.category === category && i.name === newName
-    );
-    if (duplicate) return false;
-    const idx = laundryItems.findIndex(i => i.id === id);
-    if (idx < 0) return false;
-    laundryItems[idx].name      = newName;
-    laundryItems[idx].updatedAt = new Date().toISOString().slice(0, 10);
-    return true;
-  }
-
-  // ── 거래처 선택 상태 ──────────────────────────────────────────
-  let selectedClientId = $state<string | null>(null);
-
-  onMount(() => {
-    const saved = localStorage.getItem('products_selectedClientId');
-    if (saved && clients.find(c => c.id === saved)) {
-      selectedClientId = saved;
-    } else {
-      selectedClientId = clients[0]?.id ?? null;
-    }
+  // 거래처/카테고리 변경 시 초기화
+  $effect(() => {
+    void selectedClientId;
+    selectedCategoryId = null;
+    resetGrid();
   });
 
   $effect(() => {
-    if (selectedClientId) {
-      localStorage.setItem('products_selectedClientId', selectedClientId);
-    }
+    void effectiveCategoryId;
+    resetGrid();
   });
 
-  const selectedClient = $derived(
-    clients.find(c => c.id === selectedClientId) ?? null
-  );
+  // 카테고리 드래그
+  let catDragSrcIdx  = $state<number | null>(null);
+  let catDragOverIdx = $state<number | null>(null);
 
-  // ── 거래처 선택 모달 ───────────────────────────────────────────────
-  let showClientModal = $state(false);
-
-  const clientSearchItems = $derived(
-    clients.map(c => ({ id: c.id, label: c.name, sub: typeLabel[c.type] ?? c.type }))
-  );
-
-  function openClientModal() {
-    showClientModal = true;
-  }
-
-  function handleSelectClient(id: string) {
-    selectedClientId = id;
-    showClientModal  = false;
-  }
-
-  // ── 복사 모달 ──────────────────────────────────────────────────
-  let showCopyModal = $state(false);
-  let showCopyConfirmModal = $state(false);
-  let copySourceClientId = $state<string | null>(null);
-
-  const copySearchItems = $derived(
-    clients
-      .filter(c => c.id !== selectedClientId)
-      .map(c => ({ id: c.id, label: c.name, sub: typeLabel[c.type] ?? c.type }))
-  );
-
-  function openCopyModal() {
-    copySourceClientId = null;
-    showCopyModal = true;
-  }
-
-  function selectSourceForCopy(id: string) {
-    copySourceClientId = id;
-    showCopyModal = false;
-    showCopyConfirmModal = true;
-  }
-
-  function confirmCopy() {
-    if (!selectedClientId || !copySourceClientId) return;
-
-    const sourceItems = laundryItems.filter(i => i.clientId === copySourceClientId);
-    const sourcePrices = getClientItemPrices(copySourceClientId);
-
-    const currentItemsList = laundryItems.filter(i => i.clientId === selectedClientId);
-    for (const item of currentItemsList) {
-      removeLaundryItem(item.id);
-    }
-
-    for (const sourceItem of sourceItems) {
-      addLaundryItemType(selectedClientId, sourceItem.category, sourceItem.name);
-    }
-
-    const newPrices = sourcePrices.map(p => ({
-      category: p.category,
-      itemName: p.itemName,
-      unitPrice: p.unitPrice,
-    }));
-    saveClientItemPrices(selectedClientId, newPrices);
-
-    showCopyConfirmModal = false;
-    copySourceClientId = null;
-  }
-
-  function cancelCopy() {
-    showCopyModal = false;
-    showCopyConfirmModal = false;
-    copySourceClientId = null;
-  }
-
-  // ── 카테고리 ──────────────────────────────────────────────────
-  let selectedCategory = $state<string | null>(null);
-  let localCats        = $state<string[]>([]);
-  let newCatInput      = $state('');
-  // 카테고리 순번 맵 (category → order, 1-based)
-  let catOrderMap      = $state<Record<string, number>>({});
-
-  // 카테고리 DnD 상태
-  let catDragSrcIdx    = $state<number | null>(null);
-  let catDragOverIdx   = $state<number | null>(null);
-
-  // 카테고리 순번 직접 편집 상태
-  let editingCatOrderIdx  = $state<number | null>(null);
-  let catOrderInputValue  = $state('');
+  // 카테고리 순번 편집
+  let editingCatOrderIdx = $state<number | null>(null);
+  let catOrderInputValue = $state('');
 
   function startCatOrderEdit(i: number) {
     editingCatOrderIdx = i;
@@ -302,179 +69,357 @@
     });
   }
 
-  function commitCatOrderEdit(i: number) {
-    const max = allCategories.length;
-    const raw = parseInt(catOrderInputValue, 10);
-    if (!isNaN(raw)) {
-      const to = Math.max(1, Math.min(raw, max)) - 1;
-      if (to !== i) reorderCategories(i, to);
-    }
-    editingCatOrderIdx = null;
-  }
+  function cancelCatOrderEdit() { editingCatOrderIdx = null; }
 
-  function cancelCatOrderEdit() {
-    editingCatOrderIdx = null;
-  }
+  // 카테고리 이름 추가 인풋
+  let newCatInput = $state('');
 
-  function reorderCategories(from: number, to: number) {
-    const cats = [...allCategories];
-    const [moved] = cats.splice(from, 1);
-    cats.splice(to, 0, moved);
-    // 순번 맵 재구성
-    const newMap: Record<string, number> = {};
-    cats.forEach((c, idx) => { newMap[c] = idx + 1; });
-    catOrderMap = newMap;
-    // localCats 순서도 맞춤
-    localCats = localCats.filter(c => cats.includes(c)).sort((a, b) => (newMap[a] ?? 999) - (newMap[b] ?? 999));
-    selectedCategory = moved;
-  }
-
-  function onCatDragStart(e: DragEvent, i: number) {
-    catDragSrcIdx = i;
-    if (e.dataTransfer) {
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', String(i));
-    }
-  }
-
-  function onCatDragOver(e: DragEvent, i: number) {
-    e.preventDefault();
-    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
-    catDragOverIdx = i;
-  }
-
-  function onCatDragLeave(e: DragEvent, i: number) {
-    const related = e.relatedTarget as Node | null;
-    const row = e.currentTarget as HTMLElement;
-    if (related && row.contains(related)) return;
-    if (catDragOverIdx === i) catDragOverIdx = null;
-  }
-
-  function onCatDrop(e: DragEvent, i: number) {
-    e.preventDefault();
-    if (catDragSrcIdx !== null && catDragSrcIdx !== i) {
-      reorderCategories(catDragSrcIdx, i);
-    }
-    catDragSrcIdx  = null;
-    catDragOverIdx = null;
-  }
-
-  function onCatDragEnd() {
-    catDragSrcIdx  = null;
-    catDragOverIdx = null;
-  }
-
-  const storeCats = $derived.by(() => {
-    if (!selectedClientId) return [] as string[];
-    const seen   = new SvelteSet<string>();
-    const result: string[] = [];
-    for (const item of laundryItems) {
-      if (item.clientId === selectedClientId && !seen.has(item.category)) {
-        seen.add(item.category);
-        result.push(item.category);
-      }
-    }
-    return result;
-  });
-
-  const allCategories = $derived(
-    [...storeCats, ...localCats.filter(c => !storeCats.includes(c))]
-      .sort((a, b) => {
-        const oa = catOrderMap[a] ?? 999;
-        const ob = catOrderMap[b] ?? 999;
-        return oa !== ob ? oa - ob : 0;
-      })
-  );
-
-  const effectiveCat = $derived(
-    selectedCategory && allCategories.includes(selectedCategory)
-      ? selectedCategory
-      : (allCategories[0] ?? null)
-  );
-
-  // 거래처 바뀌면 카테고리/입력 초기화
-  $effect(() => {
-    void selectedClientId;
-    selectedCategory = null;
-    localCats        = [];
-    newCatInput      = '';
-    catOrderMap      = {};
-    resetGrid();
-  });
-
-  // 카테고리 바뀌면 입력 초기화
-  $effect(() => {
-    void effectiveCat;
-    resetGrid();
-  });
-
-  function addCategory() {
-    const cat = newCatInput.trim();
-    if (!cat) return;
-    if (allCategories.includes(cat)) {
-      newCatInput      = '';
-      selectedCategory = cat;
-      return;
-    }
-    localCats        = [...localCats, cat];
-    selectedCategory = cat;
-    newCatInput      = '';
-  }
-
-  // ── 카테고리 삭제 확인 모달 ───────────────────────────────────
+  // ── 카테고리 삭제 확인 모달
   let deleteCatTarget = $state<string | null>(null);
 
-  function requestRemoveCategory(cat: string) {
-    deleteCatTarget = cat;
-  }
-
-  function confirmRemoveCategory() {
-    if (!deleteCatTarget) return;
-    removeCategory(deleteCatTarget);
-    deleteCatTarget = null;
-  }
-
-  function cancelRemoveCategory() {
-    deleteCatTarget = null;
-  }
-
-  function removeCategory(cat: string) {
-    const wasSelected = effectiveCat === cat;
-    if (selectedClientId) {
-      removeLaundryItemsByCategory(selectedClientId, cat);
-    }
-    localCats = localCats.filter(c => c !== cat);
-    if (wasSelected) {
-      const remaining  = allCategories.filter(c => c !== cat);
-      selectedCategory = remaining[0] ?? null;
-    }
-  }
-
-  // ── 품목 ──────────────────────────────────────────────────────
+  // ── 품목 그리드 ────────────────────────────────────────────────
   const currentItems = $derived(
-    selectedClientId && effectiveCat
-      ? laundryItems.filter(
-          i => i.clientId === selectedClientId && i.category === effectiveCat
-        )
+    effectiveCategoryId
+      ? data.items.filter(i => i.category_id === effectiveCategoryId)
       : []
   );
 
-  // ── 엑셀 그리드 상태 ──────────────────────────────────────────
-  // col: 0=품목명, 1=단가, 2=가격적용시기, 3=별칭, 4=중국어, 5=영어
   type GridCol = 0 | 1 | 2 | 3 | 4 | 5;
+  // col: 0=품목명, 1=단가, 2=가격적용일, 3=별칭, 4=중국어, 5=영어
 
-  function todayYMD(): string {
+  function todayYMD() {
     const d = new Date();
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const p = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
   }
 
-  let activeRow = $state<number | null>(null);
+  let activeRow       = $state<number | null>(null);
+  let nameDrafts      = $state<Record<string, string>>({});
+  let aliasDrafts     = $state<Record<string, string>>({});
+  let cnDrafts        = $state<Record<string, string>>({});
+  let enDrafts        = $state<Record<string, string>>({});
+  let priceDrafts     = $state<Record<string, string>>({});
+  let dateDrafts      = $state<Record<string, string>>({});
 
-  // ── 순번 직접 편집 상태 ───────────────────────────────────────
-  let editingOrderRow   = $state<number | null>(null);
-  let orderInputValue   = $state('');
+  let newName      = $state('');
+  let newAlias     = $state('');
+  let newCn        = $state('');
+  let newEn        = $state('');
+  let newPrice     = $state('0');
+  let newPriceDate = $state(todayYMD());
 
+  let newRowSubmitTried = $state(false);
+  const newRowNameOk  = $derived(newName.trim().length > 0);
+  const newRowPriceOk = $derived(/^\d+$/.test(newPrice.trim()));
+  const newRowDateOk  = $derived(isValidDate(newPriceDate));
+
+  let editingOrderRow  = $state<number | null>(null);
+  let orderInputValue  = $state('');
+
+  let dragSrcIdx  = $state<number | null>(null);
+  let dragOverIdx = $state<number | null>(null);
+
+  // 날짜 모달
+  let showDateModal  = $state(false);
+  let dateModalRow   = $state<number | null>(null);
+  let dateModalValue = $state('');
+
+  function resetGrid() {
+    activeRow = null;
+    nameDrafts = {}; aliasDrafts = {}; cnDrafts = {}; enDrafts = {};
+    priceDrafts = {}; dateDrafts = {};
+    newName = ''; newAlias = ''; newCn = ''; newEn = '';
+    newPrice = '0'; newPriceDate = todayYMD();
+    newRowSubmitTried = false;
+    showDateModal = false; dateModalRow = null; dateModalValue = '';
+  }
+
+  function isValidDate(str: string) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(str)) return false;
+    return !isNaN(new Date(str).getTime());
+  }
+
+  // 단가/날짜 디스플레이 헬퍼
+  function getPrice(itemId: string): number {
+    return data.itemPrices.find(p => p.item_id === itemId)?.unit_price ?? 0;
+  }
+  function getPriceDate(itemId: string): string {
+    return data.itemPrices.find(p => p.item_id === itemId)?.effective_from ?? '';
+  }
+
+  function getDisplayName(item: Item)  { return nameDrafts[item.id]  ?? item.name_ko; }
+  function getDisplayAlias(item: Item) { return aliasDrafts[item.id] ?? item.nickname ?? ''; }
+  function getDisplayCn(item: Item)    { return cnDrafts[item.id]    ?? item.name_zh ?? ''; }
+  function getDisplayEn(item: Item)    { return enDrafts[item.id]    ?? item.name_en ?? ''; }
+  function getDisplayPrice(item: Item) {
+    if (priceDrafts[item.id] !== undefined) return priceDrafts[item.id];
+    const p = getPrice(item.id);
+    return p > 0 ? String(p) : '';
+  }
+  function getDisplayDate(item: Item) {
+    return dateDrafts[item.id] ?? getPriceDate(item.id);
+  }
+
+  // 셀 포커스 시 드래프트 초기화
+  function onCellFocus(row: number, col: GridCol) {
+    activeRow = row;
+    if (row >= currentItems.length) return;
+    const item = currentItems[row];
+    if (col === 0 && nameDrafts[item.id]  === undefined) nameDrafts[item.id]  = item.name_ko;
+    if (col === 1 && priceDrafts[item.id] === undefined) priceDrafts[item.id] = getPrice(item.id) > 0 ? String(getPrice(item.id)) : '';
+    if (col === 2 && dateDrafts[item.id]  === undefined) dateDrafts[item.id]  = getPriceDate(item.id);
+    if (col === 3 && aliasDrafts[item.id] === undefined) aliasDrafts[item.id] = item.nickname ?? '';
+    if (col === 4 && cnDrafts[item.id]    === undefined) cnDrafts[item.id]    = item.name_zh ?? '';
+    if (col === 5 && enDrafts[item.id]    === undefined) enDrafts[item.id]    = item.name_en ?? '';
+  }
+
+  async function moveFocus(row: number, col: GridCol) {
+    const maxRow = currentItems.length;
+    const clampedRow = Math.max(0, Math.min(row, maxRow));
+    activeRow = clampedRow;
+    await tick();
+    const el = document.getElementById(`cell-${clampedRow}-${col}`) as HTMLElement | null;
+    if (el) { el.focus(); if ('select' in el) (el as HTMLInputElement).select(); }
+  }
+
+  // ── submit 헬퍼 ──────────────────────────────────────────────
+  let submitting = $state(false);
+
+  async function submitForm(action: string, data: Record<string, string>) {
+    if (submitting) return;
+    submitting = true;
+    const form = new FormData();
+    for (const [k, v] of Object.entries(data)) form.append(k, v);
+    const res = await fetch(`?/${action}`, { method: 'POST', body: form });
+    submitting = false;
+    if (res.ok) await invalidateAll();
+  }
+
+  // ── 품목 셀 commit ────────────────────────────────────────────
+  async function commitName(item: Item) {
+    const draft = nameDrafts[item.id];
+    if (draft === undefined) return;
+    const newN = draft.trim();
+    delete nameDrafts[item.id];
+    if (!newN || newN === item.name_ko) return;
+    await submitForm('upsertItem', {
+      id: item.id,
+      category_id: item.category_id,
+      name_ko: newN,
+      name_en: item.name_en ?? '',
+      name_zh: item.name_zh ?? '',
+      nickname: item.nickname ?? '',
+    });
+  }
+
+  async function commitAlias(item: Item) {
+    const draft = aliasDrafts[item.id];
+    if (draft === undefined) return;
+    delete aliasDrafts[item.id];
+    if (draft.trim() === (item.nickname ?? '')) return;
+    await submitForm('upsertItem', {
+      id: item.id,
+      category_id: item.category_id,
+      name_ko: item.name_ko,
+      name_en: item.name_en ?? '',
+      name_zh: item.name_zh ?? '',
+      nickname: draft.trim(),
+    });
+  }
+
+  async function commitCn(item: Item) {
+    const draft = cnDrafts[item.id];
+    if (draft === undefined) return;
+    delete cnDrafts[item.id];
+    if (draft.trim() === (item.name_zh ?? '')) return;
+    await submitForm('upsertItem', {
+      id: item.id,
+      category_id: item.category_id,
+      name_ko: item.name_ko,
+      name_en: item.name_en ?? '',
+      name_zh: draft.trim(),
+      nickname: item.nickname ?? '',
+    });
+  }
+
+  async function commitEn(item: Item) {
+    const draft = enDrafts[item.id];
+    if (draft === undefined) return;
+    delete enDrafts[item.id];
+    if (draft.trim() === (item.name_en ?? '')) return;
+    await submitForm('upsertItem', {
+      id: item.id,
+      category_id: item.category_id,
+      name_ko: item.name_ko,
+      name_en: draft.trim(),
+      name_zh: item.name_zh ?? '',
+      nickname: item.nickname ?? '',
+    });
+  }
+
+  async function commitPrice(item: Item) {
+    const draft = priceDrafts[item.id];
+    if (draft === undefined) return;
+    delete priceDrafts[item.id];
+    if (!selectedClientId || !effectiveCategoryId) return;
+    const price = parseInt(draft.replace(/[^0-9]/g, '') || '0', 10);
+    const date  = getPriceDate(item.id) || todayYMD();
+    await submitForm('upsertPrice', {
+      item_id: item.id,
+      client_id: selectedClientId,
+      unit_price: String(price),
+      effective_from: date,
+    });
+  }
+
+  async function commitDate(item: Item) {
+    const draft = dateDrafts[item.id];
+    if (draft === undefined) return;
+    delete dateDrafts[item.id];
+    if (!selectedClientId) return;
+    const val = draft.trim();
+    if (!val || !isValidDate(val)) return;
+    const price = getPrice(item.id);
+    await submitForm('upsertPrice', {
+      item_id: item.id,
+      client_id: selectedClientId,
+      unit_price: String(price),
+      effective_from: val,
+    });
+  }
+
+  async function commitCell(row: number, col: GridCol) {
+    if (row >= currentItems.length) return;
+    const item = currentItems[row];
+    if (col === 0) await commitName(item);
+    else if (col === 1) await commitPrice(item);
+    else if (col === 2) await commitDate(item);
+    else if (col === 3) await commitAlias(item);
+    else if (col === 4) await commitCn(item);
+    else if (col === 5) await commitEn(item);
+  }
+
+  async function handleCellKeydown(e: KeyboardEvent, row: number, col: GridCol) {
+    const newRowIdx = currentItems.length;
+    const isNewRow  = row === newRowIdx;
+
+    switch (e.key) {
+      case 'ArrowUp':
+        e.preventDefault();
+        await commitCell(row, col);
+        if (row > 0) moveFocus(row - 1, col);
+        break;
+      case 'ArrowDown':
+        e.preventDefault();
+        await commitCell(row, col);
+        moveFocus(row + 1, col);
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (isNewRow) await addItemAndContinue();
+        else { await commitCell(row, col); moveFocus(row + 1, col); }
+        break;
+      case 'ArrowLeft':
+        if (col > 0) { e.preventDefault(); await commitCell(row, col); moveFocus(row, (col-1) as GridCol); }
+        break;
+      case 'ArrowRight':
+        if (col < 5) { e.preventDefault(); await commitCell(row, col); moveFocus(row, (col+1) as GridCol); }
+        break;
+      case 'Tab':
+        e.preventDefault();
+        if (!e.shiftKey) {
+          await commitCell(row, col);
+          if (col < 5) moveFocus(row, (col+1) as GridCol);
+          else moveFocus(row+1, 0);
+        } else {
+          await commitCell(row, col);
+          if (col > 0) moveFocus(row, (col-1) as GridCol);
+          else if (row > 0) moveFocus(row-1, 5);
+        }
+        break;
+      case 'Escape':
+        if (!isNewRow) {
+          const item = currentItems[row];
+          delete nameDrafts[item.id]; delete aliasDrafts[item.id];
+          delete cnDrafts[item.id];   delete enDrafts[item.id];
+          delete priceDrafts[item.id]; delete dateDrafts[item.id];
+        } else {
+          newName = ''; newAlias = ''; newCn = ''; newEn = '';
+          newPriceDate = todayYMD(); newPrice = '';
+        }
+        (e.target as HTMLElement).blur();
+        activeRow = null;
+        break;
+    }
+  }
+
+  // 새 행 추가
+  async function addItemAndContinue() {
+    newRowSubmitTried = true;
+    const name = newName.trim();
+    if (!name || !selectedClientId || !effectiveCategoryId) return;
+    if (!newRowPriceOk || !newRowDateOk) return;
+
+    await submitForm('upsertItem', {
+      category_id: effectiveCategoryId,
+      name_ko: name,
+      name_en: newEn.trim(),
+      name_zh: newCn.trim(),
+      nickname: newAlias.trim(),
+    });
+
+    // 새로 생성된 item id를 가져와서 단가도 저장
+    // invalidateAll 후 data.items가 갱신되므로 찾아서 upsertPrice
+    const price = parseInt(newPrice.trim(), 10);
+    if (price > 0) {
+      // item은 name_ko로 찾기 (방금 만든 것)
+      await tick();
+      const newItem = data.items.find(i => i.name_ko === name && i.category_id === effectiveCategoryId);
+      if (newItem && selectedClientId) {
+        await submitForm('upsertPrice', {
+          item_id: newItem.id,
+          client_id: selectedClientId,
+          unit_price: String(price),
+          effective_from: newPriceDate,
+        });
+      }
+    }
+
+    newName = ''; newAlias = ''; newCn = ''; newEn = '';
+    newPrice = '0'; newPriceDate = todayYMD();
+    newRowSubmitTried = false;
+    await tick();
+    moveFocus(currentItems.length, 0);
+  }
+
+  // 날짜 모달
+  async function confirmDateModal() {
+    if (dateModalRow === null || !selectedClientId) return;
+    const row = dateModalRow;
+    if (row >= currentItems.length) return;
+    const item = currentItems[row];
+    const date = dateModalValue.trim();
+    if (!date || !isValidDate(date)) return;
+    const price = getPrice(item.id);
+    await submitForm('upsertPrice', {
+      item_id: item.id,
+      client_id: selectedClientId,
+      unit_price: String(price),
+      effective_from: date,
+    });
+    showDateModal = false; dateModalRow = null; dateModalValue = '';
+  }
+
+  function cancelDateModal() {
+    showDateModal = false; dateModalRow = null; dateModalValue = '';
+  }
+
+  // 품목 삭제
+  async function removeItem(id: string) {
+    await submitForm('deleteItem', { id });
+  }
+
+  // 순서 편집
   function startOrderEdit(i: number) {
     editingOrderRow = i;
     orderInputValue = String(i + 1);
@@ -484,606 +429,191 @@
     });
   }
 
-  function commitOrderEdit(i: number) {
-    if (!selectedClientId || !effectiveCat) { editingOrderRow = null; return; }
+  async function commitOrderEdit(i: number) {
+    if (!effectiveCategoryId) { editingOrderRow = null; return; }
     const max = currentItems.length;
     const raw = parseInt(orderInputValue, 10);
     if (!isNaN(raw)) {
-      const to = Math.max(1, Math.min(raw, max)) - 1; // 0-based
+      const to = Math.max(1, Math.min(raw, max)) - 1;
       if (to !== i) {
-        reorderLaundryItems(selectedClientId, effectiveCat, i, to);
+        const reordered = [...currentItems];
+        const [moved] = reordered.splice(i, 1);
+        reordered.splice(to, 0, moved);
+        await submitForm('reorderItems', { ids: JSON.stringify(reordered.map(x => x.id)) });
       }
     }
     editingOrderRow = null;
   }
 
-  function cancelOrderEdit() {
-    editingOrderRow = null;
-  }
+  function cancelOrderEdit() { editingOrderRow = null; }
 
-  // ── DnD 상태 ─────────────────────────────────────────────────
-  let dragSrcIdx   = $state<number | null>(null);
-  let dragOverIdx  = $state<number | null>(null);
-
+  // 품목 드래그
   function onDragStart(e: DragEvent, i: number) {
-    dragSrcIdx  = i;
-    if (e.dataTransfer) {
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', String(i));
-    }
+    dragSrcIdx = i;
+    if (e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(i)); }
   }
-
   function onDragOver(e: DragEvent, i: number) {
     e.preventDefault();
     if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
     dragOverIdx = i;
   }
-
   function onDragLeave(e: DragEvent, i: number) {
-    // 자식 요소로 이동 시 leave 무시
     const related = e.relatedTarget as Node | null;
-    const row = (e.currentTarget as HTMLElement);
-    if (related && row.contains(related)) return;
+    if (related && (e.currentTarget as HTMLElement).contains(related)) return;
     if (dragOverIdx === i) dragOverIdx = null;
   }
-
-  function onDrop(e: DragEvent, i: number) {
+  async function onDrop(e: DragEvent, i: number) {
     e.preventDefault();
-    if (dragSrcIdx !== null && dragSrcIdx !== i && selectedClientId && effectiveCat) {
-      reorderLaundryItems(selectedClientId, effectiveCat, dragSrcIdx, i);
+    if (dragSrcIdx !== null && dragSrcIdx !== i && effectiveCategoryId) {
+      const reordered = [...currentItems];
+      const [moved] = reordered.splice(dragSrcIdx, 1);
+      reordered.splice(i, 0, moved);
+      await submitForm('reorderItems', { ids: JSON.stringify(reordered.map(x => x.id)) });
     }
-    dragSrcIdx  = null;
-    dragOverIdx = null;
+    dragSrcIdx = null; dragOverIdx = null;
   }
+  function onDragEnd() { dragSrcIdx = null; dragOverIdx = null; }
 
-  function onDragEnd() {
-    dragSrcIdx  = null;
-    dragOverIdx = null;
+  // 카테고리 드래그
+  function onCatDragStart(e: DragEvent, i: number) {
+    catDragSrcIdx = i;
+    if (e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(i)); }
   }
-
-  // 기존 행 드래프트 (item.id → value)
-  let nameDrafts      = $state<Record<string, string>>({});
-  let aliasDrafts     = $state<Record<string, string>>({});
-  let cnDrafts        = $state<Record<string, string>>({});
-  let enDrafts        = $state<Record<string, string>>({});
-  let priceDrafts     = $state<Record<string, string>>({});
-
-  // 날짜 모달 상태
-  let showDateModal   = $state(false);
-  let dateModalRow    = $state<number | null>(null);
-  let dateModalValue  = $state('');
-
-  // 새 행 (마지막 빈 행)
-  let newName      = $state('');
-  let newAlias     = $state('');
-  let newCn        = $state('');
-  let newEn        = $state('');
-  let newPriceDate = $state(todayYMD());
-  let newPrice     = $state('0');
-
-  function resetGrid() {
-    activeRow      = null;
-    nameDrafts     = {};
-    aliasDrafts    = {};
-    cnDrafts       = {};
-    enDrafts       = {};
-    priceDrafts    = {};
-    dateDrafts     = {};
-    showDateModal  = false;
-    dateModalRow   = null;
-    dateModalValue = '';
-    newName        = '';
-    newAlias       = '';
-    newCn          = '';
-    newEn          = '';
-    newPriceDate   = todayYMD();
-    newPrice       = '0';
+  function onCatDragOver(e: DragEvent, i: number) {
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+    catDragOverIdx = i;
   }
-
-  function getNewRowIndex() {
-    return currentItems.length;
+  function onCatDragLeave(e: DragEvent, i: number) {
+    const related = e.relatedTarget as Node | null;
+    if (related && (e.currentTarget as HTMLElement).contains(related)) return;
+    if (catDragOverIdx === i) catDragOverIdx = null;
   }
-
-  async function moveFocus(row: number, col: GridCol) {
-    const maxRow = getNewRowIndex(); // new-row index
-    const clampedRow = Math.max(0, Math.min(row, maxRow));
-    activeRow = clampedRow;
-    await tick();
-    const el = document.getElementById(`cell-${clampedRow}-${col}`) as HTMLElement | null;
-    if (el) {
-      el.focus();
-      if ('select' in el) (el as HTMLInputElement).select();
+  async function onCatDrop(e: DragEvent, i: number) {
+    e.preventDefault();
+    if (catDragSrcIdx !== null && catDragSrcIdx !== i) {
+      const reordered = [...data.categories];
+      const [moved] = reordered.splice(catDragSrcIdx, 1);
+      reordered.splice(i, 0, moved);
+      await submitForm('reorderCategories', { ids: JSON.stringify(reordered.map(x => x.id)) });
     }
+    catDragSrcIdx = null; catDragOverIdx = null;
   }
+  function onCatDragEnd() { catDragSrcIdx = null; catDragOverIdx = null; }
 
-  // 가격적용시기 draft (item.id → 입력 문자열)
-  let dateDrafts = $state<Record<string, string>>({});
-
-  // YYYYMMDD → YYYY-MM-DD 변환 (자동 대시 삽입)
-  function formatDateInput(raw: string): string {
-    const digits = raw.replace(/[^0-9]/g, '').slice(0, 8);
-    if (digits.length <= 4) return digits;
-    if (digits.length <= 6) return `${digits.slice(0,4)}-${digits.slice(4)}`;
-    return `${digits.slice(0,4)}-${digits.slice(4,6)}-${digits.slice(6)}`;
-  }
-
-  // YYYY-MM-DD 형식 유효성 검증
-  function isValidDate(str: string): boolean {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(str)) return false;
-    const d = new Date(str);
-    return !isNaN(d.getTime());
-  }
-
-  function onCellFocus(row: number, col: GridCol) {
-    activeRow = row;
-    // 드래프트 초기화
-    if (row < currentItems.length) {
-      const item = currentItems[row];
-      if (col === 0 && nameDrafts[item.id] === undefined) {
-        nameDrafts[item.id] = item.name;
-      }
-      if (col === 1 && priceDrafts[item.id] === undefined) {
-        const p = selectedClientId && effectiveCat
-          ? getUnitPrice(selectedClientId, effectiveCat, item.name)
-          : 0;
-        priceDrafts[item.id] = p > 0 ? String(p) : '';
-      }
-      if (col === 2 && aliasDrafts[item.id] === undefined) {
-        aliasDrafts[item.id] = item.alias ?? '';
-      }
-      if (col === 3 && cnDrafts[item.id] === undefined) {
-        cnDrafts[item.id] = item.nameCn ?? '';
-      }
-      if (col === 4 && enDrafts[item.id] === undefined) {
-        enDrafts[item.id] = item.nameEn ?? '';
-      }
-      if (col === 5 && dateDrafts[item.id] === undefined) {
-        const d = selectedClientId && effectiveCat
-          ? getPriceEffectiveDate(selectedClientId, effectiveCat, item.name)
-          : undefined;
-        dateDrafts[item.id] = d ?? '';
+  async function commitCatOrderEdit(i: number) {
+    const max = data.categories.length;
+    const raw = parseInt(catOrderInputValue, 10);
+    if (!isNaN(raw)) {
+      const to = Math.max(1, Math.min(raw, max)) - 1;
+      if (to !== i) {
+        const reordered = [...data.categories];
+        const [moved] = reordered.splice(i, 1);
+        reordered.splice(to, 0, moved);
+        await submitForm('reorderCategories', { ids: JSON.stringify(reordered.map(x => x.id)) });
       }
     }
+    editingCatOrderIdx = null;
   }
 
-  function commitName(itemId: string, itemName: string) {
-    const draft = nameDrafts[itemId];
-    if (draft === undefined) return;
-    const newN = draft.trim();
-    if (!newN || newN === itemName) {
-      nameDrafts[itemId] = itemName;
-      return;
-    }
-    if (!selectedClientId || !effectiveCat) return;
-    // 이름 변경: 순서 유지를 위해 인플레이스로 rename
-    const oldPrice = getUnitPrice(selectedClientId, effectiveCat, itemName);
-    const oldPriceDate = getPriceEffectiveDate(selectedClientId, effectiveCat, itemName);
-    const renamed = renameLaundryItem(itemId, newN, selectedClientId, effectiveCat);
-    if (!renamed) {
-      // 중복 이름 등으로 실패 시 원복
-      nameDrafts[itemId] = itemName;
-      return;
-    }
-    // 가격 레코드도 새 이름으로 이전
-    const prices = getClientItemPrices(selectedClientId)
-      .filter(p => !(p.category === effectiveCat && p.itemName === itemName))
-      .map(p => ({ category: p.category, itemName: p.itemName, unitPrice: p.unitPrice, priceEffectiveDate: p.priceEffectiveDate }));
-    saveClientItemPrices(selectedClientId, prices);
-    if (oldPrice > 0) {
-      setClientItemPrice(selectedClientId, effectiveCat, newN, oldPrice);
-    }
-    if (oldPriceDate) {
-      setPriceEffectiveDate(selectedClientId, effectiveCat, newN, oldPriceDate);
-    }
-    delete nameDrafts[itemId];
+  // 카테고리 추가
+  async function addCategory() {
+    const cat = newCatInput.trim();
+    if (!cat || !selectedClient) return;
+    newCatInput = '';
+    await submitForm('upsertCategory', {
+      name: cat,
+      factory_id: selectedClient.factory_id,
+    });
   }
 
-  function commitAlias(itemId: string) {
-    const draft = aliasDrafts[itemId];
-    if (draft === undefined) return;
-    const val = draft.trim();
-    updateLaundryItemMeta(itemId, { alias: val || undefined });
-    delete aliasDrafts[itemId];
+  // 카테고리 삭제 확인
+  async function confirmRemoveCategory() {
+    if (!deleteCatTarget) return;
+    await submitForm('deleteCategory', { id: deleteCatTarget });
+    deleteCatTarget = null;
   }
-
-  function commitCn(itemId: string) {
-    const draft = cnDrafts[itemId];
-    if (draft === undefined) return;
-    const val = draft.trim();
-    updateLaundryItemMeta(itemId, { nameCn: val || undefined });
-    delete cnDrafts[itemId];
-  }
-
-  function commitEn(itemId: string) {
-    const draft = enDrafts[itemId];
-    if (draft === undefined) return;
-    const val = draft.trim();
-    updateLaundryItemMeta(itemId, { nameEn: val || undefined });
-    delete enDrafts[itemId];
-  }
-
-  function commitPrice(itemId: string, itemName: string) {
-    const draft = priceDrafts[itemId];
-    if (draft === undefined) return;
-    if (!selectedClientId || !effectiveCat) return;
-    const price = parseInt(draft.replace(/[^0-9]/g, ''), 10) || 0;
-    setClientItemPrice(selectedClientId, effectiveCat, itemName, price);
-    delete priceDrafts[itemId];
-  }
-
-  function commitDate(itemId: string, itemName: string) {
-    const draft = dateDrafts[itemId];
-    if (draft === undefined) return;
-    if (!selectedClientId || !effectiveCat) return;
-    const val = draft.trim();
-    if (!val || isValidDate(val)) {
-      setPriceEffectiveDate(selectedClientId, effectiveCat, itemName, val || null);
-    }
-    // 유효하지 않으면 원복
-    delete dateDrafts[itemId];
-  }
-
-  function commitCell(row: number, col: GridCol) {
-    if (row >= currentItems.length) return;
-    const item = currentItems[row];
-    if (col === 0) commitName(item.id, item.name);
-    else if (col === 1) commitPrice(item.id, item.name);
-    else if (col === 2) commitDate(item.id, item.name);
-    else if (col === 3) commitAlias(item.id);
-    else if (col === 4) commitCn(item.id);
-    else if (col === 5) commitEn(item.id);
-  }
-
-  function handleCellKeydown(e: KeyboardEvent, row: number, col: GridCol) {
-    const newRowIdx = getNewRowIndex();
-    const isNewRow  = row === newRowIdx;
-
-    // Regular navigation for all cols
-    switch (e.key) {
-      case 'ArrowUp':
-        e.preventDefault();
-        commitCell(row, col);
-        if (row > 0) moveFocus(row - 1, col);
-        break;
-
-      case 'ArrowDown':
-        e.preventDefault();
-        commitCell(row, col);
-        moveFocus(row + 1, col);
-        break;
-
-      case 'Enter':
-        e.preventDefault();
-        if (isNewRow) {
-          // new row: Enter anywhere commits and adds
-          addItemAndContinue();
-        } else {
-          commitCell(row, col);
-          moveFocus(row + 1, col);
-        }
-        break;
-
-      case 'ArrowLeft':
-        if (col > 0) {
-          e.preventDefault();
-          commitCell(row, col);
-          moveFocus(row, (col - 1) as GridCol);
-        }
-        break;
-
-      case 'ArrowRight':
-        if (col < 5) {
-          e.preventDefault();
-          commitCell(row, col);
-          moveFocus(row, (col + 1) as GridCol);
-        }
-        break;
-
-      case 'Tab':
-        e.preventDefault();
-        if (!e.shiftKey) {
-          commitCell(row, col);
-          if (col < 5) {
-            moveFocus(row, (col + 1) as GridCol);
-          } else {
-            moveFocus(row + 1, 0);
-          }
-        } else {
-          commitCell(row, col);
-          if (col > 0) {
-            moveFocus(row, (col - 1) as GridCol);
-          } else if (row > 0) {
-            moveFocus(row - 1, 5);
-          }
-        }
-        break;
-
-      case 'Escape':
-        if (!isNewRow) {
-          const item = currentItems[row];
-          delete nameDrafts[item.id];
-          delete aliasDrafts[item.id];
-          delete cnDrafts[item.id];
-          delete enDrafts[item.id];
-          delete priceDrafts[item.id];
-          delete dateDrafts[item.id];
-        } else {
-          newName      = '';
-          newAlias     = '';
-          newCn        = '';
-          newEn        = '';
-          newPriceDate = todayYMD();
-          newPrice     = '';
-        }
-        (e.target as HTMLElement).blur();
-        activeRow = null;
-        break;
-    }
-  }
-
-  // 새 행 유효성 (submit 시도 후 빨간줄 표시)
-  let newRowSubmitTried = $state(false);
-
-  $effect(() => {
-    void selectedClientId; void effectiveCat;
-    newRowSubmitTried = false;
-  });
-
-  const newRowNameOk    = $derived(newName.trim().length > 0);
-  const newRowPriceOk   = $derived(/^[0-9]+$/.test(newPrice.trim()) && parseInt(newPrice.trim(), 10) >= 0);
-  const newRowDateOk    = $derived(isValidDate(newPriceDate));
-
-  async function addItemAndContinue() {
-    newRowSubmitTried = true;
-    const name  = newName.trim();
-    if (!name || !selectedClientId || !effectiveCat) return;
-    if (!newRowPriceOk || !newRowDateOk) return;
-    const price = parseInt(newPrice.trim(), 10);
-    const added = addLaundryItemType(selectedClientId, effectiveCat, name);
-    if (added) {
-      setClientItemPrice(selectedClientId, effectiveCat, name, price);
-      setPriceEffectiveDate(selectedClientId, effectiveCat, name, newPriceDate);
-      const alias = newAlias.trim();
-      const cn    = newCn.trim();
-      const en    = newEn.trim();
-      if (alias || cn || en) {
-        updateLaundryItemMeta(added.id, {
-          alias: alias || undefined,
-          nameCn: cn || undefined,
-          nameEn: en || undefined,
-        });
-      }
-    }
-    localCats = localCats.filter(c => c !== effectiveCat);
-    newName           = '';
-    newAlias          = '';
-    newCn             = '';
-    newEn             = '';
-    newPriceDate      = todayYMD();
-    newPrice          = '0';
-    newRowSubmitTried = false;
-    await tick();
-    moveFocus(getNewRowIndex(), 0);
-  }
-
-  function confirmDateModal() {
-    if (dateModalRow === null || !selectedClientId || !effectiveCat) return;
-    const row = dateModalRow;
-    if (row >= currentItems.length) return;
-    const item = currentItems[row];
-    const date = dateModalValue.trim();
-    setPriceEffectiveDate(selectedClientId, effectiveCat, item.name, date || null);
-    showDateModal = false;
-    dateModalRow = null;
-    dateModalValue = '';
-  }
-
-  function cancelDateModal() {
-    showDateModal = false;
-    dateModalRow = null;
-    dateModalValue = '';
-  }
-
-  function removeItem(id: string, itemName: string) {
-    if (!selectedClientId || !effectiveCat) return;
-    removeLaundryItem(id);
-    const prices = getClientItemPrices(selectedClientId)
-      .filter(p => !(p.category === effectiveCat && p.itemName === itemName))
-      .map(p => ({ category: p.category, itemName: p.itemName, unitPrice: p.unitPrice }));
-    saveClientItemPrices(selectedClientId, prices);
-    // 드래프트 정리
-    delete nameDrafts[id];
-    delete priceDrafts[id];
-  }
-
-  function getDisplayName(item: { id: string; name: string }) {
-    return nameDrafts[item.id] ?? item.name;
-  }
-
-  function getDisplayAlias(item: { id: string; alias?: string }) {
-    return aliasDrafts[item.id] ?? item.alias ?? '';
-  }
-
-  function getDisplayCn(item: { id: string; nameCn?: string }) {
-    return cnDrafts[item.id] ?? item.nameCn ?? '';
-  }
-
-  function getDisplayEn(item: { id: string; nameEn?: string }) {
-    return enDrafts[item.id] ?? item.nameEn ?? '';
-  }
-
-  function getDisplayPrice(item: { id: string; name: string }) {
-    if (priceDrafts[item.id] !== undefined) return priceDrafts[item.id];
-    if (!selectedClientId || !effectiveCat) return '';
-    const p = getUnitPrice(selectedClientId, effectiveCat, item.name);
-    return p > 0 ? String(p) : '';
-  }
-
-  function getDisplayPriceDate(item: { id: string; name: string }) {
-    if (!selectedClientId || !effectiveCat) return '';
-    return getPriceEffectiveDate(selectedClientId, effectiveCat, item.name) ?? '';
-  }
-
-
-
-
+  function cancelRemoveCategory() { deleteCatTarget = null; }
 </script>
 
 <svelte:window onkeydown={(e) => { if (e.key === 'Escape' && showDateModal) cancelDateModal(); }} />
 
-<!-- ── 거래처 선택 모달 ───────────────────────────────────────── -->
+<!-- ── 거래처 선택 모달 ──────────────────────────────────────────── -->
 {#if showClientModal}
-  <dialog
-    open
-    aria-modal="true"
-    class="modal modal-open"
+  <dialog open aria-modal="true" class="modal modal-open"
     onkeydown={(e) => e.key === 'Escape' && (showClientModal = false)}
   >
     <div class="modal-box flex w-full max-w-lg flex-col overflow-hidden p-0" style="height: min(520px, 90vh);">
-      <!-- header -->
       <div class="flex shrink-0 items-center justify-between border-b border-base-200 px-5 py-4">
         <h3 class="text-base font-bold">거래처 선택</h3>
-        <button
-          onclick={() => (showClientModal = false)}
-          aria-label="닫기"
-          class="btn btn-ghost btn-sm btn-circle"
-        >
+        <button onclick={() => (showClientModal = false)} aria-label="닫기" class="btn btn-ghost btn-sm btn-circle">
           <Icon icon="lucide:x" class="h-4 w-4" />
         </button>
       </div>
-      <!-- search -->
       <div class="shrink-0 px-4 py-3 border-b border-base-200">
         <SearchBar
           placeholder="거래처 검색..."
           items={clientSearchItems}
-          onselect={(id) => handleSelectClient(id)}
+          onselect={(id) => { selectClient(id); showClientModal = false; }}
           class="w-full"
         />
       </div>
-      <!-- list -->
       <div class="min-h-0 flex-1 overflow-y-auto">
-        {#each clients as client (client.id)}
+        {#each data.clients as client (client.id)}
           <button
-            onclick={() => handleSelectClient(client.id)}
+            onclick={() => { selectClient(client.id); showClientModal = false; }}
             class="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-base-200 {selectedClientId === client.id ? 'bg-primary/10 font-semibold text-primary' : ''}"
           >
             <span class="min-w-0 flex-1 truncate text-sm">{client.name}</span>
-            <span class="badge badge-sm {typeBadge[client.type] ?? 'badge-ghost'} shrink-0">{typeLabel[client.type] ?? client.type}</span>
             {#if selectedClientId === client.id}
               <Icon icon="lucide:check" class="h-4 w-4 shrink-0 text-primary" />
             {/if}
           </button>
         {/each}
-        {#if clients.length === 0}
+        {#if data.clients.length === 0}
           <p class="py-10 text-center text-sm opacity-50">거래처 없음</p>
         {/if}
       </div>
     </div>
-    <div class="modal-backdrop" role="button" tabindex="-1" onclick={() => (showClientModal = false)} onkeydown={(e) => e.key === 'Escape' && (showClientModal = false)}></div>
+    <div class="modal-backdrop" role="button" tabindex="-1"
+      onclick={() => (showClientModal = false)}
+      onkeydown={(e) => e.key === 'Escape' && (showClientModal = false)}
+    ></div>
   </dialog>
 {/if}
 
-<!-- ── 복사 소스 선택 모달 ────────────────────────────────────── -->
-{#if showCopyModal}
-  <dialog
-    open
-    aria-modal="true"
-    class="modal modal-open"
-    onkeydown={(e) => e.key === 'Escape' && cancelCopy()}
-  >
-    <div class="modal-box flex w-full max-w-lg flex-col overflow-hidden p-0" style="height: min(520px, 90vh);">
-      <div class="flex shrink-0 items-center justify-between border-b border-base-200 px-5 py-4">
-        <h3 class="text-base font-bold">복사할 거래처 선택</h3>
-        <button
-          onclick={cancelCopy}
-          aria-label="닫기"
-          class="btn btn-ghost btn-sm btn-circle"
-        >
-          <Icon icon="lucide:x" class="h-4 w-4" />
-        </button>
-      </div>
-      <div class="shrink-0 px-4 py-3 border-b border-base-200">
-        <SearchBar
-          placeholder="거래처 검색..."
-          items={copySearchItems}
-          onselect={(id) => selectSourceForCopy(id)}
-          class="w-full"
-        />
-      </div>
-      <div class="min-h-0 flex-1 overflow-y-auto">
-        {#each clients.filter(c => c.id !== selectedClientId) as client (client.id)}
-          <button
-            onclick={() => selectSourceForCopy(client.id)}
-            class="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-base-200"
-          >
-            <span class="min-w-0 flex-1 truncate text-sm">{client.name}</span>
-            <span class="badge badge-sm {typeBadge[client.type] ?? 'badge-ghost'} shrink-0">{typeLabel[client.type] ?? client.type}</span>
-          </button>
-        {/each}
-        {#if clients.filter(c => c.id !== selectedClientId).length === 0}
-          <p class="py-10 text-center text-sm opacity-50">다른 거래처 없음</p>
-        {/if}
-      </div>
-    </div>
-    <div class="modal-backdrop" role="button" tabindex="-1" onclick={cancelCopy} onkeydown={(e) => e.key === 'Escape' && cancelCopy()}></div>
-  </dialog>
-{/if}
-
-<!-- ── 복사 확인 모달 ─────────────────────────────────────────── -->
-{#if showCopyConfirmModal && copySourceClientId && selectedClientId}
-  {@const sourceClient  = clients.find(c => c.id === copySourceClientId)}
-  {@const currentClient = clients.find(c => c.id === selectedClientId)}
-  <dialog
-    open
-    aria-modal="true"
-    class="modal modal-open"
-    onkeydown={(e) => e.key === 'Escape' && cancelCopy()}
-  >
-    <div class="modal-box w-full max-w-md p-0 overflow-hidden">
-      <div class="flex shrink-0 items-center gap-3 border-b border-base-200 px-6 py-4">
-        <Icon icon="lucide:triangle-alert" class="h-6 w-6 shrink-0 text-warning" />
-        <h3 class="text-base font-bold">품목 복사 확인</h3>
-      </div>
-      <div class="px-6 py-4">
-        <p class="mb-3 text-sm">
-          <strong>{sourceClient?.name}</strong>의 품목과 단가를
-          <strong>{currentClient?.name}</strong>에 복사합니다.
-        </p>
-        <p class="text-sm opacity-70">기존 품목은 모두 삭제되고 복사된 품목으로 교체됩니다.</p>
-      </div>
-      <div class="modal-action shrink-0 border-t border-base-200 bg-base-200 px-6 py-4 flex gap-2 justify-end">
-        <button onclick={cancelCopy} class="btn btn-ghost btn-sm">취소</button>
-        <button onclick={confirmCopy} class="btn btn-warning btn-sm">복사 실행</button>
-      </div>
-    </div>
-    <div class="modal-backdrop" role="button" tabindex="-1" onclick={cancelCopy} onkeydown={(e) => e.key === 'Escape' && cancelCopy()}></div>
-  </dialog>
-{/if}
-
-<!-- ── 카테고리 삭제 확인 모달 ─────────────────────────────── -->
+<!-- ── 카테고리 삭제 확인 모달 ──────────────────────────────────── -->
 {#if deleteCatTarget}
-  {@const catItemCount = selectedClientId ? laundryItems.filter(i => i.clientId === selectedClientId && i.category === deleteCatTarget).length : 0}
-  <dialog open aria-modal="true" class="modal modal-open" onkeydown={(e) => e.key === 'Escape' && cancelRemoveCategory()}>
+  {@const targetCat = data.categories.find(c => c.id === deleteCatTarget)}
+  {@const catItemCount = data.items.filter(i => i.category_id === deleteCatTarget).length}
+  <dialog open aria-modal="true" class="modal modal-open"
+    onkeydown={(e) => e.key === 'Escape' && cancelRemoveCategory()}
+  >
     <div class="modal-box w-full max-w-sm rounded-2xl p-6">
-      <h3 class="text-base font-extrabold mb-2">카테고리 삭제</h3>
-      <p class="text-sm text-base-content/70 mb-1">
-        <span class="font-bold text-error">{catLabel(deleteCatTarget)}</span> 카테고리를 삭제합니다.
+      <h3 class="mb-2 text-base font-extrabold">카테고리 삭제</h3>
+      <p class="mb-1 text-sm text-base-content/70">
+        <span class="font-bold text-error">"{targetCat?.name}"</span> 카테고리를 삭제하시겠습니까?
       </p>
       {#if catItemCount > 0}
-        <p class="text-sm text-base-content/60 mb-6">해당 카테고리에 등록된 품목 <strong>{catItemCount}개</strong>도 함께 삭제됩니다.</p>
+        <p class="mb-6 text-sm text-base-content/60">
+          해당 카테고리의 품목 <strong>{catItemCount}개</strong>도 함께 삭제됩니다.
+        </p>
       {:else}
-        <p class="text-sm text-base-content/60 mb-6">등록된 품목이 없습니다.</p>
+        <p class="mb-6 text-sm text-base-content/60">해당 카테고리에 등록된 품목이 없습니다.</p>
       {/if}
       <div class="modal-action">
         <button onclick={cancelRemoveCategory} class="btn btn-ghost font-bold">취소</button>
         <button onclick={confirmRemoveCategory} class="btn btn-error font-bold">삭제</button>
       </div>
     </div>
-    <div class="modal-backdrop" role="button" tabindex="-1" onclick={cancelRemoveCategory} onkeydown={(e) => e.key === 'Escape' && cancelRemoveCategory()}></div>
+    <div class="modal-backdrop" role="button" tabindex="-1"
+      onclick={cancelRemoveCategory}
+      onkeydown={(e) => e.key === 'Escape' && cancelRemoveCategory()}
+    ></div>
   </dialog>
 {/if}
 
-<!-- ── 메인 레이아웃 ────────────────────────────────── -->
+<!-- ── 메인 레이아웃 ─────────────────────────────────────────────── -->
 <div class="h-full flex flex-col overflow-hidden bg-base-200">
 
   <!-- 헤더 -->
@@ -1091,10 +621,9 @@
     <div class="flex items-center gap-4">
       <h2 class="text-2xl font-extrabold tracking-tight">상품 관리</h2>
       <div class="ml-auto flex items-center gap-2">
-        <!-- 거래처 선택 버튼 -->
         <button
-          onclick={openClientModal}
-          class="btn btn-ghost btn-sm flex items-center gap-1.5"
+          onclick={() => (showClientModal = true)}
+          class="btn btn-sm btn-ghost border border-base-300 min-w-48 justify-between"
         >
           <Icon icon="lucide:building-2" class="h-4 w-4 opacity-50" />
           {#if selectedClient}
@@ -1104,26 +633,15 @@
           {/if}
           <Icon icon="lucide:chevron-down" class="h-3.5 w-3.5 opacity-50" />
         </button>
-        <!-- 복사 버튼 -->
-        <button
-          onclick={openCopyModal}
-          disabled={!selectedClientId}
-          class="btn btn-outline btn-sm flex items-center gap-1.5"
-          title="다른 거래처 품목 복사"
-        >
-          <Icon icon="lucide:copy" class="h-4 w-4" />
-          품목 복사
-        </button>
       </div>
     </div>
   </header>
 
-  <!-- 바디 -->
   <div class="flex flex-1 min-h-0 gap-5 overflow-hidden px-6 py-5">
 
-    <!-- ── 카테고리 사이드바 ── -->
+    <!-- 카테고리 사이드바 -->
     <aside class="w-56 shrink-0 flex flex-col min-h-0 overflow-hidden rounded-lg border border-base-300 bg-base-100 shadow">
-
+      <!-- 카테고리 추가 -->
       <div class="shrink-0 border-b-2 border-base-200 bg-base-200 px-4 py-3">
         <p class="mb-2 text-xs font-bold uppercase tracking-wide opacity-50">카테고리</p>
         <div class="flex gap-1.5">
@@ -1133,50 +651,49 @@
             bind:value={newCatInput}
             onkeydown={(e) => e.key === 'Enter' && addCategory()}
             disabled={!selectedClientId}
-            class="input input-xs min-w-0 flex-1 disabled:opacity-50"
+            class="input input-xs input-bordered flex-1 min-w-0"
           />
           <button
             onclick={addCategory}
-            aria-label="카테고리 추가"
-            disabled={!newCatInput.trim() || !selectedClientId}
-            class="btn btn-primary btn-xs btn-square"
+            disabled={!selectedClientId || !newCatInput.trim()}
+            class="btn btn-xs btn-primary"
           >
             <Icon icon="lucide:plus" class="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
 
+      <!-- 카테고리 목록 -->
       <ul class="flex-1 min-h-0 overflow-y-auto py-1 flex flex-col gap-0.5 px-1">
-        {#if allCategories.length === 0}
+        {#if !selectedClientId}
           <li class="px-4 py-8 text-center text-xs opacity-40 pointer-events-none">
-            <span>카테고리를<br/>추가해주세요</span>
+            <span>거래처를<br/>선택해주세요</span>
+          </li>
+        {:else if data.categories.length === 0}
+          <li class="px-4 py-8 text-center text-xs opacity-40 pointer-events-none">
+            <span>카테고리 없음</span>
           </li>
         {:else}
-          {#each allCategories as cat, ci (cat)}
-            {@const isActive   = effectiveCat === cat}
+          {#each data.categories as cat, ci (cat.id)}
+            {@const isActive   = effectiveCategoryId === cat.id}
             {@const isDragOver = catDragOverIdx === ci}
             {@const isDragSrc  = catDragSrcIdx  === ci}
             <li
-              class="group relative transition-all duration-150
-                {isDragOver ? 'ring-2 ring-primary ring-inset rounded-md' : ''}
-                {isDragSrc  ? 'opacity-40' : ''}"
               draggable="true"
               ondragstart={(e) => onCatDragStart(e, ci)}
-              ondragover={(e) => onCatDragOver(e, ci)}
+              ondragover={(e)  => onCatDragOver(e, ci)}
               ondragleave={(e) => onCatDragLeave(e, ci)}
-              ondrop={(e) => onCatDrop(e, ci)}
+              ondrop={(e)      => onCatDrop(e, ci)}
               ondragend={onCatDragEnd}
+              animate:flip={{ duration: 180 }}
+              class="rounded-lg transition-colors
+                {isActive   ? 'bg-primary text-primary-content shadow' : 'hover:bg-base-200'}
+                {isDragOver ? 'ring-2 ring-primary' : ''}
+                {isDragSrc  ? 'opacity-40' : ''}"
             >
               <div class="flex items-center gap-1">
-                <!-- 순번 셀 -->
-                <div
-                  class="flex h-8 w-6 shrink-0 cursor-pointer items-center justify-center rounded text-[10px] font-bold select-none
-                    {isActive ? 'text-primary-content/60' : 'text-base-content/30 hover:text-base-content/60'}"
-                  ondblclick={() => startCatOrderEdit(ci)}
-                  title="더블클릭하면 순번을 직접 입력할 수 있어요"
-                  role="button"
-                  tabindex="-1"
-                >
+                <!-- 순번 -->
+                <div class="w-8 shrink-0 flex items-center justify-center">
                   {#if editingCatOrderIdx === ci}
                     <input
                       id="cat-order-input-{ci}"
@@ -1185,33 +702,37 @@
                       bind:value={catOrderInputValue}
                       onblur={() => commitCatOrderEdit(ci)}
                       onkeydown={(e) => {
-                        if (e.key === 'Enter') { e.preventDefault(); commitCatOrderEdit(ci); }
-                        else if (e.key === 'Escape') { e.preventDefault(); cancelCatOrderEdit(); }
+                        if (e.key === 'Enter') commitCatOrderEdit(ci);
+                        if (e.key === 'Escape') cancelCatOrderEdit();
                       }}
-                      onclick={(e) => e.stopPropagation()}
-                      class="w-6 rounded bg-base-100 text-center text-[10px] font-bold text-base-content outline outline-1 outline-primary"
+                      class="w-7 text-center text-xs rounded border border-primary bg-base-100 text-base-content outline-none py-0.5"
                     />
                   {:else}
-                    {ci + 1}
+                    <span
+                      class="text-[10px] font-bold opacity-40 cursor-pointer select-none w-7 text-center hover:opacity-80"
+                      onclick={() => startCatOrderEdit(ci)}
+                      role="button"
+                      tabindex="-1"
+                    >{ci + 1}</span>
                   {/if}
                 </div>
-
-                <!-- 카테고리 버튼 -->
+                <!-- 이름 버튼 -->
                 <button
-                  onclick={() => (selectedCategory = cat)}
-                  class="flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-2 py-2 text-sm font-medium transition-colors {isActive ? 'bg-primary text-primary-content font-bold' : 'hover:bg-base-200'}"
+                  onclick={() => (selectedCategoryId = cat.id)}
+                  draggable="false"
+                  class="flex flex-1 items-center gap-1.5 px-1 py-2 text-left text-sm font-medium min-w-0"
                 >
                   <Icon icon="lucide:grip-vertical" class="h-3.5 w-3.5 shrink-0 opacity-30 cursor-grab active:cursor-grabbing" />
-                  <span class="min-w-0 flex-1 truncate text-left">{catLabel(cat)}</span>
+                  <span class="min-w-0 flex-1 truncate">{cat.name}</span>
                 </button>
-
-                <!-- 삭제 버튼 -->
+                <!-- 삭제 -->
                 <button
-                  onclick={() => requestRemoveCategory(cat)}
-                  class="btn btn-ghost btn-xs btn-circle hidden text-error group-hover:flex shrink-0"
+                  onclick={() => (deleteCatTarget = cat.id)}
                   title="카테고리 삭제"
+                  class="btn btn-ghost btn-xs btn-circle opacity-0 hover:opacity-100 shrink-0 mr-1
+                    {isActive ? 'text-primary-content/70 hover:text-primary-content' : 'text-base-content/50'}"
                 >
-                  ×
+                  <Icon icon="lucide:x" class="h-3 w-3" />
                 </button>
               </div>
             </li>
@@ -1220,108 +741,100 @@
       </ul>
     </aside>
 
-    <!-- ── 품목 패널 ── -->
+    <!-- 품목 그리드 -->
     <section class="flex flex-1 min-w-0 flex-col min-h-0 overflow-hidden rounded-lg border border-base-300 bg-base-100 shadow">
-
-      <!-- 패널 헤더 -->
+      <!-- 그리드 헤더 -->
       <div class="shrink-0 border-b-2 border-base-200 bg-base-200 px-6 py-3.5 flex items-center justify-between">
         <div class="flex items-center gap-2">
           <span class="text-sm font-bold">
-            {effectiveCat ? catLabel(effectiveCat) : '—'}
+            {#if effectiveCategoryId}
+              {data.categories.find(c => c.id === effectiveCategoryId)?.name ?? ''}
+            {:else}
+              품목
+            {/if}
           </span>
-          <span class="badge badge-sm badge-neutral font-semibold">
-            {currentItems.length}개
-          </span>
+          <span class="badge badge-sm badge-neutral font-semibold">{currentItems.length}</span>
         </div>
         <p class="text-[11px] opacity-60 flex items-center gap-1.5">
-          <kbd class="kbd kbd-sm">↑↓←→</kbd>
-          셀 이동 &nbsp;·&nbsp;
-          <kbd class="kbd kbd-sm">Enter</kbd>
-          다음 행 &nbsp;·&nbsp;
-          <kbd class="kbd kbd-sm">Tab</kbd>
-          다음 셀
+          <kbd class="kbd kbd-sm">Tab</kbd> 이동
+          <kbd class="kbd kbd-sm">Enter</kbd> 저장
+          <kbd class="kbd kbd-sm">Esc</kbd> 취소
         </p>
       </div>
 
-      <!-- 테이블 -->
+      <!-- 그리드 본문 -->
       <div class="flex-1 min-h-0 overflow-y-auto overflow-x-auto">
         {#if !selectedClientId}
           <div class="flex h-full items-center justify-center">
-            <p class="text-sm opacity-40">거래처를 선택해주세요.</p>
+            <p class="text-sm opacity-40">거래처를 선택해주세요</p>
           </div>
-        {:else if !effectiveCat}
+        {:else if !effectiveCategoryId}
           <div class="flex h-full items-center justify-center">
-            <p class="text-sm opacity-40">카테고리를 추가해주세요.</p>
+            <p class="text-sm opacity-40">카테고리를 선택하거나 추가해주세요</p>
           </div>
         {:else}
           <table class="border-collapse" style="table-layout:fixed; width:100%;">
             <colgroup>
-              <col style="width:4%" />
-              <col style="width:16%" />
+              <col style="width:4%"  />
+              <col style="width:20%" />
               <col style="width:13%" />
               <col style="width:13%" />
-              <col style="width:16%" />
-              <col style="width:16%" />
+              <col style="width:13%" />
               <col style="width:18%" />
-              <col style="width:4%" />
+              <col style="width:15%" />
+              <col style="width:4%"  />
             </colgroup>
-            <!-- 컬럼 헤더 -->
             <thead class="sticky top-0 z-10">
               <tr class="bg-base-200">
                 <th class="h-9 px-2 text-center text-[11px] font-bold uppercase tracking-wide opacity-60 select-none border-b-2 border-r border-base-300">#</th>
-                <th class="h-9 px-3 text-left text-[11px] font-bold uppercase tracking-wide opacity-60 border-b-2 border-r border-base-300">품목명</th>
-                <th class="h-9 px-3 text-right text-[11px] font-bold uppercase tracking-wide opacity-60 border-b-2 border-r border-base-300">단가 (원)</th>
-                <th class="h-9 px-3 text-center text-[11px] font-bold uppercase tracking-wide opacity-60 border-b-2 border-r border-base-300">가격적용시기</th>
-                <th class="h-9 px-3 text-left text-[11px] font-bold uppercase tracking-wide opacity-60 border-b-2 border-r border-base-300">별칭</th>
-                <th class="h-9 px-3 text-left text-[11px] font-bold uppercase tracking-wide opacity-60 border-b-2 border-r border-base-300">중국어</th>
-                <th class="h-9 px-3 text-left text-[11px] font-bold uppercase tracking-wide opacity-60 border-b-2 border-r border-base-300">영어</th>
+                <th class="h-9 px-3 text-left   text-[11px] font-bold uppercase tracking-wide opacity-60 border-b-2 border-r border-base-300">품목명</th>
+                <th class="h-9 px-3 text-right   text-[11px] font-bold uppercase tracking-wide opacity-60 border-b-2 border-r border-base-300">단가</th>
+                <th class="h-9 px-3 text-center  text-[11px] font-bold uppercase tracking-wide opacity-60 border-b-2 border-r border-base-300">적용일</th>
+                <th class="h-9 px-3 text-left   text-[11px] font-bold uppercase tracking-wide opacity-60 border-b-2 border-r border-base-300">별칭</th>
+                <th class="h-9 px-3 text-left   text-[11px] font-bold uppercase tracking-wide opacity-60 border-b-2 border-r border-base-300">중국어</th>
+                <th class="h-9 px-3 text-left   text-[11px] font-bold uppercase tracking-wide opacity-60 border-b-2 border-r border-base-300">영어</th>
                 <th class="h-9 border-b-2 border-base-300"></th>
               </tr>
             </thead>
-
             <tbody>
-              <!-- 기존 품목 행들 -->
               {#each currentItems as item, i (item.id)}
                 {@const isActiveRow = activeRow === i}
                 {@const isDragOver  = dragOverIdx === i}
                 {@const isDragSrc   = dragSrcIdx  === i}
                 <tr
-                  animate:flip={{ duration: 220 }}
                   draggable="true"
                   ondragstart={(e) => onDragStart(e, i)}
-                  ondragover={(e) => onDragOver(e, i)}
+                  ondragover={(e)  => onDragOver(e, i)}
                   ondragleave={(e) => onDragLeave(e, i)}
-                  ondrop={(e) => onDrop(e, i)}
+                  ondrop={(e)      => onDrop(e, i)}
                   ondragend={onDragEnd}
-                  class="transition-colors
-                    {isActiveRow ? 'bg-primary/5' : i % 2 === 0 ? 'bg-base-100 hover:bg-primary/5' : 'bg-base-200/40 hover:bg-primary/5'}
-                    {isDragSrc  ? 'opacity-40' : ''}
-                    {isDragOver ? 'ring-2 ring-inset ring-primary bg-primary/10' : ''}"
+                  animate:flip={{ duration: 150 }}
+                  class="transition-colors group
+                    {isActiveRow ? 'bg-primary/5' : 'hover:bg-base-200/50'}
+                    {isDragOver  ? 'ring-2 ring-inset ring-primary' : ''}
+                    {isDragSrc   ? 'opacity-40' : ''}"
                 >
-                  <!-- 행 번호 -->
+                  <!-- 순번 -->
                   <td class="h-9 border-b border-r border-base-200 px-2 text-center select-none">
                     {#if editingOrderRow === i}
                       <input
                         id="order-input-{i}"
-                        type="number"
-                        min="1"
-                        max={currentItems.length}
+                        type="text"
+                        inputmode="numeric"
                         bind:value={orderInputValue}
-                        onkeydown={(e) => {
-                          if (e.key === 'Enter')  { e.preventDefault(); commitOrderEdit(i); }
-                          if (e.key === 'Escape') { e.preventDefault(); cancelOrderEdit(); }
-                        }}
                         onblur={() => commitOrderEdit(i)}
-                        class="w-full text-center text-xs font-bold bg-primary/10 border border-primary rounded outline-none text-primary [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                        onkeydown={(e) => {
+                          if (e.key === 'Enter')  commitOrderEdit(i);
+                          if (e.key === 'Escape') cancelOrderEdit();
+                        }}
+                        class="w-8 text-center text-xs rounded border border-primary bg-base-100 outline-none py-0.5"
                       />
                     {:else}
                       <span
+                        class="text-[11px] opacity-40 cursor-pointer hover:opacity-80 select-none"
+                        onclick={() => startOrderEdit(i)}
                         role="button"
-                        tabindex="0"
-                        class="block cursor-grab active:cursor-grabbing text-xs font-bold opacity-40 hover:opacity-70 transition-opacity"
-                        title="드래그하거나 더블클릭으로 순번 변경"
-                        ondblclick={() => startOrderEdit(i)}
-                        onkeydown={(e) => e.key === 'Enter' && startOrderEdit(i)}
+                        tabindex="-1"
                       >{i + 1}</span>
                     {/if}
                   </td>
@@ -1331,12 +844,12 @@
                     <input
                       id="cell-{i}-0"
                       type="text"
-                      autocomplete="off"
                       value={getDisplayName(item)}
+                      oninput={(e) => (nameDrafts[item.id] = (e.target as HTMLInputElement).value)}
                       onfocus={() => onCellFocus(i, 0)}
-                      onblur={() => commitName(item.id, item.name)}
+                      onblur={() => commitName(item)}
                       onkeydown={(e) => handleCellKeydown(e, i, 0)}
-                      class="w-full h-full px-3 bg-transparent font-medium outline-none focus:bg-primary/5 transition-colors duration-75"
+                      class="h-full w-full bg-transparent px-3 text-sm outline-none focus:bg-primary/5"
                     />
                   </td>
 
@@ -1345,36 +858,29 @@
                     <input
                       id="cell-{i}-1"
                       type="text"
-                      autocomplete="off"
                       inputmode="numeric"
                       value={getDisplayPrice(item)}
-                      oninput={(e) => { const v = e.currentTarget.value.replace(/[^0-9]/g, ''); priceDrafts[item.id] = v; e.currentTarget.value = v; }}
+                      oninput={(e) => (priceDrafts[item.id] = (e.target as HTMLInputElement).value)}
                       onfocus={() => onCellFocus(i, 1)}
-                      onblur={() => commitPrice(item.id, item.name)}
+                      onblur={() => commitPrice(item)}
                       onkeydown={(e) => handleCellKeydown(e, i, 1)}
-                      placeholder="—"
-                      class="w-full h-full px-3 text-right bg-transparent outline-none focus:bg-primary/5 placeholder:opacity-30 transition-colors duration-75"
+                      placeholder="0"
+                      class="h-full w-full bg-transparent px-3 text-right text-sm outline-none focus:bg-primary/5"
                     />
                   </td>
 
-                  <!-- 가격적용시기 -->
+                  <!-- 적용일 -->
                   <td class="h-9 p-0 border-b border-r border-base-200">
                     <input
                       id="cell-{i}-2"
                       type="text"
-                      autocomplete="off"
-                      inputmode="numeric"
-                      value={dateDrafts[item.id] ?? getDisplayPriceDate(item)}
-                      oninput={(e) => {
-                        dateDrafts[item.id] = formatDateInput(e.currentTarget.value);
-                        e.currentTarget.value = dateDrafts[item.id];
-                      }}
+                      value={getDisplayDate(item)}
+                      oninput={(e) => (dateDrafts[item.id] = (e.target as HTMLInputElement).value)}
                       onfocus={() => onCellFocus(i, 2)}
-                      onblur={() => commitDate(item.id, item.name)}
+                      onblur={() => commitDate(item)}
                       onkeydown={(e) => handleCellKeydown(e, i, 2)}
                       placeholder="YYYY-MM-DD"
-                      class="w-full h-full px-3 text-center font-mono text-sm bg-transparent outline-none focus:bg-primary/5 placeholder:opacity-30 transition-colors duration-75
-                        {(!dateDrafts[item.id] && !getDisplayPriceDate(item)) || isValidDate(dateDrafts[item.id] ?? getDisplayPriceDate(item)) ? '' : 'bg-error/5 text-error'}"
+                      class="h-full w-full bg-transparent px-3 text-center text-sm outline-none focus:bg-primary/5"
                     />
                   </td>
 
@@ -1383,14 +889,12 @@
                     <input
                       id="cell-{i}-3"
                       type="text"
-                      autocomplete="off"
                       value={getDisplayAlias(item)}
-                      oninput={(e) => { aliasDrafts[item.id] = e.currentTarget.value; }}
+                      oninput={(e) => (aliasDrafts[item.id] = (e.target as HTMLInputElement).value)}
                       onfocus={() => onCellFocus(i, 3)}
-                      onblur={() => commitAlias(item.id)}
+                      onblur={() => commitAlias(item)}
                       onkeydown={(e) => handleCellKeydown(e, i, 3)}
-                      placeholder="—"
-                      class="w-full h-full px-3 bg-transparent outline-none focus:bg-primary/5 placeholder:opacity-30 transition-colors duration-75"
+                      class="h-full w-full bg-transparent px-3 text-sm outline-none focus:bg-primary/5"
                     />
                   </td>
 
@@ -1399,14 +903,12 @@
                     <input
                       id="cell-{i}-4"
                       type="text"
-                      autocomplete="off"
                       value={getDisplayCn(item)}
-                      oninput={(e) => { cnDrafts[item.id] = e.currentTarget.value; }}
+                      oninput={(e) => (cnDrafts[item.id] = (e.target as HTMLInputElement).value)}
                       onfocus={() => onCellFocus(i, 4)}
-                      onblur={() => commitCn(item.id)}
+                      onblur={() => commitCn(item)}
                       onkeydown={(e) => handleCellKeydown(e, i, 4)}
-                      placeholder="—"
-                      class="w-full h-full px-3 bg-transparent outline-none focus:bg-primary/5 placeholder:opacity-30 transition-colors duration-75"
+                      class="h-full w-full bg-transparent px-3 text-sm outline-none focus:bg-primary/5"
                     />
                   </td>
 
@@ -1415,24 +917,21 @@
                     <input
                       id="cell-{i}-5"
                       type="text"
-                      autocomplete="off"
                       value={getDisplayEn(item)}
-                      oninput={(e) => { enDrafts[item.id] = e.currentTarget.value; }}
+                      oninput={(e) => (enDrafts[item.id] = (e.target as HTMLInputElement).value)}
                       onfocus={() => onCellFocus(i, 5)}
-                      onblur={() => commitEn(item.id)}
+                      onblur={() => commitEn(item)}
                       onkeydown={(e) => handleCellKeydown(e, i, 5)}
-                      placeholder="—"
-                      class="w-full h-full px-3 bg-transparent outline-none focus:bg-primary/5 placeholder:opacity-30 transition-colors duration-75"
+                      class="h-full w-full bg-transparent px-3 text-sm outline-none focus:bg-primary/5"
                     />
                   </td>
 
-                  <!-- 삭제 버튼 -->
+                  <!-- 삭제 -->
                   <td class="h-9 border-b border-base-200 px-1 text-center">
                     <button
-                      onclick={() => removeItem(item.id, item.name)}
-                      class="btn btn-ghost btn-xs btn-square text-error opacity-0 transition-opacity"
+                      onclick={() => removeItem(item.id)}
                       title="품목 삭제"
-                      tabindex="-1"
+                      class="btn btn-ghost btn-xs btn-circle text-error/50 hover:text-error opacity-0 group-hover:opacity-100"
                     >
                       <Icon icon="lucide:trash-2" class="h-4 w-4" />
                     </button>
@@ -1440,180 +939,135 @@
                 </tr>
               {/each}
 
-              <!-- 새 행 (빈 입력 행) -->
+              <!-- 새 행 -->
               {#if true}
-              {@const newRowIdx = currentItems.length}
-              {@const isNewRowActive = activeRow === newRowIdx}
-              <tr class="transition-colors {isNewRowActive ? 'bg-success/5' : 'hover:bg-base-200/30'}">
-                <td class="h-9 border-b border-dashed border-r border-base-300 px-2 text-center text-[11px] opacity-30 select-none">✾</td>
-
-                <!-- 품목명 (col 0) -->
-                <td class="h-9 p-0 border-b border-dashed border-r border-base-300">
-                  <input
-                    id="cell-{newRowIdx}-0"
-                    type="text"
-                    autocomplete="off"
-                    bind:value={newName}
-                    onfocus={() => { activeRow = newRowIdx; }}
-                    onblur={() => { if (activeRow === newRowIdx) activeRow = null; }}
-                    onkeydown={(e) => handleCellKeydown(e, newRowIdx, 0)}
-                    placeholder="새 품목명..."
-                    class="w-full h-full px-3 bg-transparent outline-none placeholder:opacity-30 transition-colors duration-75
-                      {newRowSubmitTried && !newRowNameOk ? 'bg-error/5 text-error placeholder:text-error' : 'focus:bg-success/5'}"
-                  />
-                </td>
-
-                <!-- 단가 (col 1) -->
-                <td class="h-9 p-0 border-b border-dashed border-r border-base-300">
-                  <input
-                    id="cell-{newRowIdx}-1"
-                    type="text"
-                    autocomplete="off"
-                    inputmode="numeric"
-                    bind:value={newPrice}
-                    oninput={(e) => { newPrice = e.currentTarget.value.replace(/[^0-9]/g, ''); e.currentTarget.value = newPrice; }}
-                    onfocus={() => { activeRow = newRowIdx; }}
-                    onblur={() => { if (activeRow === newRowIdx) activeRow = null; }}
-                    onkeydown={(e) => handleCellKeydown(e, newRowIdx, 1)}
-                    placeholder="단가"
-                    class="w-full h-full px-3 text-right bg-transparent outline-none placeholder:opacity-30 transition-colors duration-75
-                      {newRowSubmitTried && !newRowPriceOk ? 'bg-error/5 text-error' : 'focus:bg-success/5'}"
-                  />
-                </td>
-
-                <!-- 가격적용시기 (col 2) -->
-                <td class="h-9 p-0 border-b border-dashed border-r border-base-300">
-                  <input
-                    id="cell-{newRowIdx}-2"
-                    type="text"
-                    autocomplete="off"
-                    inputmode="numeric"
-                    value={newPriceDate}
-                    oninput={(e) => { newPriceDate = formatDateInput(e.currentTarget.value); e.currentTarget.value = newPriceDate; }}
-                    onfocus={() => { activeRow = newRowIdx; }}
-                    onblur={() => { if (activeRow === newRowIdx) activeRow = null; }}
-                    onkeydown={(e) => handleCellKeydown(e, newRowIdx, 2)}
-                    placeholder="YYYY-MM-DD"
-                    class="w-full h-full px-3 text-center font-mono text-sm bg-transparent outline-none placeholder:opacity-30 transition-colors duration-75
-                      {newRowSubmitTried && !newRowDateOk ? 'bg-error/5 text-error' : 'focus:bg-success/5'}"
-                  />
-                </td>
-
-                <!-- 별칭 (col 3) -->
-                <td class="h-9 p-0 border-b border-dashed border-r border-base-300">
-                  <input
-                    id="cell-{newRowIdx}-3"
-                    type="text"
-                    autocomplete="off"
-                    bind:value={newAlias}
-                    onfocus={() => { activeRow = newRowIdx; }}
-                    onblur={() => { if (activeRow === newRowIdx) activeRow = null; }}
-                    onkeydown={(e) => handleCellKeydown(e, newRowIdx, 3)}
-                    placeholder="—"
-                    class="w-full h-full px-3 bg-transparent outline-none focus:bg-success/5 placeholder:opacity-30 transition-colors duration-75"
-                  />
-                </td>
-
-                <!-- 중국어 (col 4) -->
-                <td class="h-9 p-0 border-b border-dashed border-r border-base-300">
-                  <input
-                    id="cell-{newRowIdx}-4"
-                    type="text"
-                    autocomplete="off"
-                    bind:value={newCn}
-                    onfocus={() => { activeRow = newRowIdx; }}
-                    onblur={() => { if (activeRow === newRowIdx) activeRow = null; }}
-                    onkeydown={(e) => handleCellKeydown(e, newRowIdx, 4)}
-                    placeholder="—"
-                    class="w-full h-full px-3 bg-transparent outline-none focus:bg-success/5 placeholder:opacity-30 transition-colors duration-75"
-                  />
-                </td>
-
-                <!-- 영어 (col 5) -->
-                <td class="h-9 p-0 border-b border-dashed border-r border-base-300">
-                  <input
-                    id="cell-{newRowIdx}-5"
-                    type="text"
-                    autocomplete="off"
-                    bind:value={newEn}
-                    onfocus={() => { activeRow = newRowIdx; }}
-                    onblur={() => { if (activeRow === newRowIdx) activeRow = null; }}
-                    onkeydown={(e) => handleCellKeydown(e, newRowIdx, 5)}
-                    placeholder="—"
-                    class="w-full h-full px-3 bg-transparent outline-none focus:bg-success/5 placeholder:opacity-30 transition-colors duration-75"
-                  />
-                </td>
-
-                <td class="h-9 border-b border-dashed border-base-300 px-1 text-center">
-                  {#if newName.trim()}
-                    <button
-                      onclick={() => addItemAndContinue()}
-                      class="btn btn-success btn-xs btn-square"
-                      title="추가 (Enter)"
-                      tabindex="-1"
-                    >
-                      <Icon icon="lucide:check" class="h-3.5 w-3.5" />
-                    </button>
-                  {/if}
-                </td>
-              </tr>
-
-              <!-- 빈 공간 행 (시각적 여백) -->
-              <tr>
-                <td colspan="8" class="h-16"></td>
-              </tr>
-
+                {@const newRowIdx    = currentItems.length}
+                {@const isNewRowActive = activeRow === newRowIdx}
+                <tr class="transition-colors {isNewRowActive ? 'bg-success/5' : 'hover:bg-base-200/30'}">
+                  <td class="h-9 border-b border-dashed border-r border-base-300 px-2 text-center text-[11px] opacity-30 select-none">
+                    {newRowIdx + 1}
+                  </td>
+                  <td class="h-9 p-0 border-b border-dashed border-r border-base-300">
+                    <input
+                      id="cell-{newRowIdx}-0"
+                      type="text"
+                      placeholder="품목명 입력 후 Enter"
+                      bind:value={newName}
+                      onfocus={() => (activeRow = newRowIdx)}
+                      onkeydown={(e) => handleCellKeydown(e, newRowIdx, 0)}
+                      class="h-full w-full bg-transparent px-3 text-sm outline-none placeholder:opacity-30
+                        {newRowSubmitTried && !newRowNameOk ? 'ring-2 ring-inset ring-error' : ''}"
+                    />
+                  </td>
+                  <td class="h-9 p-0 border-b border-dashed border-r border-base-300">
+                    <input
+                      id="cell-{newRowIdx}-1"
+                      type="text"
+                      inputmode="numeric"
+                      placeholder="0"
+                      bind:value={newPrice}
+                      onfocus={() => (activeRow = newRowIdx)}
+                      onkeydown={(e) => handleCellKeydown(e, newRowIdx, 1)}
+                      class="h-full w-full bg-transparent px-3 text-right text-sm outline-none placeholder:opacity-30
+                        {newRowSubmitTried && !newRowPriceOk ? 'ring-2 ring-inset ring-error' : ''}"
+                    />
+                  </td>
+                  <td class="h-9 p-0 border-b border-dashed border-r border-base-300">
+                    <input
+                      id="cell-{newRowIdx}-2"
+                      type="text"
+                      placeholder="YYYY-MM-DD"
+                      bind:value={newPriceDate}
+                      onfocus={() => (activeRow = newRowIdx)}
+                      onkeydown={(e) => handleCellKeydown(e, newRowIdx, 2)}
+                      class="h-full w-full bg-transparent px-3 text-center text-sm outline-none placeholder:opacity-30
+                        {newRowSubmitTried && !newRowDateOk ? 'ring-2 ring-inset ring-error' : ''}"
+                    />
+                  </td>
+                  <td class="h-9 p-0 border-b border-dashed border-r border-base-300">
+                    <input
+                      id="cell-{newRowIdx}-3"
+                      type="text"
+                      placeholder="별칭"
+                      bind:value={newAlias}
+                      onfocus={() => (activeRow = newRowIdx)}
+                      onkeydown={(e) => handleCellKeydown(e, newRowIdx, 3)}
+                      class="h-full w-full bg-transparent px-3 text-sm outline-none placeholder:opacity-30"
+                    />
+                  </td>
+                  <td class="h-9 p-0 border-b border-dashed border-r border-base-300">
+                    <input
+                      id="cell-{newRowIdx}-4"
+                      type="text"
+                      placeholder="중국어명"
+                      bind:value={newCn}
+                      onfocus={() => (activeRow = newRowIdx)}
+                      onkeydown={(e) => handleCellKeydown(e, newRowIdx, 4)}
+                      class="h-full w-full bg-transparent px-3 text-sm outline-none placeholder:opacity-30"
+                    />
+                  </td>
+                  <td class="h-9 p-0 border-b border-dashed border-r border-base-300">
+                    <input
+                      id="cell-{newRowIdx}-5"
+                      type="text"
+                      placeholder="영어명"
+                      bind:value={newEn}
+                      onfocus={() => (activeRow = newRowIdx)}
+                      onkeydown={(e) => handleCellKeydown(e, newRowIdx, 5)}
+                      class="h-full w-full bg-transparent px-3 text-sm outline-none placeholder:opacity-30"
+                    />
+                  </td>
+                  <td class="h-9 border-b border-dashed border-base-300 px-1 text-center">
+                    {#if newName.trim()}
+                      <button
+                        onclick={addItemAndContinue}
+                        class="btn btn-ghost btn-xs btn-circle text-success"
+                      >
+                        <Icon icon="lucide:check" class="h-3.5 w-3.5" />
+                      </button>
+                    {/if}
+                  </td>
+                </tr>
+                <tr><td colspan="8" class="h-16"></td></tr>
               {/if}
             </tbody>
           </table>
         {/if}
       </div>
     </section>
-
   </div>
 </div>
 
-<!-- ── 가격 적용 시기 날짜 모달 ── -->
+<!-- ── 날짜 모달 ──────────────────────────────────────────────────── -->
 {#if showDateModal && dateModalRow !== null}
-  <dialog
-    open
-    aria-modal="true"
-    class="modal modal-open"
-    onkeydown={(e) => e.key === 'Escape' && cancelDateModal()}
-  >
+  <dialog open aria-modal="true" class="modal modal-open">
     <div class="modal-box w-full max-w-sm flex flex-col gap-4">
       <div>
-        <h3 class="text-base font-bold mb-1">가격 적용 시기</h3>
-        <p class="text-xs opacity-50">이 날짜부터 해당 단가가 적용됩니다</p>
+        <h3 class="text-base font-bold mb-1">단가 적용일 변경</h3>
+        <p class="text-xs opacity-50">YYYY-MM-DD 형식으로 입력하세요</p>
       </div>
-
       <div>
-        <label for="dateInput" class="label label-text text-xs font-semibold mb-1">
-          적용 시작일 (YYYY-MM-DD)
-        </label>
+        <label for="dateInput" class="label label-text text-xs font-semibold mb-1">적용 시작일</label>
         <input
           id="dateInput"
           type="date"
           bind:value={dateModalValue}
-          class="input input-sm w-full"
+          class="input input-bordered input-sm w-full"
         />
       </div>
-
       <div class="modal-action border-t border-base-200 pt-4 mt-0">
         <button type="button" onclick={cancelDateModal} class="btn btn-ghost btn-sm">취소</button>
         <button type="button" onclick={confirmDateModal} class="btn btn-primary btn-sm">확인</button>
       </div>
     </div>
-    <div class="modal-backdrop" role="button" tabindex="-1" onclick={cancelDateModal} onkeydown={(e) => e.key === 'Escape' && cancelDateModal()}></div>
+    <div class="modal-backdrop" role="button" tabindex="-1"
+      onclick={cancelDateModal}
+      onkeydown={(e) => e.key === 'Escape' && cancelDateModal()}
+    ></div>
   </dialog>
 {/if}
 
 <style>
-  tr:hover button[title="품목 삭제"] {
-    opacity: 1;
-  }
-  td:has(> input:focus) {
-    outline: 2px solid hsl(var(--p) / 0.6);
-    outline-offset: -2px;
-  }
+  tr:hover button[title="품목 삭제"] { opacity: 1; }
+  td:has(> input:focus) { background-color: hsl(var(--p) / 0.05); }
 </style>
