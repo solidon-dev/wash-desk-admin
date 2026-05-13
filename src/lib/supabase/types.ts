@@ -26,7 +26,6 @@ export type LogType  = Enums<'log_type'>;  // 'in' | 'out'
 export type Category         = Tables<'categories'>;
 export type Client           = Tables<'clients'>;
 export type Factory          = Tables<'factories'>;
-export type FactoryMember    = Tables<'factory_members'>;
 export type Inventory        = Tables<'inventory'>;
 export type InventoryLog     = Tables<'inventory_logs'>;
 export type InvoiceAttachment = Tables<'invoice_attachments'>;
@@ -44,7 +43,6 @@ export type Profile          = Tables<'profiles'>;
 export type CategoryInsert          = TablesInsert<'categories'>;
 export type ClientInsert            = TablesInsert<'clients'>;
 export type FactoryInsert           = TablesInsert<'factories'>;
-export type FactoryMemberInsert     = TablesInsert<'factory_members'>;
 export type InventoryInsert         = TablesInsert<'inventory'>;
 export type InventoryLogInsert      = TablesInsert<'inventory_logs'>;
 export type InvoiceAttachmentInsert = TablesInsert<'invoice_attachments'>;
@@ -62,7 +60,6 @@ export type ProfileInsert           = TablesInsert<'profiles'>;
 export type CategoryUpdate          = TablesUpdate<'categories'>;
 export type ClientUpdate            = TablesUpdate<'clients'>;
 export type FactoryUpdate           = TablesUpdate<'factories'>;
-export type FactoryMemberUpdate     = TablesUpdate<'factory_members'>;
 export type InventoryUpdate         = TablesUpdate<'inventory'>;
 export type InventoryLogUpdate      = TablesUpdate<'inventory_logs'>;
 export type InvoiceAttachmentUpdate = TablesUpdate<'invoice_attachments'>;
@@ -88,9 +85,6 @@ export type RpcReturns<T extends keyof Functions>  = Functions[T]['Returns'];
 // RPC 함수별 명시적 alias
 export type GetUnitPriceArgs          = RpcArgs<'get_unit_price'>;
 export type GetUnitPriceReturns       = RpcReturns<'get_unit_price'>;
-
-export type IsFactoryMemberArgs       = RpcArgs<'is_factory_member'>;
-export type IsFactoryMemberReturns    = RpcReturns<'is_factory_member'>;
 
 export type MyRoleReturns             = RpcReturns<'my_role'>;
 

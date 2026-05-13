@@ -16,32 +16,32 @@ export type Database = {
     Tables: {
       categories: {
         Row: {
+          client_id: string
           created_at: string
-          factory_id: string
           id: string
           name: string
           sort_order: number
         }
         Insert: {
+          client_id: string
           created_at?: string
-          factory_id: string
           id?: string
           name: string
           sort_order?: number
         }
         Update: {
+          client_id?: string
           created_at?: string
-          factory_id?: string
           id?: string
           name?: string
           sort_order?: number
         }
         Relationships: [
           {
-            foreignKeyName: "categories_factory_id_fkey"
-            columns: ["factory_id"]
+            foreignKeyName: "categories_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: "factories"
+            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
         ]
@@ -449,7 +449,6 @@ export type Database = {
       }
       item_prices: {
         Row: {
-          client_id: string
           created_at: string
           effective_from: string
           id: string
@@ -457,7 +456,6 @@ export type Database = {
           unit_price: number
         }
         Insert: {
-          client_id: string
           created_at?: string
           effective_from: string
           id?: string
@@ -465,7 +463,6 @@ export type Database = {
           unit_price?: number
         }
         Update: {
-          client_id?: string
           created_at?: string
           effective_from?: string
           id?: string
@@ -473,13 +470,6 @@ export type Database = {
           unit_price?: number
         }
         Relationships: [
-          {
-            foreignKeyName: "item_prices_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "item_prices_item_id_fkey"
             columns: ["item_id"]
@@ -492,8 +482,8 @@ export type Database = {
       items: {
         Row: {
           category_id: string
+          client_id: string
           created_at: string
-          factory_id: string
           id: string
           name_en: string | null
           name_ko: string
@@ -503,8 +493,8 @@ export type Database = {
         }
         Insert: {
           category_id: string
+          client_id: string
           created_at?: string
-          factory_id: string
           id?: string
           name_en?: string | null
           name_ko: string
@@ -514,8 +504,8 @@ export type Database = {
         }
         Update: {
           category_id?: string
+          client_id?: string
           created_at?: string
-          factory_id?: string
           id?: string
           name_en?: string | null
           name_ko?: string
@@ -532,10 +522,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "items_factory_id_fkey"
-            columns: ["factory_id"]
+            foreignKeyName: "items_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: "factories"
+            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
         ]
@@ -588,7 +578,6 @@ export type Database = {
           p_category_id: string
           p_client_id: string
           p_effective_from: string
-          p_factory_id: string
           p_name_en: string
           p_name_ko: string
           p_name_zh: string
@@ -606,6 +595,15 @@ export type Database = {
       my_role: {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
+      }
+      process_inventory_delta: {
+        Args: {
+          p_client_id: string
+          p_delta: number
+          p_factory_id: string
+          p_item_id: string
+        }
+        Returns: Json
       }
       process_inventory_out: {
         Args: {

@@ -2,7 +2,7 @@
   import Icon from '@iconify/svelte';
   import { tick } from 'svelte';
   import { flip } from 'svelte/animate';
-  import { goto } from '$app/navigation';
+  import { goto, invalidateAll } from '$app/navigation';
   import { deserialize } from '$app/forms';
   import SearchBar from '$lib/components/SearchBar.svelte';
   import type { PageProps, PageData } from './$types';
@@ -11,7 +11,7 @@
   let { data }: PageProps = $props();
 
   type Item = PageData['items'][number];
-  type Price = { id: string; item_id: string; client_id: string; unit_price: number; effective_from: string };
+  type Price = { id: string; item_id: string; unit_price: number; effective_from: string };
 
   // ── 낙관적 로컈 상태 ──────────────────────────────────────────
   // $derived로 맨저 래핑해서 $effect가 정확히 추적하게 함 (state_referenced_locally 경고 해결)
@@ -274,7 +274,7 @@
   function patchLocalItem(id: string, patch: Partial<Item>) {
     localItems = localItems.map(it => it.id === id ? { ...it, ...patch } : it);
   }
-  function patchLocalPrice(itemId: string, patch: Partial<Price>, clientId: string) {
+  function patchLocalPrice(itemId: string, patch: Partial<Price>) {
     const existing = localPrices.find(p => p.item_id === itemId);
     if (existing) {
       localPrices = localPrices.map(p => p.item_id === itemId ? { ...p, ...patch } : p);
@@ -282,7 +282,6 @@
       localPrices = [...localPrices, {
         id: `tmp-${itemId}`,
         item_id: itemId,
-        client_id: clientId,
         unit_price: 0,
         effective_from: todayYMD(),
         ...patch,
@@ -359,11 +358,11 @@
     const prevPrice = getPrice(item.id);
     if (price === prevPrice) return; // 변화 없으면 서버 요청 안 함
     const date  = getPriceDate(item.id) || todayYMD();
-    patchLocalPrice(item.id, { unit_price: price }, selectedClientId);
+    patchLocalPrice(item.id, { unit_price: price });
     submitBg('upsertPrice', {
-      item_id: item.id, client_id: selectedClientId,
+      item_id: item.id,
       unit_price: String(price), effective_from: date,
-    }, () => patchLocalPrice(item.id, { unit_price: prevPrice }, selectedClientId!));
+    }, () => patchLocalPrice(item.id, { unit_price: prevPrice }));
   }
 
   function commitDate(item: Item) {
@@ -381,11 +380,11 @@
       return;
     }
     const price = getPrice(item.id);
-    patchLocalPrice(item.id, { effective_from: val }, selectedClientId);
+    patchLocalPrice(item.id, { effective_from: val });
     submitBg('upsertPrice', {
-      item_id: item.id, client_id: selectedClientId,
+      item_id: item.id,
       unit_price: String(price), effective_from: val,
-    }, () => patchLocalPrice(item.id, { effective_from: prevDate }, selectedClientId!));
+    }, () => patchLocalPrice(item.id, { effective_from: prevDate }));
   }
 
   // commit은 이제 동기적 (낙관적 업데이트, bg fetch는 fire-and-forget)
@@ -481,7 +480,7 @@
     const tmpItem: Item = {
       id: tmpId,
       category_id: catId,
-      factory_id: selectedClient!.factory_id,
+      client_id: cliId,
       name_ko: name,
       name_en: en || null,
       name_zh: cn || null,
@@ -489,7 +488,7 @@
       sort_order: maxSort,
     };
     localItems = [...localItems, tmpItem];
-    if (price > 0) patchLocalPrice(tmpId, { unit_price: price, effective_from: priceDate }, cliId);
+    if (price > 0) patchLocalPrice(tmpId, { unit_price: price, effective_from: priceDate });
 
     await tick();
     moveFocus(currentItems.length - 1, 0); // 방금 추가된 행으로
@@ -548,11 +547,11 @@
     const price = getPrice(item.id);
     const prevDate = getPriceDate(item.id);
     const cliId = selectedClientId;
-    patchLocalPrice(item.id, { effective_from: date }, cliId);
+    patchLocalPrice(item.id, { effective_from: date });
     submitBg('upsertPrice', {
-      item_id: item.id, client_id: cliId,
+      item_id: item.id,
       unit_price: String(price), effective_from: date,
-    }, () => patchLocalPrice(item.id, { effective_from: prevDate }, cliId));
+    }, () => patchLocalPrice(item.id, { effective_from: prevDate }));
     showDateModal = false; dateModalRow = null; dateModalValue = '';
   }
 
@@ -693,7 +692,7 @@
     newCatInput = '';
     await submitAndReload('upsertCategory', {
       name: cat,
-      factory_id: selectedClient.factory_id,
+      client_id: selectedClientId!,
     });
   }
 
