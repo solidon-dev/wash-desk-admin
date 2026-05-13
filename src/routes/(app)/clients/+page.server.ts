@@ -8,7 +8,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	let query = locals.supabase
 		.from('clients')
 		.select('id, factory_id, name, business_number, email, manager_name, manager_phone, contract_start_date, contract_end_date, created_at, deleted_at')
-		.order('created_at', { ascending: false });
+		.order('created_at', { ascending: false })
+		.order('id', { ascending: true });
 
 	if (!showHidden) query = query.is('deleted_at', null);
 	if (q)           query = query.ilike('name', `%${q}%`);
