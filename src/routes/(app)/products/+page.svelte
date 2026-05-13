@@ -962,7 +962,12 @@
                       type="text"
                       inputmode="numeric"
                       value={getDisplayPrice(item)}
-                      oninput={(e) => (priceDrafts[item.id] = (e.target as HTMLInputElement).value)}
+                      oninput={(e) => {
+                        const el = e.target as HTMLInputElement;
+                        const numeric = el.value.replace(/[^0-9]/g, '');
+                        el.value = numeric;
+                        priceDrafts[item.id] = numeric;
+                      }}
                       onfocus={() => onCellFocus(i, 1)}
                       onblur={() => commitPrice(item)}
                       onkeydown={(e) => handleCellKeydown(e, i, 1)}
@@ -1067,7 +1072,13 @@
                       type="text"
                       inputmode="numeric"
                       placeholder="0"
-                      bind:value={newPrice}
+                      value={newPrice}
+                      oninput={(e) => {
+                        const el = e.target as HTMLInputElement;
+                        const numeric = el.value.replace(/[^0-9]/g, '');
+                        el.value = numeric;
+                        newPrice = numeric;
+                      }}
                       onfocus={() => (activeRow = newRowIdx)}
                       onkeydown={(e) => handleCellKeydown(e, newRowIdx, 1)}
                       class="h-full w-full bg-transparent px-3 text-right text-sm outline-none placeholder:opacity-30
