@@ -164,6 +164,14 @@
     return !isNaN(new Date(str).getTime());
   }
 
+  // 숫자만 입력받아 YYYY-MM-DD 형태로 자동 포맷
+  function formatDateInput(raw: string): string {
+    const digits = raw.replace(/[^0-9]/g, '').slice(0, 8);
+    if (digits.length <= 4) return digits;
+    if (digits.length <= 6) return `${digits.slice(0, 4)}-${digits.slice(4)}`;
+    return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`;
+  }
+
   // 단가/날짜 디스플레이 헬퍼
   function getPrice(itemId: string): number {
     return localPrices.find(p => p.item_id === itemId)?.unit_price ?? 0;
@@ -982,7 +990,13 @@
                       id="cell-{i}-2"
                       type="text"
                       value={getDisplayDate(item)}
-                      oninput={(e) => (dateDrafts[item.id] = (e.target as HTMLInputElement).value)}
+                      oninput={(e) => {
+                        const el = e.target as HTMLInputElement;
+                        const formatted = formatDateInput(el.value);
+                        el.value = formatted;
+                        el.setSelectionRange(formatted.length, formatted.length);
+                        dateDrafts[item.id] = formatted;
+                      }}
                       onfocus={() => onCellFocus(i, 2)}
                       onblur={() => commitDate(item)}
                       onkeydown={(e) => handleCellKeydown(e, i, 2)}
@@ -1089,8 +1103,16 @@
                     <input
                       id="cell-{newRowIdx}-2"
                       type="text"
+                      inputmode="numeric"
                       placeholder="YYYY-MM-DD"
-                      bind:value={newPriceDate}
+                      value={newPriceDate}
+                      oninput={(e) => {
+                        const el = e.target as HTMLInputElement;
+                        const formatted = formatDateInput(el.value);
+                        el.value = formatted;
+                        el.setSelectionRange(formatted.length, formatted.length);
+                        newPriceDate = formatted;
+                      }}
                       onfocus={() => (activeRow = newRowIdx)}
                       onkeydown={(e) => handleCellKeydown(e, newRowIdx, 2)}
                       class="h-full w-full bg-transparent px-3 text-center text-sm outline-none placeholder:opacity-30
