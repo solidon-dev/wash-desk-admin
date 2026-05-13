@@ -1116,7 +1116,7 @@
                   <td class="h-9 border-b border-dashed border-r border-base-300 px-2 text-center text-[11px] opacity-30 select-none">
                     {newRowIdx + 1}
                   </td>
-                  <td class="h-9 p-0 border-b border-dashed border-r border-base-300 {newRowSubmitTried && !newRowNameOk ? 'bg-error/15' : ''}">
+                  <td class="h-9 p-0 border-b border-dashed border-r border-base-300" style={newRowSubmitTried && !newRowNameOk ? 'background:hsl(var(--er)/.15)' : ''}>
                     <input
                       id="cell-{newRowIdx}-0"
                       type="text"
@@ -1127,7 +1127,7 @@
                       class="h-full w-full bg-transparent px-3 text-sm outline-none placeholder:opacity-30"
                     />
                   </td>
-                  <td class="h-9 p-0 border-b border-dashed border-r border-base-300 {newRowSubmitTried && !newRowPriceOk ? 'bg-error/15' : ''}">
+                  <td class="h-9 p-0 border-b border-dashed border-r border-base-300" style={newRowSubmitTried && !newRowPriceOk ? 'background:hsl(var(--er)/.15)' : ''}>
                     <input
                       id="cell-{newRowIdx}-1"
                       type="text"
@@ -1149,7 +1149,7 @@
                       class="h-full w-full bg-transparent px-3 text-right text-sm outline-none placeholder:opacity-30"
                     />
                   </td>
-                  <td class="h-9 p-0 border-b border-dashed border-r border-base-300 {newRowSubmitTried && !newRowDateOk ? 'bg-error/15' : ''}">
+                  <td class="h-9 p-0 border-b border-dashed border-r border-base-300" style={newRowSubmitTried && !newRowDateOk ? 'background:hsl(var(--er)/.15)' : ''}>
                     <input
                       id="cell-{newRowIdx}-2"
                       type="text"
@@ -1202,7 +1202,7 @@
                     />
                   </td>
                   <td class="h-9 border-b border-dashed border-base-300 px-1 text-center">
-                    {#if newName.trim()}
+                    {#if newName.trim() && newRowPriceOk}
                       <button
                         onclick={addItemAndContinue}
                         class="btn btn-ghost btn-xs btn-circle text-success"
