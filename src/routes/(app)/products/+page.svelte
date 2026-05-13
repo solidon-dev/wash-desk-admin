@@ -138,7 +138,8 @@
   let newRowSubmitTried = $state(false);
   const newRowNameOk  = $derived(newName.trim().length > 0);
   const newRowPriceOk = $derived(/^\d+$/.test(newPrice.trim()));
-  const newRowDateOk  = $derived(isValidDate(newPriceDate));
+  // 날짜 빈칸이면 오늘 날짜로 대체하니 유효성 체크 제외
+  const newRowDateOk  = $derived(!newPriceDate.trim() || isValidDate(newPriceDate));
 
   let editingOrderRow  = $state<number | null>(null);
   let orderInputValue  = $state('');
@@ -357,8 +358,10 @@
     if (draft === undefined) return;
     delete dateDrafts[item.id];
     if (!selectedClientId) return;
-    const val = draft.trim();
-    if (!val || !isValidDate(val)) return;
+    // 빈칸이면 오늘 날짜로 저장, 유효하지 않은 형식이면 무시
+    const raw = draft.trim();
+    if (raw && !isValidDate(raw)) return;
+    const val = raw || todayYMD();
     const price = getPrice(item.id);
     const prevDate = getPriceDate(item.id);
     patchLocalPrice(item.id, { effective_from: val }, selectedClientId);
@@ -441,8 +444,8 @@
     if (!name || !selectedClientId || !effectiveCategoryId) return;
     if (!newRowPriceOk || !newRowDateOk) return;
 
-    const price    = parseInt(newPrice.trim(), 10);
-    const priceDate = newPriceDate;
+    const price     = parseInt(newPrice.trim(), 10);
+    const priceDate = newPriceDate.trim() || todayYMD(); // 빈칸이면 오늘 날짜
     const catId    = effectiveCategoryId;
     const cliId    = selectedClientId;
     const alias    = newAlias.trim();
@@ -475,6 +478,7 @@
     moveFocus(currentItems.length - 1, 0); // 방금 추가된 행으로
 
     // 백그라운드로 서버에 저장
+    const savedFocusId = `cell-${currentItems.length - 1}-0`; // ID 교체 후 포커스 복원용
     const form = new FormData();
     form.append('category_id', catId);
     form.append('name_ko', name);
@@ -505,6 +509,10 @@
           unit_price: String(price), effective_from: priceDate,
         }, () => { localPrices = localPrices.filter(p => p.item_id !== realId); });
       }
+      // key 변경으로 해당 tr이 재생성될 수 있으니 tick 후 포커스 복원
+      await tick();
+      const el = document.getElementById(savedFocusId) as HTMLInputElement | null;
+      if (el) { el.focus(); el.select?.(); }
     } catch {
       // 실패 → 로컈 롤백
       localItems = localItems.filter(i => i.id !== tmpId);
