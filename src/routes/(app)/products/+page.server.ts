@@ -22,8 +22,6 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const myRole      = locals.session?.role;
 	const myFactoryId = getFactoryId(locals);
 
-	const selectedClientId = url.searchParams.get('clientId') || null;
-
 	// 거래처 목록 (soft-delete 제외, 이름순)
 	let clientsQuery = locals.supabase
 		.from('clients')
@@ -37,6 +35,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 	const { data: clients, error: clientsError } = await clientsQuery;
 	if (clientsError) return { clients: [], categories: [], items: [], itemPrices: [], selectedClientId: null };
+
+	// clientId 파라미터 없으면 첫 번째 거래처 자동 선택
+	const selectedClientId = url.searchParams.get('clientId') || (clients?.[0]?.id ?? null);
 
 	if (!selectedClientId) {
 		return { clients: clients ?? [], categories: [], items: [], itemPrices: [], selectedClientId: null };
