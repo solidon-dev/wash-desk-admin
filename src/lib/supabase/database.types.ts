@@ -214,7 +214,7 @@ export type Database = {
           id: string
           inventory_id: string
           item_id: string
-          log_type: string
+          log_type: Database["public"]["Enums"]["log_type"]
           note: string | null
           processed_at: string
           quantity: number
@@ -227,7 +227,7 @@ export type Database = {
           id?: string
           inventory_id: string
           item_id: string
-          log_type: string
+          log_type: Database["public"]["Enums"]["log_type"]
           note?: string | null
           processed_at?: string
           quantity: number
@@ -240,7 +240,7 @@ export type Database = {
           id?: string
           inventory_id?: string
           item_id?: string
-          log_type?: string
+          log_type?: Database["public"]["Enums"]["log_type"]
           note?: string | null
           processed_at?: string
           quantity?: number
@@ -422,7 +422,6 @@ export type Database = {
           period_start: string
           snapshot_client: Json | null
           snapshot_factory: Json | null
-          status: string
           subtotal: number
           total: number
           vat: number
@@ -438,7 +437,6 @@ export type Database = {
           period_start: string
           snapshot_client?: Json | null
           snapshot_factory?: Json | null
-          status?: string
           subtotal?: number
           total?: number
           vat?: number
@@ -454,7 +452,6 @@ export type Database = {
           period_start?: string
           snapshot_client?: Json | null
           snapshot_factory?: Json | null
-          status?: string
           subtotal?: number
           total?: number
           vat?: number
@@ -612,6 +609,7 @@ export type Database = {
       }
     }
     Enums: {
+      log_type: "in" | "out"
       user_role: "super_admin" | "factory_admin" | "worker"
     }
     CompositeTypes: {
@@ -740,6 +738,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      log_type: ["in", "out"],
       user_role: ["super_admin", "factory_admin", "worker"],
     },
   },

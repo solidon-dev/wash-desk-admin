@@ -17,6 +17,7 @@ export type { Database, Tables, TablesInsert, TablesUpdate, Enums };
 // ----------------------------------------------------------------
 
 export type UserRole = Enums<'user_role'>; // 'super_admin' | 'factory_admin' | 'worker'
+export type LogType  = Enums<'log_type'>;  // 'in' | 'out'
 
 // ----------------------------------------------------------------
 // 테이블 Row 타입 (SELECT 결과)
