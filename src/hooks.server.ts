@@ -3,10 +3,27 @@ import type { Handle } from '@sveltejs/kit';
 
 export const handle: Handle = async ({ event, resolve }) => {
 	const supabase = createSupabaseServerClient(event.cookies);
-
-	const { data: { session } } = await supabase.auth.getSession();
-	event.locals.session = session;
 	event.locals.supabase = supabase;
 
-	return resolve(event);
+	// getUser()를 써야 서버에서 실제 JWT 검증을 한다 (getSession은 캐시만 봄)
+	const { data: { user } } = await supabase.auth.getUser();
+
+	if (user) {
+		// profiles 테이블에서 role 조회
+		const { data: profile } = await supabase
+			.from('profiles')
+			.select('role')
+			.eq('id', user.id)
+			.single();
+
+		event.locals.session = { user, role: profile?.role ?? null };
+	} else {
+		event.locals.session = null;
+	}
+
+	return resolve(event, {
+		filterSerializedResponseHeaders(name) {
+			return name === 'content-range' || name === 'x-supabase-api-version';
+		}
+	});
 };

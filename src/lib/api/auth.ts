@@ -12,10 +12,29 @@ export function onAuthStateChange(callback: Parameters<typeof supabase.auth.onAu
 }
 
 // 로그인 — username만 받아서 @mail.com 붙임
-export async function login(username: string, password: string) {
+// super_admin / factory_admin 만 허용
+export async function login(username: string, password: string): Promise<string | null> {
 	const email = `${username}@mail.com`;
-	const { error } = await supabase.auth.signInWithPassword({ email, password });
-	return error;
+	const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+	if (error) return error.message;
+	if (!data.user) return '로그인 실패';
+
+	// role 확인
+	const { data: profile } = await supabase
+		.from('profiles')
+		.select('role')
+		.eq('id', data.user.id)
+		.single();
+
+	const role = profile?.role;
+	if (role !== 'super_admin' && role !== 'factory_admin') {
+		// 접근 권한 없음 — 바로 로그아웃
+		await supabase.auth.signOut();
+		return 'ACCESS_DENIED';
+	}
+
+	return null;
 }
 
 // 로그아웃

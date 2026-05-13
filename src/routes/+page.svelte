@@ -24,7 +24,10 @@
 		const username = (form.elements.namedItem('username') as HTMLInputElement).value.trim();
 		const password = (form.elements.namedItem('password') as HTMLInputElement).value;
 		const error = await login(username, password);
-		if (error) {
+		if (error === 'ACCESS_DENIED') {
+			errorMsg = '접근 권한이 없습니다. 관리자에게 문의하세요.';
+			isLoading = false;
+		} else if (error) {
 			errorMsg = '아이디 또는 비밀번호가 올바르지 않습니다.';
 			isLoading = false;
 		} else {
