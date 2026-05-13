@@ -3,6 +3,7 @@
   import { tick } from 'svelte';
   import { flip } from 'svelte/animate';
   import { goto } from '$app/navigation';
+  import { onMount } from 'svelte';
   import { deserialize } from '$app/forms';
   import SearchBar from '$lib/components/SearchBar.svelte';
   import type { PageProps, PageData } from './$types';
@@ -45,12 +46,25 @@
     data.clients.find(c => c.id === selectedClientId) ?? null
   );
 
+  const LS_KEY = 'products:selectedClientId';
+
   function selectClient(id: string) {
+    localStorage.setItem(LS_KEY, id);
     const url = new URL(window.location.href);
     url.searchParams.set('clientId', id);
     showClientModal = false;
     goto(url.toString(), { replaceState: true });
   }
+
+  // 페이지 진입 시 clientId 파라미터 없으면 localStorage에서 복원
+  onMount(() => {
+    if (!data.selectedClientId) {
+      const saved = localStorage.getItem(LS_KEY);
+      if (saved && data.clients.some(c => c.id === saved)) {
+        selectClient(saved);
+      }
+    }
+  });
 
   // 거래처 선택 모달
   let showClientModal = $state(false);
