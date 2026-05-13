@@ -1,24 +1,14 @@
 import { supabase } from '$lib/supabase/client';
-import type { Session, User } from '@supabase/supabase-js';
 
-// 현재 세션/유저 상태
-export let session = $state<Session | null>(null);
-export let user = $state<User | null>(null);
-export let authReady = $state(false);
+// 세션 조회
+export async function getSession() {
+	const { data } = await supabase.auth.getSession();
+	return data.session;
+}
 
-// 앱 시작 시 한번 호출 — 세션 로드 + 변경 구독
-export function initAuth() {
-	supabase.auth.getSession().then(({ data }) => {
-		session = data.session;
-		user = data.session?.user ?? null;
-		authReady = true;
-	});
-
-	supabase.auth.onAuthStateChange((_event, s) => {
-		session = s;
-		user = s?.user ?? null;
-		authReady = true;
-	});
+// 세션 변경 구독 (콜러 측에서 $state 업데이트용)
+export function onAuthStateChange(callback: Parameters<typeof supabase.auth.onAuthStateChange>[0]) {
+	return supabase.auth.onAuthStateChange(callback);
 }
 
 // 로그인 — username만 받아서 @mail.com 붙임

@@ -4,7 +4,7 @@
 	import { onMount } from 'svelte';
 	import Icon from '@iconify/svelte';
 	import SearchBar from '$lib/components/SearchBar.svelte';
-	import { session, authReady, logout } from '$lib/api/auth';
+	import { logout } from '$lib/api/auth';
 
 	let { children } = $props();
 
@@ -14,11 +14,6 @@
 			document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
 		apply(mq.matches);
 		mq.addEventListener('change', e => apply(e.matches));
-	});
-
-	// 세션 없으면 로그인 페이지로
-	$effect(() => {
-		if (authReady && !session) goto('/');
 	});
 
 	async function handleLogout() {

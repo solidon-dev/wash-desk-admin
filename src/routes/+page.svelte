@@ -1,15 +1,15 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { goto } from '$app/navigation';
+	import { enhance } from '$app/forms';
 	import Icon from '@iconify/svelte';
-	import { login, session, authReady } from '$lib/api/auth';
+	import type { ActionData } from './$types';
 
-	let username = $state('');
-	let password = $state('');
-	let errorMsg = $state('');
+	let { form }: { form: ActionData } = $props();
+
 	let isLoading = $state(false);
 	let showPassword = $state(false);
 
+	// 다크모드
+	import { onMount } from 'svelte';
 	onMount(() => {
 		const mq = window.matchMedia('(prefers-color-scheme: dark)');
 		const apply = (dark: boolean) =>
@@ -17,26 +17,6 @@
 		apply(mq.matches);
 		mq.addEventListener('change', (e) => apply(e.matches));
 	});
-
-	// 이미 로그인된 경우 리다이렉트
-	$effect(() => {
-		if (authReady && session) goto('/clients');
-	});
-
-	async function handleLogin(e: Event) {
-		e.preventDefault();
-		errorMsg = '';
-		isLoading = true;
-
-		const error = await login(username.trim(), password);
-
-		if (error) {
-			errorMsg = '아이디 또는 비밀번호가 올바르지 않습니다.';
-			isLoading = false;
-		} else {
-			goto('/clients');
-		}
-	}
 </script>
 
 <svelte:head>
@@ -72,7 +52,13 @@
 			<div class="card-body gap-0 px-8 py-8">
 				<h2 class="mb-6 text-lg font-extrabold text-base-content">로그인</h2>
 
-				<form onsubmit={handleLogin} class="flex flex-col gap-5">
+				<form method="POST" action="?/login" use:enhance={() => {
+					isLoading = true;
+					return async ({ update }) => {
+						isLoading = false;
+						await update();
+					};
+				}} class="flex flex-col gap-5">
 
 					<!-- 아이디 -->
 					<div class="form-control gap-2">
@@ -83,8 +69,8 @@
 							<Icon icon="lucide:user" class="h-4 w-4 shrink-0 text-base-content/30" />
 							<input
 								id="username"
+								name="username"
 								type="text"
-								bind:value={username}
 								placeholder="아이디를 입력하세요"
 								autocomplete="username"
 								class="grow text-sm bg-transparent outline-none placeholder:text-base-content/25"
@@ -102,8 +88,8 @@
 							<Icon icon="lucide:lock" class="h-4 w-4 shrink-0 text-base-content/30" />
 							<input
 								id="password"
+								name="password"
 								type={showPassword ? 'text' : 'password'}
-								bind:value={password}
 								placeholder="비밀번호를 입력하세요"
 								autocomplete="current-password"
 								class="grow text-sm bg-transparent outline-none placeholder:text-base-content/25"
@@ -122,10 +108,10 @@
 					</div>
 
 					<!-- 에러 메시지 -->
-					{#if errorMsg}
+					{#if form?.error}
 						<div class="alert alert-error gap-2 rounded-xl py-3 px-4 text-sm font-semibold">
 							<Icon icon="lucide:circle-alert" class="h-4 w-4 shrink-0" />
-							<span>{errorMsg}</span>
+							<span>{form.error}</span>
 						</div>
 					{/if}
 
