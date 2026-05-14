@@ -1313,40 +1313,29 @@
 				<!-- ━━ 일별 상세 뷰 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
 					{:else}
 						{@const isMultiMonth = periodFrom.slice(0, 7) !== periodTo.slice(0, 7)}
+						{@const catCols = statementData.catGroups}
 						<div class="card bg-base-100 shadow-sm overflow-hidden">
 
-							<!-- ── 컨럼 헤더 (sticky) ── -->
+							<!-- ── 컬럼 헤더 sticky ── -->
 							<div class="sticky top-0 z-10 grid border-b border-base-200 bg-base-100 shadow-sm"
-								 style="grid-template-columns: 6rem 1fr 1fr 1fr 6rem;">
-								<!-- 날짜 -->
+								 style="grid-template-columns: 6rem {catCols.map(() => '1fr').join(' ')} 6rem;">
 								<div class="flex items-center justify-center px-3 py-3.5 border-r border-base-200">
 									<span class="text-xs font-bold uppercase tracking-widest text-base-content/40">날짜</span>
 								</div>
-								<!-- 타월 -->
-								<div class="flex items-center gap-2 border-r border-base-200 px-4 py-3.5" style="border-top: 3px solid oklch(var(--in));">
-									<span class="h-2.5 w-2.5 rounded-full bg-info shrink-0"></span>
-									<span class="text-sm font-bold text-info">타월</span>
-									{#if statementData.catTotals['towel'] > 0}
-										<span class="ml-auto text-xs font-semibold text-info tabular-nums">{statementData.catTotals['towel'].toLocaleString()}개</span>
-									{/if}
-								</div>
-								<!-- 시트 -->
-								<div class="flex items-center gap-2 border-r border-base-200 px-4 py-3.5" style="border-top: 3px solid oklch(var(--p));">
-									<span class="h-2.5 w-2.5 rounded-full bg-primary shrink-0"></span>
-									<span class="text-sm font-bold text-primary">시트</span>
-									{#if statementData.catTotals['sheet'] > 0}
-										<span class="ml-auto text-xs font-semibold text-primary tabular-nums">{statementData.catTotals['sheet'].toLocaleString()}개</span>
-									{/if}
-								</div>
-								<!-- 유니폼 -->
-								<div class="flex items-center gap-2 border-r border-base-200 px-4 py-3.5" style="border-top: 3px solid oklch(var(--wa));">
-									<span class="h-2.5 w-2.5 rounded-full bg-warning shrink-0"></span>
-									<span class="text-sm font-bold text-warning">유니폼</span>
-									{#if statementData.catTotals['uniform'] > 0}
-										<span class="ml-auto text-xs font-semibold text-warning tabular-nums">{statementData.catTotals['uniform'].toLocaleString()}개</span>
-									{/if}
-								</div>
-								<!-- 합계 -->
+								{#each catCols as cg (cg.category)}
+									{@const ci  = catIndexMap.get(cg.category) ?? 0}
+									{@const col = getCatColor(ci)}
+									<div class="flex items-center gap-2 border-r border-base-200 px-4 py-3.5"
+										 style="border-top: 3px solid #{col.font};">
+										<span class="h-2.5 w-2.5 rounded-full shrink-0" style="background: #{col.font};"></span>
+										<span class="text-sm font-bold" style="color: #{col.font};">{cg.label}</span>
+										{#if (statementData.catTotals[cg.category] ?? 0) > 0}
+											<span class="ml-auto text-xs font-semibold tabular-nums" style="color: #{col.font};">
+												{statementData.catTotals[cg.category].toLocaleString()}개
+											</span>
+										{/if}
+									</div>
+								{/each}
 								<div class="flex items-center justify-end px-4 py-3.5">
 									<span class="text-xs font-bold uppercase tracking-widest text-base-content/40">합계</span>
 								</div>
@@ -1355,14 +1344,11 @@
 							<!-- ── 스크롤 바디 ── -->
 							<div style="max-height: 65vh; overflow-y: auto;">
 								{#each statementData.dailyRows as drow (drow.date)}
-									{@const dow      = ['일','월','화','수','목','금','토'][new Date(drow.date).getDay()]}
+									{@const dow       = ['일','월','화','수','목','금','토'][new Date(drow.date).getDay()]}
 									{@const isWeekend = new Date(drow.date).getDay() === 0 || new Date(drow.date).getDay() === 6}
-									{@const towelItems   = drow.items.filter(it => it.category === 'towel')}
-									{@const sheetItems   = drow.items.filter(it => it.category === 'sheet')}
-									{@const uniformItems = drow.items.filter(it => it.category === 'uniform')}
 
 									<div class="grid border-b border-base-200 last:border-b-0 transition-colors hover:bg-base-200/30 {isWeekend ? 'bg-error/5' : 'bg-base-100'}"
-										 style="grid-template-columns: 6rem 1fr 1fr 1fr 6rem;">
+										 style="grid-template-columns: 6rem {catCols.map(() => '1fr').join(' ')} 6rem;">
 
 										<!-- 날짜 셀 -->
 										<div class="flex flex-col items-center justify-center border-r border-base-200 py-4 px-2 {isWeekend ? 'bg-error/10' : ''}">
@@ -1373,53 +1359,29 @@
 											<span class="mt-1.5 text-xs font-bold {isWeekend ? 'text-error/70' : 'text-base-content/40'}">{dow}</span>
 										</div>
 
-										<!-- 타월 셀 -->
-										<div class="border-r border-base-200 px-4 py-3.5" style="border-left: 2px solid oklch(var(--in) / 0.3);">
-											{#if towelItems.length > 0}
-												<div class="space-y-1.5">
-													{#each towelItems as it (it.itemName)}
-														<div class="flex items-center justify-between gap-2">
-															<span class="text-sm leading-snug">{it.itemName}</span>
-															<span class="shrink-0 text-sm font-bold tabular-nums text-info">{it.quantity.toLocaleString()}<span class="ml-0.5 text-xs font-normal text-base-content/40">개</span></span>
-														</div>
-													{/each}
-												</div>
-											{:else}
-												<span class="text-base text-base-content/20 select-none">—</span>
-											{/if}
-										</div>
-
-										<!-- 시트 셀 -->
-										<div class="border-r border-base-200 px-4 py-3.5" style="border-left: 2px solid oklch(var(--p) / 0.3);">
-											{#if sheetItems.length > 0}
-												<div class="space-y-1.5">
-													{#each sheetItems as it (it.itemName)}
-														<div class="flex items-center justify-between gap-2">
-															<span class="text-sm leading-snug">{it.itemName}</span>
-															<span class="shrink-0 text-sm font-bold tabular-nums text-primary">{it.quantity.toLocaleString()}<span class="ml-0.5 text-xs font-normal text-base-content/40">개</span></span>
-														</div>
-													{/each}
-												</div>
-											{:else}
-												<span class="text-base text-base-content/20 select-none">—</span>
-											{/if}
-										</div>
-
-										<!-- 유니폼 셀 -->
-										<div class="border-r border-base-200 px-4 py-3.5" style="border-left: 2px solid oklch(var(--wa) / 0.3);">
-											{#if uniformItems.length > 0}
-												<div class="space-y-1.5">
-													{#each uniformItems as it (it.itemName)}
-														<div class="flex items-center justify-between gap-2">
-															<span class="text-sm leading-snug">{it.itemName}</span>
-															<span class="shrink-0 text-sm font-bold tabular-nums text-warning">{it.quantity.toLocaleString()}<span class="ml-0.5 text-xs font-normal text-base-content/40">개</span></span>
-														</div>
-													{/each}
-												</div>
-											{:else}
-												<span class="text-base text-base-content/20 select-none">—</span>
-											{/if}
-										</div>
+										<!-- 카테고리별 셀 동적 -->
+										{#each catCols as cg (cg.category)}
+											{@const ci       = catIndexMap.get(cg.category) ?? 0}
+											{@const col      = getCatColor(ci)}
+											{@const catItems = drow.items.filter(it => it.category === cg.category)}
+											<div class="border-r border-base-200 px-4 py-3.5"
+												 style="border-left: 2px solid #{col.font}33;">
+												{#if catItems.length > 0}
+													<div class="space-y-1.5">
+														{#each catItems as it (it.itemName)}
+															<div class="flex items-center justify-between gap-2">
+																<span class="text-sm leading-snug">{it.itemName}</span>
+																<span class="shrink-0 text-sm font-bold tabular-nums" style="color: #{col.font};">
+																	{it.quantity.toLocaleString()}<span class="ml-0.5 text-xs font-normal text-base-content/40">개</span>
+																</span>
+															</div>
+														{/each}
+													</div>
+												{:else}
+													<span class="text-base text-base-content/20 select-none">—</span>
+												{/if}
+											</div>
+										{/each}
 
 										<!-- 합계 셀 -->
 										<div class="flex flex-col items-end justify-center px-4 py-3.5">
@@ -1432,34 +1394,25 @@
 
 							<!-- ── 하단 합계 행 ── -->
 							<div class="grid border-t-2 border-base-300 bg-base-200"
-								 style="grid-template-columns: 6rem 1fr 1fr 1fr 6rem;">
+								 style="grid-template-columns: 6rem {catCols.map(() => '1fr').join(' ')} 6rem;">
 								<div class="flex items-center justify-center px-3 py-3 border-r border-base-200">
 									<span class="text-xs font-bold">{statementData.activeDays}일</span>
 								</div>
-								<div class="flex items-center justify-between px-4 py-3 border-r border-base-200">
-									{#if statementData.catTotals['towel'] > 0}
-										<span class="text-xs text-base-content/40">소계</span>
-										<span class="text-sm font-black tabular-nums text-info">{statementData.catTotals['towel'].toLocaleString()}<span class="ml-0.5 text-xs font-normal text-base-content/40">개</span></span>
-									{:else}
-										<span class="text-sm text-base-content/20">—</span>
-									{/if}
-								</div>
-								<div class="flex items-center justify-between px-4 py-3 border-r border-base-200">
-									{#if statementData.catTotals['sheet'] > 0}
-										<span class="text-xs text-base-content/40">소계</span>
-										<span class="text-sm font-black tabular-nums text-primary">{statementData.catTotals['sheet'].toLocaleString()}<span class="ml-0.5 text-xs font-normal text-base-content/40">개</span></span>
-									{:else}
-										<span class="text-sm text-base-content/20">—</span>
-									{/if}
-								</div>
-								<div class="flex items-center justify-between px-4 py-3 border-r border-base-200">
-									{#if statementData.catTotals['uniform'] > 0}
-										<span class="text-xs text-base-content/40">소계</span>
-										<span class="text-sm font-black tabular-nums text-warning">{statementData.catTotals['uniform'].toLocaleString()}<span class="ml-0.5 text-xs font-normal text-base-content/40">개</span></span>
-									{:else}
-										<span class="text-sm text-base-content/20">—</span>
-									{/if}
-								</div>
+								{#each catCols as cg (cg.category)}
+									{@const ci  = catIndexMap.get(cg.category) ?? 0}
+									{@const col = getCatColor(ci)}
+									{@const tot = statementData.catTotals[cg.category] ?? 0}
+									<div class="flex items-center justify-between px-4 py-3 border-r border-base-200">
+										{#if tot > 0}
+											<span class="text-xs text-base-content/40">소계</span>
+											<span class="text-sm font-black tabular-nums" style="color: #{col.font};">
+												{tot.toLocaleString()}<span class="ml-0.5 text-xs font-normal text-base-content/40">개</span>
+											</span>
+										{:else}
+											<span class="text-sm text-base-content/20">—</span>
+										{/if}
+									</div>
+								{/each}
 								<div class="flex flex-col items-end justify-center px-4 py-3">
 									<span class="text-base font-black tabular-nums">{statementData.grandTotal.toLocaleString()}</span>
 									<span class="text-xs text-base-content/40">개</span>
