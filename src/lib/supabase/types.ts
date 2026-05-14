@@ -35,6 +35,7 @@ export type Invoice          = Tables<'invoices'>;
 export type ItemPrice        = Tables<'item_prices'>;
 export type Item             = Tables<'items'>;
 export type Profile          = Tables<'profiles'>;
+export type Shipout          = Tables<'shipouts'>;
 
 // ----------------------------------------------------------------
 // 테이블 Insert 타입
@@ -52,6 +53,7 @@ export type InvoiceInsert           = TablesInsert<'invoices'>;
 export type ItemPriceInsert         = TablesInsert<'item_prices'>;
 export type ItemInsert              = TablesInsert<'items'>;
 export type ProfileInsert           = TablesInsert<'profiles'>;
+export type ShipoutInsert           = TablesInsert<'shipouts'>;
 
 // ----------------------------------------------------------------
 // 테이블 Update 타입
@@ -69,6 +71,7 @@ export type InvoiceUpdate           = TablesUpdate<'invoices'>;
 export type ItemPriceUpdate         = TablesUpdate<'item_prices'>;
 export type ItemUpdate              = TablesUpdate<'items'>;
 export type ProfileUpdate           = TablesUpdate<'profiles'>;
+export type ShipoutUpdate           = TablesUpdate<'shipouts'>;
 
 // ----------------------------------------------------------------
 // RPC 함수 타입
@@ -91,5 +94,11 @@ export type MyRoleReturns             = RpcReturns<'my_role'>;
 export type ProcessInventoryOutArgs    = RpcArgs<'process_inventory_out'>;
 export type ProcessInventoryOutReturns = RpcReturns<'process_inventory_out'>;
 
-export type CreateItemWithPriceArgs    = RpcArgs<'create_item_with_price'>;
-export type CreateItemWithPriceReturns = RpcReturns<'create_item_with_price'>;
+export type ExecuteShipoutArgs     = RpcArgs<'execute_shipout'>;
+export type ExecuteShipoutReturns  = RpcReturns<'execute_shipout'>;
+
+export type DeleteShipoutArgs      = RpcArgs<'delete_shipout'>;
+export type DeleteShipoutReturns   = RpcReturns<'delete_shipout'>;
+
+export type UpdateShipoutArgs      = RpcArgs<'update_shipout'>;
+export type UpdateShipoutReturns   = RpcReturns<'update_shipout'>;
