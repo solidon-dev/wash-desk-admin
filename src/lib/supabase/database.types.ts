@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -503,6 +503,41 @@ export type Database = {
             columns: ["factory_id"]
             isOneToOne: false
             referencedRelation: "factories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shipout_memos: {
+        Row: {
+          author_name: string
+          content: string
+          created_at: string
+          id: string
+          shipout_id: string
+          title: string
+        }
+        Insert: {
+          author_name?: string
+          content?: string
+          created_at?: string
+          id?: string
+          shipout_id: string
+          title?: string
+        }
+        Update: {
+          author_name?: string
+          content?: string
+          created_at?: string
+          id?: string
+          shipout_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipout_memos_shipout_id_fkey"
+            columns: ["shipout_id"]
+            isOneToOne: false
+            referencedRelation: "shipouts"
             referencedColumns: ["id"]
           },
         ]

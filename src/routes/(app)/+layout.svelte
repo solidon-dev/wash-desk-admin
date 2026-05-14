@@ -8,7 +8,7 @@
 	import type { LayoutData } from './$types';
 
 	type FactoryItem = { id: string; name: string };
-	type Props = { children: import('svelte').Snippet; data: LayoutData & { factories: FactoryItem[]; role: string; user: { email?: string } | null } };
+	type Props = { children: import('svelte').Snippet; data: LayoutData & { factories: FactoryItem[]; role: string; user: { email?: string } | null; memoCount: number } };
 	let { children, data }: Props = $props();
 
 	const role = $derived(data.role as 'super_admin' | 'factory_admin');
@@ -65,7 +65,7 @@
 		return pathname === nav.path || pathname.startsWith(nav.path + '/');
 	}
 
-	const unreadMemoCount = 2;
+	const unreadMemoCount = $derived(data.memoCount ?? 0);
 
 	let factoryOpen   = $state(false);
 	let sidebarOpen   = $state(false);

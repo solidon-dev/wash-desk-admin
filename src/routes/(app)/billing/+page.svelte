@@ -1,3 +1,36 @@
+<script module lang="ts">
+	// 모듈 레벨에서 폰트 로딩 즉시 시작 — 컴포넌트 마운트 전에 fetch 킥오프
+	function arrayBufferToBase64Module(buffer: ArrayBuffer): string {
+		let binary = '';
+		const bytes = new Uint8Array(buffer);
+		for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+		return btoa(binary);
+	}
+
+	type FontCache = { reg: string; bold: string };
+	let _fontCacheModule: FontCache | null = null;
+	let _fontLoadPromise: Promise<FontCache> | null = null;
+
+	export function preloadFonts(): Promise<FontCache> {
+		if (_fontCacheModule) return Promise.resolve(_fontCacheModule);
+		if (_fontLoadPromise) return _fontLoadPromise;
+		_fontLoadPromise = Promise.all([
+			fetch('/NanumGothic-Regular.ttf'),
+			fetch('/NanumGothic-Bold.ttf'),
+		]).then(async ([regResp, boldResp]) => {
+			if (!regResp.ok)  throw new Error('폰트 로드 실패(Regular)');
+			if (!boldResp.ok) throw new Error('폰트 로드 실패(Bold)');
+			const [regBuf, boldBuf] = await Promise.all([regResp.arrayBuffer(), boldResp.arrayBuffer()]);
+			_fontCacheModule = { reg: arrayBufferToBase64Module(regBuf), bold: arrayBufferToBase64Module(boldBuf) };
+			return _fontCacheModule;
+		});
+		return _fontLoadPromise;
+	}
+
+	// 번들 로드 즉시 킥오프 (브라우저 환경에서만)
+	if (typeof window !== 'undefined') preloadFonts().catch(() => {});
+</script>
+
 <script lang="ts">
 	import Icon from '@iconify/svelte';
 	import { tick } from 'svelte';
@@ -401,6 +434,10 @@
 	let pdfBlobUrl    = $state<string | null>(null);
 	let pdfGenerating = $state(false);
 	let issuingInvoice = $state(false);
+	let invoiceIssued  = $state(false); // 현재 PDF 모달에서 이미 발행했는지
+	let pendingInvoiceData: {
+		fd: FormData;
+	} | null = null; // 발행 버튼 누를 때 쓸 데이터
 	let invoiceHistory = $derived((data as BillingPageData).invoiceHistory ?? []);
 	let historyPdfModal = $state(false);
 	let historyPdfUrl   = $state<string | null>(null);
@@ -413,20 +450,8 @@
 	let localDeletedIds    = $state(new Set<string>());
 	let filteredHistory    = $derived(invoiceHistory.filter(inv => !localDeletedIds.has(inv.id)));
 
-	// 폰트 캐시 (최초 1회 fetch 후 재사용)
-	let _fontCache: { reg: string; bold: string } | null = null;
-	async function loadFonts(): Promise<{ reg: string; bold: string }> {
-		if (_fontCache) return _fontCache;
-		const [regResp, boldResp] = await Promise.all([
-			fetch('/NanumGothic-Regular.ttf'),
-			fetch('/NanumGothic-Bold.ttf'),
-		]);
-		if (!regResp.ok)  throw new Error('폰트 로드 실패(Regular)');
-		if (!boldResp.ok) throw new Error('폰트 로드 실패(Bold)');
-		const [regBuf, boldBuf] = await Promise.all([regResp.arrayBuffer(), boldResp.arrayBuffer()]);
-		_fontCache = { reg: arrayBufferToBase64(regBuf), bold: arrayBufferToBase64(boldBuf) };
-		return _fontCache;
-	}
+	// 폰트 로딩 — 모듈 스코프 preloadFonts() 위임
+	const loadFonts = preloadFonts;
 
 	function openSupplierThenPdf() {
 		if (!selectedClient || invoiceLines.length === 0) return;
@@ -434,16 +459,34 @@
 		showSupplierModal = true;
 	}
 
-	// 페이지 로드 시 폰트 미리 캐싱
-	$effect(() => { loadFonts().catch(() => {}); });
-
 	async function confirmSupplierAndPdf() {
 		saveSupplier(supplierEdit);
 		showSupplierModal = false;
 		pdfGenerating = true;
 		showPdfModal  = true;
 		pdfBlobUrl    = null;
+		invoiceIssued = false;
 		await tick();
+
+		// 발행 버튼에서 쓸 FormData 미리 준비
+		const supplyAmount = invoiceTotal;
+		const vatRaw = Math.floor(supplyAmount * 0.1);
+		const vat    = Math.floor(vatRaw / 10) * 10;
+		const jeolsa = vatRaw - vat;
+		const total  = supplyAmount + vat;
+		const fd = new FormData();
+		fd.append('client_id',        selectedClientId);
+		fd.append('period_from',       periodFrom);
+		fd.append('period_to',         periodTo);
+		fd.append('subtotal',          String(supplyAmount));
+		fd.append('vat',               String(vat));
+		fd.append('jeolsa',            String(jeolsa));
+		fd.append('total',             String(total));
+		fd.append('snapshot_factory',  JSON.stringify(supplierEdit));
+		fd.append('snapshot_client',   JSON.stringify({ id: selectedClientId, name: selectedClient?.name ?? '' }));
+		fd.append('items',             JSON.stringify(invoiceLines));
+		pendingInvoiceData = { fd };
+
 		try {
 			const blobUrl = await generateInvoicePdf({
 				supplier: supplierEdit,
@@ -454,42 +497,27 @@
 				supplyAmount: invoiceTotal,
 			});
 			pdfBlobUrl = blobUrl;
-
-			// DB 저장 — 텍스트 데이터만 전송
-			issuingInvoice = true;
-			try {
-				const supplyAmount = invoiceTotal;
-				const vatRaw = Math.floor(supplyAmount * 0.1);
-				const vat    = Math.floor(vatRaw / 10) * 10;
-				const jeolsa = vatRaw - vat;
-				const total  = supplyAmount + vat;
-
-				const fd = new FormData();
-				fd.append('client_id',        selectedClientId);
-				fd.append('period_from',       periodFrom);
-				fd.append('period_to',         periodTo);
-				fd.append('subtotal',          String(supplyAmount));
-				fd.append('vat',               String(vat));
-				fd.append('jeolsa',            String(jeolsa));
-				fd.append('total',             String(total));
-				fd.append('snapshot_factory',  JSON.stringify(supplierEdit));
-				fd.append('snapshot_client',   JSON.stringify({ id: selectedClientId, name: selectedClient?.name ?? '' }));
-				fd.append('items',             JSON.stringify(invoiceLines));
-
-				const res  = await fetch('?/issueInvoice', { method: 'POST', body: fd });
-				const json = await res.json();
-				if (!res.ok || json?.type === 'failure') {
-					console.error('청구서 저장 실패:', json);
-				} else {
-					await invalidateAll();
-				}
-			} catch (e) {
-				console.error('청구서 저장 중 오류:', e);
-			} finally {
-				issuingInvoice = false;
-			}
 		} finally {
 			pdfGenerating = false;
+		}
+	}
+
+	async function issueInvoiceFromModal() {
+		if (!pendingInvoiceData || issuingInvoice || invoiceIssued) return;
+		issuingInvoice = true;
+		try {
+			const res  = await fetch('?/issueInvoice', { method: 'POST', body: pendingInvoiceData.fd });
+			const json = await res.json();
+			if (!res.ok || json?.type === 'failure') {
+				console.error('청구서 저장 실패:', json);
+			} else {
+				invoiceIssued = true;
+				invalidateAll(); // 킥오프
+			}
+		} catch (e) {
+			console.error('청구서 저장 중 오류:', e);
+		} finally {
+			issuingInvoice = false;
 		}
 	}
 
@@ -499,21 +527,12 @@
 
 	function closePdfModal() {
 		showPdfModal = false;
+		pendingInvoiceData = null;
+		invoiceIssued = false;
 		if (pdfBlobUrl) {
 			URL.revokeObjectURL(pdfBlobUrl);
 			pdfBlobUrl = null;
 		}
-	}
-
-	// ArrayBuffer → Base64 안전 변환 (스택 오버플로우 방지)
-	function arrayBufferToBase64(buffer: ArrayBuffer): string {
-		let binary = '';
-		const bytes = new Uint8Array(buffer);
-		const chunkSize = 8192;
-		for (let i = 0; i < bytes.length; i += chunkSize) {
-			binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
-		}
-		return btoa(binary);
 	}
 
 	function downloadPdf() {
@@ -1771,6 +1790,32 @@
 						<p class="text-sm text-base-content/40">PDF를 불러올 수 없습니다.</p>
 					</div>
 				{/if}
+			</div>
+
+			<!-- 푸터: 발행 / 닫기 -->
+			<div class="shrink-0 flex items-center justify-end gap-2 border-t border-base-200 bg-base-100 px-5 py-3">
+				{#if invoiceIssued}
+					<span class="flex items-center gap-1.5 text-sm font-semibold text-success">
+						<Icon icon="lucide:check-circle" class="h-4 w-4" />
+						발행 완료
+					</span>
+				{:else}
+					<button
+						type="button"
+						class="btn btn-success btn-sm gap-1.5"
+						onclick={issueInvoiceFromModal}
+						disabled={!pdfBlobUrl || issuingInvoice}
+					>
+						{#if issuingInvoice}
+							<span class="loading loading-spinner loading-xs"></span>
+							저장 중...
+						{:else}
+							<Icon icon="lucide:send" class="h-4 w-4" />
+							청구서 발행
+						{/if}
+					</button>
+				{/if}
+				<button type="button" class="btn btn-ghost btn-sm" onclick={closePdfModal}>닫기</button>
 			</div>
 		</div>
 		<form method="dialog" class="modal-backdrop"><button onclick={closePdfModal}>close</button></form>

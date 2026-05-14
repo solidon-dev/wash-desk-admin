@@ -36,6 +36,7 @@ export type ItemPrice        = Tables<'item_prices'>;
 export type Item             = Tables<'items'>;
 export type Profile          = Tables<'profiles'>;
 export type Shipout          = Tables<'shipouts'>;
+export type ShipoutMemo      = Tables<'shipout_memos'>;
 
 // ----------------------------------------------------------------
 // 테이블 Insert 타입
@@ -54,6 +55,7 @@ export type ItemPriceInsert         = TablesInsert<'item_prices'>;
 export type ItemInsert              = TablesInsert<'items'>;
 export type ProfileInsert           = TablesInsert<'profiles'>;
 export type ShipoutInsert           = TablesInsert<'shipouts'>;
+export type ShipoutMemoInsert       = TablesInsert<'shipout_memos'>;
 
 // ----------------------------------------------------------------
 // 테이블 Update 타입
@@ -72,6 +74,7 @@ export type ItemPriceUpdate         = TablesUpdate<'item_prices'>;
 export type ItemUpdate              = TablesUpdate<'items'>;
 export type ProfileUpdate           = TablesUpdate<'profiles'>;
 export type ShipoutUpdate           = TablesUpdate<'shipouts'>;
+export type ShipoutMemoUpdate       = TablesUpdate<'shipout_memos'>;
 
 // ----------------------------------------------------------------
 // RPC 함수 타입

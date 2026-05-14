@@ -25,10 +25,18 @@ export const load: LayoutServerLoad = async ({ locals, url }) => {
 		.is('deleted_at', null)
 		.order('created_at', { ascending: true });
 
+	// 메모 건수 (최근 30일)
+	const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+	const { count: memoCount } = await locals.supabase
+		.from('shipout_memos')
+		.select('id', { count: 'exact', head: true })
+		.gte('created_at', since);
+
 	return {
 		user: locals.session.user,
 		role,
 		factory_id: locals.session.factory_id ?? null,
 		factories: factories ?? [],
+		memoCount: memoCount ?? 0,
 	};
 };
