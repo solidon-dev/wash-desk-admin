@@ -96,10 +96,11 @@
 			return ts >= fromTs && ts <= toTs;
 		});
 		const catSortMap = new Map(data.categories.map((c, i) => [c.name, i]));
+		// key = category + itemName + unitPrice (단가가 다르면 별도 행)
 		const map: Record<string, InvoiceLine> = {};
 		for (const s of inRange) {
 			for (const item of s.items) {
-				const key = item.category + '__' + item.itemName;
+				const key = item.category + '__' + item.itemName + '__' + item.unitPrice;
 				if (!map[key]) map[key] = {
 					category:      item.category,
 					catSortOrder:  catSortMap.get(item.category) ?? 99,
