@@ -1,21 +1,12 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
-  import { invalidateAll } from '$app/navigation';
+  import { goto } from '$app/navigation';
   import Icon from '@iconify/svelte';
   import SearchBar from '$lib/components/SearchBar.svelte';
   import Pagination from '$lib/components/Pagination.svelte';
   import TableCard from '$lib/components/TableCard.svelte';
   import type { PageData } from './$types';
   import { formatPhone, displayPhone } from '$lib/utils/phone';
-
-  type Props = {
-    data: PageData & { users: UserRow[]; allFactories: { id: string; name: string }[]; role: string; factory_id: string | null };
-    form: { success?: boolean; error?: string } | null;
-  };
-  let { data, form }: Props = $props();
-
-  const myRole      = $derived(data.role as UserRole);
-  const myFactoryId = $derived(data.factory_id as string | null);
 
   type UserRole = 'super_admin' | 'factory_admin' | 'worker';
 
@@ -31,6 +22,27 @@
     deleted_at: string | null;
   };
 
+  type Props = {
+    data: PageData & {
+      users: UserRow[];
+      total: number;
+      page: number;
+      PAGE_SIZE: number;
+      showDeleted: boolean;
+      q: string;
+      allFactories: { id: string; name: string }[];
+      role: string;
+      factory_id: string | null;
+    };
+    form: { success?: boolean; error?: string } | null;
+  };
+  let { data, form }: Props = $props();
+
+  const myRole      = $derived(data.role as UserRole);
+  const myFactoryId = $derived(data.factory_id as string | null);
+  const factories   = $derived(data.allFactories);
+  const totalPages  = $derived(Math.max(1, Math.ceil(data.total / data.PAGE_SIZE)));
+
   const roleLabel: Record<UserRole, string> = {
     super_admin:   '최고관리자',
     factory_admin: '공장관리자',
@@ -42,47 +54,26 @@
     worker:        'badge-ghost',
   };
 
-  let users      = $state<UserRow[]>(data.users);
-  const factories = $derived(data.allFactories);
-
-  // 서버 액션 성공 시 데이터 갱신
+  // 서버 액션 성공 시 모달만 닫기 (페이지 재로드는 SvelteKit이 자동 처리)
   $effect(() => {
-    if (form?.success) {
-      invalidateAll().then(() => {
-        users = data.users;
-        closeModal();
-      });
-    }
+    if (form?.success) closeModal();
   });
 
-  // ── 검색 / 필터 ──
-  let selectedId  = $state('');
-  let showDeleted = $state(false);
+  // ── URL 이동 헬퍼 ──
+  function navTo(params: { q?: string; page?: number; hidden?: boolean }) {
+    const q      = params.q      ?? data.q;
+    const page   = params.page   ?? 1;
+    const hidden = params.hidden ?? data.showDeleted;
+    const parts: string[] = [];
+    if (q)        parts.push(`q=${encodeURIComponent(q)}`);
+    if (hidden)   parts.push('hidden=1');
+    if (page > 1) parts.push(`page=${page}`);
+    goto(parts.length ? `?${parts.join('&')}` : '?');
+  }
 
   const searchItems = $derived(
-    users
-      .filter(u => u.deleted_at === null)
-      .map(u => ({ id: u.id, label: u.full_name ?? u.username, sub: u.username }))
+    data.users.map(u => ({ id: u.id, label: u.full_name ?? u.username, sub: u.username }))
   );
-
-  const PAGE_SIZE = 10;
-  let currentPage = $state(1);
-
-  const filteredUsers = $derived(
-    users.filter(u => {
-      if (u.role === 'super_admin') return false;
-      // factory_admin은 자기 공장 소속만 표시
-      if (myRole === 'factory_admin' && u.factory_id !== myFactoryId) return false;
-      if (!showDeleted && u.deleted_at !== null) return false;
-      if (selectedId) return u.id === selectedId;
-      return true;
-    })
-  );
-
-  $effect(() => { void selectedId; void showDeleted; currentPage = 1; });
-
-  const totalPages   = $derived(Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE)));
-  const visibleUsers = $derived(filteredUsers.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE));
 
   // super_admin: 모두 수정 가능
   // factory_admin: 자기 공장 소속만
@@ -166,11 +157,11 @@
     <SearchBar
       placeholder="이름, 아이디 검색..."
       items={searchItems}
-      onselect={(id) => (selectedId = id)}
+      onselect={(id) => { if (id) navTo({ q: id }); }}
       class="w-64 sm:w-72"
     />
     <label class="flex items-center gap-2 cursor-pointer select-none text-sm text-base-content/60 font-semibold">
-      <input type="checkbox" bind:checked={showDeleted} class="checkbox checkbox-sm" />
+      <input type="checkbox" checked={data.showDeleted} onchange={(e) => navTo({ hidden: (e.target as HTMLInputElement).checked })} class="checkbox checkbox-sm" />
       비활성화 포함
     </label>
     {#if myRole === 'super_admin' || myRole === 'factory_admin'}
@@ -202,14 +193,14 @@
         </tr>
       </thead>
       <tbody>
-        {#if filteredUsers.length === 0}
+        {#if data.users.length === 0}
           <tr>
             <td colspan="7" class="py-16 text-center text-base-content/40 text-sm">
               등록된 사용자가 없습니다.
             </td>
           </tr>
         {:else}
-          {#each visibleUsers as user (user.id)}
+          {#each data.users as user (user.id)}
             {@const isDeleted = user.deleted_at !== null}
             {@const role = user.role as UserRole}
             <tr class="hover:bg-base-200 transition-colors {isDeleted ? 'opacity-40' : ''}">
@@ -245,7 +236,7 @@
   </TableCard>
 
   <div class="mt-4">
-    <Pagination {currentPage} {totalPages} totalItems={filteredUsers.length} pageSize={PAGE_SIZE} onpage={(p) => (currentPage = p)} />
+    <Pagination currentPage={data.page} {totalPages} totalItems={data.total} pageSize={data.PAGE_SIZE} onpage={(p) => navTo({ page: p })} />
   </div>
 </div>
 

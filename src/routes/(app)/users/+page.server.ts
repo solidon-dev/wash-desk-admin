@@ -4,41 +4,59 @@ import { PRIVATE_SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
 import { PUBLIC_SUPABASE_URL } from '$env/static/public';
 import type { Actions, PageServerLoad } from './$types';
 
+const PAGE_SIZE = 10;
+
 function getAdminClient() {
 	return createClient(PUBLIC_SUPABASE_URL, PRIVATE_SUPABASE_SERVICE_ROLE_KEY, {
 		auth: { autoRefreshToken: false, persistSession: false },
 	});
 }
 
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, url }) => {
+	const myRole      = locals.session?.role;
+	const myFactoryId = locals.session?.factory_id as string | null;
+
+	const page        = Math.max(1, Number(url.searchParams.get('page') ?? '1'));
+	const showDeleted = url.searchParams.get('hidden') === '1';
+	const q           = url.searchParams.get('q')?.trim() ?? '';
+
 	const admin = getAdminClient();
 
-	const [
-		{ data: users, error },
-		{ data: authList },
-		{ data: allFactories },
-	] = await Promise.all([
-		locals.supabase
-			.from('profiles')
-			.select('id, full_name, phone, role, factory_id, created_at, deleted_at, factories(id, name)')
-			.order('created_at', { ascending: true }),
-		admin.auth.admin.listUsers({ perPage: 1000 }),
-		locals.supabase
-			.from('factories')
-			.select('id, name')
-			.order('name'),
-	]);
+	// 쿼리 기본 조건
+	let query = locals.supabase
+		.from('profiles')
+		.select('id, full_name, phone, role, factory_id, created_at, deleted_at, factories(id, name)', { count: 'exact' })
+		.neq('role', 'super_admin')
+		.order('created_at', { ascending: true })
+		.range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
 
-	if (error) return { users: [], allFactories: [] };
+	if (!showDeleted) query = query.is('deleted_at', null);
+	if (q)            query = query.ilike('full_name', `%${q}%`);
+	if (myRole === 'factory_admin' && myFactoryId)
+		query = query.eq('factory_id', myFactoryId);
+
+	const [{ data: profiles, count, error }, { data: authList }, { data: allFactories }] =
+		await Promise.all([
+			query,
+			admin.auth.admin.listUsers({ perPage: 1000 }),
+			locals.supabase.from('factories').select('id, name').order('name'),
+		]);
+
+	if (error) return { users: [], total: 0, page, PAGE_SIZE, showDeleted, q, allFactories: [] };
 
 	const emailMap = new Map(authList?.users.map(u => [u.id, u.email ?? '']) ?? []);
 
 	return {
-		users: (users ?? []).map(u => ({
+		users: (profiles ?? []).map(u => ({
 			...u,
 			username: (emailMap.get(u.id) ?? '').replace('@mail.com', ''),
 			factory_name: (u.factories as { name: string } | null)?.name ?? null,
 		})),
+		total: count ?? 0,
+		page,
+		PAGE_SIZE,
+		showDeleted,
+		q,
 		allFactories: allFactories ?? [],
 	};
 };
