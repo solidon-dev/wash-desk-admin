@@ -408,11 +408,34 @@
 	let historyPdfUrl   = $state<string | null>(null);
 	let historyPdfLoading = $state(false);
 
+	// 삭제 확인 모달
+	let deleteConfirmModal = $state(false);
+	let deleteTargetId     = $state<string | null>(null);
+	let deleteLoading      = $state(false);
+
+	// 폰트 캐시 (최초 1회 fetch 후 재사용)
+	let _fontCache: { reg: string; bold: string } | null = null;
+	async function loadFonts(): Promise<{ reg: string; bold: string }> {
+		if (_fontCache) return _fontCache;
+		const [regResp, boldResp] = await Promise.all([
+			fetch('/NanumGothic-Regular.ttf'),
+			fetch('/NanumGothic-Bold.ttf'),
+		]);
+		if (!regResp.ok)  throw new Error('폰트 로드 실패(Regular)');
+		if (!boldResp.ok) throw new Error('폰트 로드 실패(Bold)');
+		const [regBuf, boldBuf] = await Promise.all([regResp.arrayBuffer(), boldResp.arrayBuffer()]);
+		_fontCache = { reg: arrayBufferToBase64(regBuf), bold: arrayBufferToBase64(boldBuf) };
+		return _fontCache;
+	}
+
 	function openSupplierThenPdf() {
 		if (!selectedClient || invoiceLines.length === 0) return;
 		supplierEdit = loadSupplier();
 		showSupplierModal = true;
 	}
+
+	// 페이지 로드 시 폰트 미리 캐싱
+	$effect(() => { loadFonts().catch(() => {}); });
 
 	async function confirmSupplierAndPdf() {
 		saveSupplier(supplierEdit);
@@ -514,17 +537,11 @@
 		const { supplier: SUPPLIER, clientName, periodFrom: pFrom, periodTo: pTo, lines, supplyAmount } = params;
 		const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
-		// ── 나눔고딕 Regular + Bold 로드 ──
-		const [fontRegResp, fontBoldResp] = await Promise.all([
-			fetch('/NanumGothic-Regular.ttf'),
-			fetch('/NanumGothic-Bold.ttf'),
-		]);
-		if (!fontRegResp.ok)  throw new Error(`폰트 로드 실패(Regular): ${fontRegResp.status}`);
-		if (!fontBoldResp.ok) throw new Error(`폰트 로드 실패(Bold): ${fontBoldResp.status}`);
-		const [fontRegBuf, fontBoldBuf] = await Promise.all([fontRegResp.arrayBuffer(), fontBoldResp.arrayBuffer()]);
-		doc.addFileToVFS('NanumGothic-Regular.ttf', arrayBufferToBase64(fontRegBuf));
+		// ── 나눔고딕 캐시에서 로드 ──
+		const fonts = await loadFonts();
+		doc.addFileToVFS('NanumGothic-Regular.ttf', fonts.reg);
 		doc.addFont('NanumGothic-Regular.ttf', 'NanumGothic', 'normal');
-		doc.addFileToVFS('NanumGothic-Bold.ttf', arrayBufferToBase64(fontBoldBuf));
+		doc.addFileToVFS('NanumGothic-Bold.ttf', fonts.bold);
 		doc.addFont('NanumGothic-Bold.ttf', 'NanumGothic', 'bold');
 
 		const pageW   = doc.internal.pageSize.getWidth(); // 210mm
@@ -1618,15 +1635,9 @@
 													<button
 														type="button"
 														class="btn btn-xs btn-error btn-ghost gap-1"
-														onclick={async () => {
-															if (!confirm('이 청구서를 취소하시겠습니까?')) return;
-															const fdx = new FormData();
-															fdx.append('invoice_id', inv.id);
-															await fetch('?/cancelInvoice', { method: 'POST', body: fdx });
-															await invalidateAll();
-														}}
+														onclick={() => { deleteTargetId = inv.id; deleteConfirmModal = true; }}
 													>
-														<Icon icon="lucide:x-circle" class="h-3 w-3" />취소
+														<Icon icon="lucide:trash-2" class="h-3 w-3" />삭제
 													</button>
 												{/if}
 											</div>
@@ -1809,6 +1820,47 @@
 	</dialog>
 {/if}
 
-
-
+{#if deleteConfirmModal}
+	<dialog class="modal modal-open" aria-modal="true">
+		<div class="modal-box max-w-sm">
+			<div class="flex items-center gap-3 mb-4">
+				<div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-error/10">
+					<Icon icon="lucide:trash-2" class="h-5 w-5 text-error" />
+				</div>
+				<div>
+					<h3 class="text-base font-extrabold">청구서 삭제</h3>
+					<p class="text-sm text-base-content/50 mt-0.5">이 청구서를 삭제하면 복구할 수 없습니다.</p>
+				</div>
+			</div>
+			<div class="modal-action mt-2">
+				<button type="button" class="btn btn-ghost btn-sm" onclick={() => { deleteConfirmModal = false; deleteTargetId = null; }} disabled={deleteLoading}>취소</button>
+				<button
+					type="button"
+					class="btn btn-error btn-sm gap-1.5"
+					disabled={deleteLoading}
+					onclick={async () => {
+						if (!deleteTargetId) return;
+						deleteLoading = true;
+						try {
+							const fdx = new FormData();
+							fdx.append('invoice_id', deleteTargetId);
+							await fetch('?/cancelInvoice', { method: 'POST', body: fdx });
+							await invalidateAll();
+							deleteConfirmModal = false;
+							deleteTargetId = null;
+						} finally {
+							deleteLoading = false;
+						}
+					}}
+				>
+					{#if deleteLoading}<span class="loading loading-spinner loading-xs"></span>{/if}
+					<Icon icon="lucide:trash-2" class="h-3.5 w-3.5" />삭제
+				</button>
+			</div>
+		</div>
+		<form method="dialog" class="modal-backdrop">
+			<button aria-label="닫기" onclick={() => { deleteConfirmModal = false; deleteTargetId = null; }}></button>
+		</form>
+	</dialog>
+{/if}
 
