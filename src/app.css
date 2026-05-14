@@ -1,2 +1,12 @@
 @import 'tailwindcss';
 @import 'daisyui/daisyui.css';
+
+@keyframes nav-progress {
+	0%   { transform: translateX(-100%); }
+	60%  { transform: translateX(-10%); }
+	100% { transform: translateX(0%); }
+}
+
+.animate-nav-progress {
+	animation: nav-progress 1.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}

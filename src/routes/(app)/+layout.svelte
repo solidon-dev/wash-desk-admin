@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { afterNavigate, goto } from '$app/navigation';
+	import { navigating } from '$app/stores';
 	import { onMount } from 'svelte';
 	import Icon from '@iconify/svelte';
 	import SearchBar from '$lib/components/SearchBar.svelte';
@@ -278,6 +279,13 @@
 					>로그아웃</button>
 				</div>
 			</div>
+		</div>
+	{/if}
+
+	<!-- ── 페이지 전환 로딩 바 ── -->
+	{#if $navigating}
+		<div class="fixed top-0 left-0 right-0 z-[9999] h-[3px] overflow-hidden">
+			<div class="h-full bg-primary animate-nav-progress"></div>
 		</div>
 	{/if}
 
