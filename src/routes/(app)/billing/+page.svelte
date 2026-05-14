@@ -412,6 +412,8 @@
 	let deleteConfirmModal = $state(false);
 	let deleteTargetId     = $state<string | null>(null);
 	let deleteLoading      = $state(false);
+	let localDeletedIds    = $state(new Set<string>());
+	let filteredHistory    = $derived(invoiceHistory.filter(inv => !localDeletedIds.has(inv.id)));
 
 	// 폰트 캐시 (최초 1회 fetch 후 재사용)
 	let _fontCache: { reg: string; bold: string } | null = null;
@@ -1554,9 +1556,9 @@
 			<div class="card bg-base-100 shadow-sm overflow-hidden">
 				<div class="flex items-center gap-3 border-b border-base-200 px-5 py-3">
 					<h3 class="text-base font-bold">발행 내역</h3>
-					<span class="badge badge-ghost badge-sm">{invoiceHistory.length}건</span>
+					<span class="badge badge-ghost badge-sm">{filteredHistory.length}건</span>
 				</div>
-				{#if invoiceHistory.length === 0}
+				{#if filteredHistory.length === 0}
 					<div class="flex flex-col items-center justify-center py-16">
 						<p class="text-base-content/40">발행된 청구서가 없습니다.</p>
 					</div>
@@ -1576,8 +1578,8 @@
 								</tr>
 							</thead>
 							<tbody>
-								{#each invoiceHistory as inv (inv.id)}
-									<tr class="hover {inv.status === 'cancelled' ? 'opacity-50' : ''}">
+								{#each filteredHistory as inv (inv.id)}
+									<tr class="hover">
 										<td class="text-xs">{formatDate(inv.created_at.slice(0, 10))}</td>
 										<td class="text-xs font-mono">{formatDate(inv.period_start)} ~ {formatDate(inv.period_end)}</td>
 										<td class="text-xs text-right">{inv.invoice_items.length}</td>
@@ -1844,8 +1846,10 @@
 						try {
 							const fdx = new FormData();
 							fdx.append('invoice_id', deleteTargetId);
-							await fetch('?/cancelInvoice', { method: 'POST', body: fdx });
-							await invalidateAll();
+							const res = await fetch('?/cancelInvoice', { method: 'POST', body: fdx });
+							if (res.ok) {
+								localDeletedIds = new Set([...localDeletedIds, deleteTargetId]);
+							}
 							deleteConfirmModal = false;
 							deleteTargetId = null;
 						} finally {

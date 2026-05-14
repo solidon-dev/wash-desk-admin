@@ -270,7 +270,7 @@ export const actions: Actions = {
 		return { success: true, invoiceId };
 	},
 
-	// ── 청구서 취소 ─────────────────────────────────────────────────────
+	// ── 청구서 취소 ──────────────────────────────────────────────
 	cancelInvoice: async ({ request, locals }) => {
 		const myRole   = locals.session?.role;
 		const myUserId = locals.session?.user?.id ?? null;
@@ -285,17 +285,16 @@ export const actions: Actions = {
 		const fd         = await request.formData();
 		const invoice_id = fd.get('invoice_id') as string;
 
+		// invoice_items 먼저 삭제 (외래키 제약)
+		await locals.supabase.from('invoice_items').delete().eq('invoice_id', invoice_id);
+
 		const { error } = await locals.supabase
 			.from('invoices')
-			.update({
-				status:       'cancelled',
-				cancelled_at: new Date().toISOString(),
-				cancelled_by: myUserId,
-			})
+			.delete()
 			.eq('id', invoice_id);
 
 		if (error) {
-			return fail(500, { error: '취소 실패: ' + error.message });
+			return fail(500, { error: '삭제 실패: ' + error.message });
 		}
 
 		return { success: true };
