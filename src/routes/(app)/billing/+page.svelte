@@ -1610,11 +1610,12 @@
 													onclick={async () => {
 														const sf = inv.snapshot_factory as typeof SUPPLIER_DEFAULT | null;
 														const sc = inv.snapshot_client as { name?: string } | null;
+														// category_name → sort_order 매핑 (현재 categories 기준)
+														const catSortMap = new Map(data.categories.map((c, i) => [c.name, i]));
 														const histLines: InvoiceLine[] = [...inv.invoice_items]
-															.sort((a, b) => a.sort_order - b.sort_order)
 															.map(it => ({
 																category:      it.category_name ?? '',
-																catSortOrder:  0,
+																catSortOrder:  catSortMap.get(it.category_name ?? '') ?? 99,
 																itemName:      it.item_name_ko,
 																itemSortOrder: it.sort_order,
 																quantity:      it.quantity,
@@ -1622,7 +1623,11 @@
 																amount:        it.amount,
 																priceFrom:     null,
 																priceTo:       null,
-															}));
+															}))
+															.sort((a, b) => {
+																const co = a.catSortOrder - b.catSortOrder;
+																return co !== 0 ? co : a.itemSortOrder - b.itemSortOrder;
+															});
 														historyPdfLoading = true;
 														historyPdfModal = true;
 														historyPdfUrl = null;
