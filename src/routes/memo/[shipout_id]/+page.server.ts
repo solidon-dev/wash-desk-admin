@@ -3,18 +3,16 @@ import type { PageServerLoad, Actions } from './$types';
 import { createClient } from '@supabase/supabase-js';
 import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
 
-// 이 페이지는 인증 없이 접근 가능 — anon 클라이언트 사용
-function anonClient() {
-	return createClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY);
-}
+// 서버 싱글턴 — 매 요청마다 새 인스턴스 생성 방지
+const anonSupabase = createClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY, {
+	auth: { autoRefreshToken: false, persistSession: false },
+});
 
 export const load: PageServerLoad = async ({ params }) => {
 	const { shipout_id } = params;
 
-	const supabase = anonClient();
-
 	// shipout 정보 조회 (존재 여부 확인 + 거래처명 표시용)
-	const { data: shipout, error: shipoutError } = await supabase
+	const { data: shipout, error: shipoutError } = await anonSupabase
 		.from('shipouts')
 		.select(`
 			id,
@@ -30,7 +28,7 @@ export const load: PageServerLoad = async ({ params }) => {
 	}
 
 	// 해당 shipout의 기존 메모 목록
-	const { data: memos } = await supabase
+	const { data: memos } = await anonSupabase
 		.from('shipout_memos')
 		.select('id, title, author_name, created_at')
 		.eq('shipout_id', shipout_id)
@@ -58,23 +56,14 @@ export const actions: Actions = {
 			return fail(400, { error: '제목과 내용을 입력해주세요.' });
 		}
 
-		const supabase = anonClient();
-
-		// shipout 존재 여부 재확인
-		const { data: shipout } = await supabase
-			.from('shipouts')
-			.select('id')
-			.eq('id', shipout_id)
-			.is('deleted_at', null)
-			.single();
-
-		if (!shipout) return fail(404, { error: '해당 출고 건을 찾을 수 없습니다.' });
-
-		const { error: insertError } = await supabase
+		const { error: insertError } = await anonSupabase
 			.from('shipout_memos')
 			.insert({ shipout_id, title, content, author_name });
 
-		if (insertError) return fail(500, { error: '메모 저장에 실패했습니다.' });
+		if (insertError) {
+			if (insertError.code === '23503') return fail(404, { error: '해당 출고 건을 찾을 수 없습니다.' });
+			return fail(500, { error: '메모 저장에 실패했습니다.' });
+		}
 
 		return { success: true };
 	},

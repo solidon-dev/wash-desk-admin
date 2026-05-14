@@ -11,21 +11,27 @@ function getAdminClient() {
 }
 
 export const load: PageServerLoad = async ({ locals }) => {
-	const { data: users, error } = await locals.supabase
-		.from('profiles')
-		.select('id, full_name, phone, role, factory_id, created_at, deleted_at, factories(id, name)')
-		.order('created_at', { ascending: true });
-
-	if (error) return { users: [] };
-
 	const admin = getAdminClient();
-	const { data: authList } = await admin.auth.admin.listUsers({ perPage: 1000 });
-	const emailMap = new Map(authList?.users.map(u => [u.id, u.email ?? '']) ?? []);
 
-	const { data: allFactories } = await locals.supabase
-		.from('factories')
-		.select('id, name')
-		.order('name');
+	const [
+		{ data: users, error },
+		{ data: authList },
+		{ data: allFactories },
+	] = await Promise.all([
+		locals.supabase
+			.from('profiles')
+			.select('id, full_name, phone, role, factory_id, created_at, deleted_at, factories(id, name)')
+			.order('created_at', { ascending: true }),
+		admin.auth.admin.listUsers({ perPage: 1000 }),
+		locals.supabase
+			.from('factories')
+			.select('id, name')
+			.order('name'),
+	]);
+
+	if (error) return { users: [], allFactories: [] };
+
+	const emailMap = new Map(authList?.users.map(u => [u.id, u.email ?? '']) ?? []);
 
 	return {
 		users: (users ?? []).map(u => ({
@@ -78,8 +84,7 @@ export const actions: Actions = {
 			return fail(400, { error: msg });
 		}
 
-		const adminDb = getAdminClient();
-		const { error: profileErr } = await adminDb
+		const { error: profileErr } = await admin
 			.from('profiles')
 			.update({ role: (role ?? 'worker') as 'factory_admin' | 'worker', factory_id, phone })
 			.eq('id', created.user.id);

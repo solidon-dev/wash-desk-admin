@@ -49,21 +49,21 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	if (!targetClient)
 		return { clients: clients ?? [], categories: [], items: [], itemPrices: [], selectedClientId: null };
 
-	// categories — client_id 기준
-	const { data: categories } = await locals.supabase
-		.from('categories')
-		.select('id, name, sort_order, client_id')
-		.eq('client_id', selectedClientId)
-		.order('sort_order', { ascending: true })
-		.order('created_at', { ascending: true });
-
-	// items — client_id 기준
-	const { data: items } = await locals.supabase
-		.from('items')
-		.select('id, category_id, client_id, name_ko, name_en, name_zh, nickname, sort_order')
-		.eq('client_id', selectedClientId)
-		.order('sort_order', { ascending: true })
-		.order('created_at', { ascending: true });
+	// categories + items 병렬 조회
+	const [{ data: categories }, { data: items }] = await Promise.all([
+		locals.supabase
+			.from('categories')
+			.select('id, name, sort_order, client_id')
+			.eq('client_id', selectedClientId)
+			.order('sort_order', { ascending: true })
+			.order('created_at', { ascending: true }),
+		locals.supabase
+			.from('items')
+			.select('id, category_id, client_id, name_ko, name_en, name_zh, nickname, sort_order')
+			.eq('client_id', selectedClientId)
+			.order('sort_order', { ascending: true })
+			.order('created_at', { ascending: true }),
+	]);
 
 	// item_prices — items에 딸린 단가 (client_id 없음, item_id로만)
 	const itemIds = (items ?? []).map(i => i.id);
@@ -162,11 +162,11 @@ export const actions: Actions = {
 			const fg = await guardClientFactory(locals, first.client_id, myFactoryId); if (fg) return fg;
 		}
 
-		const results = await Promise.all(
-			ids.map((id, idx) => locals.supabase.from('categories').update({ sort_order: idx }).eq('id', id))
-		);
-		const failed = results.find(r => r.error);
-		if (failed?.error) return fail(500, { error: failed.error.message });
+		const { error: reorderError } = await (locals.supabase.rpc as unknown as (fn: string, args: Record<string, unknown>) => Promise<{ error: { message: string } | null }>)('reorder_categories', {
+			p_ids: ids,
+			p_orders: ids.map((_, idx) => idx),
+		});
+		if (reorderError) return fail(500, { error: reorderError.message });
 		return { success: true };
 	},
 
@@ -271,11 +271,11 @@ export const actions: Actions = {
 			const fg = await guardClientFactory(locals, first.client_id, myFactoryId); if (fg) return fg;
 		}
 
-		const results = await Promise.all(
-			ids.map((id, idx) => locals.supabase.from('items').update({ sort_order: idx }).eq('id', id))
-		);
-		const failed = results.find(r => r.error);
-		if (failed?.error) return fail(500, { error: failed.error.message });
+		const { error: reorderError } = await (locals.supabase.rpc as unknown as (fn: string, args: Record<string, unknown>) => Promise<{ error: { message: string } | null }>)('reorder_items', {
+			p_ids: ids,
+			p_orders: ids.map((_, idx) => idx),
+		});
+		if (reorderError) return fail(500, { error: reorderError.message });
 		return { success: true };
 	},
 
@@ -325,12 +325,11 @@ export const actions: Actions = {
 		if (myRole === 'factory_admin') {
 			const { data: price } = await locals.supabase
 				.from('item_prices').select('item_id').eq('id', id).single();
-			if (price) {
-				const { data: item } = await locals.supabase
-					.from('items').select('client_id').eq('id', price.item_id).single();
-				if (!item) return fail(404, { error: '품목을 찾을 수 없습니다.' });
-				const fg = await guardClientFactory(locals, item.client_id, myFactoryId); if (fg) return fg;
-			}
+			if (!price) return fail(404, { error: '단가를 찾을 수 없습니다.' });
+			const { data: item } = await locals.supabase
+				.from('items').select('client_id').eq('id', price.item_id).single();
+			if (!item) return fail(404, { error: '품목을 찾을 수 없습니다.' });
+			const fg = await guardClientFactory(locals, item.client_id, myFactoryId); if (fg) return fg;
 		}
 
 		const { error } = await locals.supabase.from('item_prices').delete().eq('id', id);

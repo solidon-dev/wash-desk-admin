@@ -1,8 +1,12 @@
 import { fail } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 
-export const load: PageServerLoad = async ({ locals }) => {
-	const { data: memos, error: memosError } = await locals.supabase
+const PAGE_SIZE = 50;
+
+export const load: PageServerLoad = async ({ locals, url }) => {
+	const page = Math.max(1, Number(url.searchParams.get('page') ?? '1'));
+
+	const { data: memos, error: memosError, count } = await locals.supabase
 		.from('shipout_memos')
 		.select(`
 			id,
@@ -17,13 +21,13 @@ export const load: PageServerLoad = async ({ locals }) => {
 				created_at,
 				clients ( id, name )
 			)
-		`)
+		`, { count: 'exact' })
 		.order('created_at', { ascending: false })
-		.limit(300);
+		.range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
 
 	if (memosError) console.error('memos load error:', memosError);
 
-	return { memos: memos ?? [] };
+	return { memos: memos ?? [], total: count ?? 0, page, PAGE_SIZE };
 };
 
 export const actions: Actions = {

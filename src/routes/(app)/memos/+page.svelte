@@ -19,9 +19,10 @@
 		} | null;
 	};
 
-	let { data }: { data: PageData & { memos: MemoRow[] } } = $props();
+	let { data }: { data: PageData & { memos: MemoRow[]; total: number; page: number; PAGE_SIZE: number } } = $props();
 
 	const memos = $derived(data.memos ?? []);
+	const totalPages = $derived(Math.ceil((data.total ?? 0) / (data.PAGE_SIZE ?? 50)));
 
 	// ── 검색 (SearchBar) ──
 	const searchItems = $derived(
@@ -196,9 +197,22 @@
 			</div>
 		{/if}
 	</div>
-</div>
 
-<!-- ───── 메모 상세 모달 ───── -->
+	<!-- 페이지네이션 -->
+	{#if totalPages > 1}
+		<div class="flex justify-center mt-5 gap-1">
+			{#if data.page > 1}
+				<a href="?page={data.page - 1}" class="btn btn-sm btn-ghost">‹ 이전</a>
+			{/if}
+			{#each Array.from({ length: totalPages }, (_, i) => i + 1) as p (p)}
+				<a href="?page={p}" class="btn btn-sm {data.page === p ? 'btn-primary' : 'btn-ghost'}">{p}</a>
+			{/each}
+			{#if data.page < totalPages}
+				<a href="?page={data.page + 1}" class="btn btn-sm btn-ghost">다음 ›</a>
+			{/if}
+		</div>
+	{/if}
+</div>
 {#if viewingMemo}
 	{@const m = viewingMemo}
 	<dialog class="modal modal-open" aria-modal="true">
