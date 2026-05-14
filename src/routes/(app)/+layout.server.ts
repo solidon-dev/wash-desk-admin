@@ -26,11 +26,10 @@ export const load: LayoutServerLoad = async ({ locals, url }) => {
 		.order('created_at', { ascending: true });
 
 	// 메모 건수 (최근 30일)
-	const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 	const { count: memoCount } = await locals.supabase
 		.from('shipout_memos')
 		.select('id', { count: 'exact', head: true })
-		.gte('created_at', since);
+		.eq('is_read', false);
 
 	return {
 		user: locals.session.user,

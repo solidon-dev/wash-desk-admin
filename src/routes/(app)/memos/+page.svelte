@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Icon from '@iconify/svelte';
 	import { enhance } from '$app/forms';
+	import SearchBar from '$lib/components/SearchBar.svelte';
 	import type { PageData } from './$types';
 
 	type MemoRow = {
@@ -9,88 +10,72 @@
 		title: string;
 		content: string;
 		author_name: string;
+		is_read: boolean;
 		created_at: string;
 		shipouts: {
 			id: string;
 			created_at: string;
-			client_id: string;
-			factory_id: string;
 			clients: { id: string; name: string } | null;
 		} | null;
 	};
 
-	type ShipoutRow = {
-		id: string;
-		created_at: string;
-		client_id: string;
-		clients: { id: string; name: string } | null;
-	};
+	let { data }: { data: PageData & { memos: MemoRow[] } } = $props();
 
-	let { data }: { data: PageData & { memos: MemoRow[]; shipouts: ShipoutRow[] } } = $props();
+	const memos = $derived(data.memos ?? []);
 
-	// PageData & 로 타입 확장했으니 직접 접근 가능
-	const memos     = $derived(data.memos ?? []);
-	const shipouts  = $derived(data.shipouts ?? []);
-
-	// ── 검색 / 필터 ──
+	// ── 검색 (SearchBar) ──
+	const searchItems = $derived(
+		memos.map(m => ({
+			id: m.id,
+			label: m.shipouts?.clients?.name ?? '—',
+			sub: m.title,
+		}))
+	);
+	let selectedId   = $state('');
 	let searchQuery  = $state('');
-	let filterShipout = $state('all');
+
+	// ── 읽음 필터 ──
+	let statusFilter = $state<'all' | 'unread' | 'read'>('unread');
+
+	const unreadCount = $derived(memos.filter(m => !m.is_read).length);
 
 	const filteredMemos = $derived(
 		memos.filter(m => {
-			const matchShipout = filterShipout === 'all' || m.shipout_id === filterShipout;
-			const q = searchQuery.toLowerCase();
-			const matchSearch = !q ||
-				m.title.toLowerCase().includes(q) ||
-				m.content.toLowerCase().includes(q) ||
-				m.author_name.toLowerCase().includes(q) ||
-				(m.shipouts?.clients?.name ?? '').toLowerCase().includes(q);
-			return matchShipout && matchSearch;
+			if (selectedId) return m.id === selectedId;
+			const matchStatus =
+				statusFilter === 'all'    ? true :
+				statusFilter === 'unread' ? !m.is_read : m.is_read;
+			if (!matchStatus) return false;
+			if (searchQuery) {
+				const q = searchQuery.toLowerCase();
+				return (
+					m.title.toLowerCase().includes(q) ||
+					m.content.toLowerCase().includes(q) ||
+					m.author_name.toLowerCase().includes(q) ||
+					(m.shipouts?.clients?.name ?? '').toLowerCase().includes(q)
+				);
+			}
+			return true;
 		})
 	);
 
-	// ── 날짜 포맷 ──
 	function fmtDate(s: string) {
 		const d = new Date(s);
-		const pad = (n: number) => String(n).padStart(2, '0');
-		return `${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-	}
-	function fmtShipoutLabel(s: ShipoutRow) {
-		const clientName = s.clients?.name ?? '미확인';
-		const d = new Date(s.created_at);
-		return `${clientName} — ${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
+		const p = (n: number) => String(n).padStart(2, '0');
+		return `${d.getFullYear()}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 	}
 
-	// ── 메모 상세 모달 ──
+	// ── 상세 모달 ──
 	let viewingMemo = $state<MemoRow | null>(null);
 
-	// ── 메모 작성 모달 (테스트용) ──
-	let showWriteModal   = $state(false);
-	let writeShipoutId   = $state('');
-	let writeTitle       = $state('');
-	let writeContent     = $state('');
-	let writeAuthor      = $state('');
-	let writeSubmitting  = $state(false);
-	let writeError       = $state('');
-
-	function openWriteModal() {
-		writeShipoutId  = shipouts[0]?.id ?? '';
-		writeTitle      = '';
-		writeContent    = '';
-		writeAuthor     = '';
-		writeError      = '';
-		showWriteModal  = true;
-	}
-
 	// ── 삭제 확인 ──
-	let deleteTargetId = $state<string | null>(null);
+	let deleteTargetId   = $state<string | null>(null);
 	let deleteSubmitting = $state(false);
 
 	// ── QR 링크 복사 ──
 	let copiedId = $state<string | null>(null);
 	function copyQrLink(shipoutId: string) {
-		const url = `${window.location.origin}/memo/${shipoutId}`;
-		navigator.clipboard.writeText(url).then(() => {
+		navigator.clipboard.writeText(`${window.location.origin}/memo/${shipoutId}`).then(() => {
 			copiedId = shipoutId;
 			setTimeout(() => { copiedId = null; }, 2000);
 		});
@@ -100,41 +85,52 @@
 <div class="min-h-full bg-base-200 px-8 py-10">
 
 	<!-- 헤더 -->
-	<div class="flex items-center justify-between mb-6">
-		<div>
-			<h2 class="text-2xl font-extrabold text-base-content">메모 확인</h2>
-			<p class="text-sm text-base-content/50 mt-0.5">출고 건별로 실무자가 남긴 메모를 확인합니다.</p>
-		</div>
-		<button
-			type="button"
-			class="btn btn-primary btn-sm gap-1.5"
-			onclick={openWriteModal}
-		>
-			<Icon icon="lucide:plus" class="w-4 h-4" />
-			테스트 메모 작성
-		</button>
+	<div class="mb-6">
+		<h2 class="text-2xl font-extrabold text-base-content">
+			메모 확인
+			{#if unreadCount > 0}
+				<span class="badge badge-primary font-bold ml-2">{unreadCount}</span>
+			{/if}
+		</h2>
+		<p class="text-sm text-base-content/50 mt-0.5">출고 건별로 실무자가 남긴 메모를 확인합니다.</p>
 	</div>
 
-	<!-- 필터 -->
+	<!-- 검색 / 필터 바 -->
 	<div class="flex flex-wrap items-center gap-3 mb-5">
-		<!-- 검색 -->
-		<div class="relative">
-			<Icon icon="lucide:search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/30 pointer-events-none" />
-			<input
-				type="text"
-				placeholder="제목, 내용, 작성자, 거래처 검색..."
-				class="input input-bordered input-sm pl-9 w-72"
-				bind:value={searchQuery}
-			/>
-		</div>
-		<!-- 출고 건 필터 -->
-		<select class="select select-bordered select-sm" bind:value={filterShipout}>
-			<option value="all">전체 출고 건</option>
-			{#each shipouts as s (s.id)}
-				<option value={s.id}>{fmtShipoutLabel(s)}</option>
+		<SearchBar
+			placeholder="거래처명, 제목 검색..."
+			items={searchItems}
+			onselect={(id) => { selectedId = id; searchQuery = ''; }}
+			oninput={(v) => { searchQuery = v; selectedId = ''; }}
+			class="w-64 sm:w-72"
+		/>
+
+		<!-- 읽음 상태 필터 -->
+		<div class="flex items-center gap-1">
+			{#each ([
+				{ value: 'all',    label: '전체'     },
+				{ value: 'unread', label: '안읽음'   },
+				{ value: 'read',   label: '읽음'     },
+			] as const) as f (f.value)}
+				<button
+					type="button"
+					class="btn btn-sm {statusFilter === f.value ? 'btn-primary' : 'btn-ghost'}"
+					onclick={() => { statusFilter = f.value; selectedId = ''; }}
+				>{f.label}</button>
 			{/each}
-		</select>
-		<span class="text-sm text-base-content/40 ml-auto">{filteredMemos.length}건</span>
+		</div>
+
+		<!-- 전체 읽음 -->
+		<form method="POST" action="?/markAllRead" use:enhance class="ml-auto">
+			<button
+				type="submit"
+				class="btn btn-sm btn-ghost gap-1.5"
+				disabled={unreadCount === 0}
+			>
+				<Icon icon="lucide:check-check" class="w-4 h-4" />
+				전체 읽음
+			</button>
+		</form>
 	</div>
 
 	<!-- 테이블 -->
@@ -149,29 +145,35 @@
 				<table class="table table-sm w-full">
 					<thead class="bg-base-200 text-base-content/60">
 						<tr>
+							<th class="text-xs w-6"></th>
 							<th class="text-xs">거래처</th>
-							<th class="text-xs">출고일</th>
+							<th class="text-xs hidden sm:table-cell">출고일</th>
 							<th class="text-xs">제목</th>
-							<th class="text-xs">작성자</th>
-							<th class="text-xs">작성일시</th>
-							<th class="text-xs text-center w-24">액션</th>
+							<th class="text-xs hidden md:table-cell">작성자</th>
+							<th class="text-xs hidden lg:table-cell">작성일시</th>
+							<th class="text-xs text-center w-20">액션</th>
 						</tr>
 					</thead>
 					<tbody>
 						{#each filteredMemos as memo (memo.id)}
 							<tr
-								class="hover cursor-pointer"
+								class="hover cursor-pointer {memo.is_read ? 'opacity-50' : 'font-semibold'}"
 								onclick={() => { viewingMemo = memo; }}
 							>
-								<td class="font-semibold text-sm">{memo.shipouts?.clients?.name ?? '—'}</td>
-								<td class="text-xs text-base-content/60">
+								<td>
+									{#if !memo.is_read}
+										<span class="inline-block w-2 h-2 rounded-full bg-primary"></span>
+									{/if}
+								</td>
+								<td>{memo.shipouts?.clients?.name ?? '—'}</td>
+								<td class="text-xs text-base-content/60 hidden sm:table-cell">
 									{memo.shipouts?.created_at ? fmtDate(memo.shipouts.created_at) : '—'}
 								</td>
 								<td class="text-sm">{memo.title}</td>
-								<td class="text-xs text-base-content/60">{memo.author_name}</td>
-								<td class="text-xs text-base-content/50 whitespace-nowrap">{fmtDate(memo.created_at)}</td>
+								<td class="text-xs text-base-content/60 hidden md:table-cell">{memo.author_name}</td>
+								<td class="text-xs text-base-content/50 whitespace-nowrap hidden lg:table-cell">{fmtDate(memo.created_at)}</td>
 								<td onclick={(e) => e.stopPropagation()}>
-									<div class="flex items-center justify-center gap-1">
+									<div class="flex items-center justify-center gap-0.5">
 										<button
 											type="button"
 											class="btn btn-ghost btn-xs"
@@ -206,7 +208,7 @@
 {#if viewingMemo}
 	{@const m = viewingMemo}
 	<dialog class="modal modal-open" aria-modal="true">
-		<div class="modal-box w-full max-w-lg rounded-2xl p-6 flex flex-col gap-0" style="max-height: 600px;">
+		<div class="modal-box w-full max-w-lg rounded-2xl p-6 flex flex-col gap-0" style="max-height:600px;">
 			<div class="flex items-start justify-between mb-4">
 				<div>
 					<p class="text-xs font-bold text-base-content/40 uppercase tracking-wide mb-1">
@@ -222,12 +224,10 @@
 					<Icon icon="lucide:x" class="w-5 h-5" />
 				</button>
 			</div>
-			<p class="text-xs text-base-content/40 mb-4 flex items-center gap-1">
-				<Icon icon="lucide:user" class="w-3.5 h-3.5" />
-				{m.author_name}
-				<span class="ml-2 flex items-center gap-1">
-					<Icon icon="lucide:clock" class="w-3.5 h-3.5" />
-					{fmtDate(m.created_at)}
+			<p class="text-xs text-base-content/40 mb-4 flex items-center gap-1.5">
+				<Icon icon="lucide:user" class="w-3.5 h-3.5" />{m.author_name}
+				<span class="flex items-center gap-1 ml-2">
+					<Icon icon="lucide:clock" class="w-3.5 h-3.5" />{fmtDate(m.created_at)}
 				</span>
 			</p>
 			<div class="divider my-0"></div>
@@ -239,144 +239,32 @@
 				<button
 					type="button"
 					class="btn btn-ghost btn-sm gap-1.5 text-base-content/50"
-					onclick={() => { copyQrLink(m.shipout_id); }}
+					onclick={() => copyQrLink(m.shipout_id)}
 				>
 					<Icon icon="lucide:link" class="w-4 h-4" />
 					{copiedId === m.shipout_id ? '복사됨!' : 'QR 링크 복사'}
 				</button>
-				<button
-					type="button"
-					onclick={() => { viewingMemo = null; }}
-					class="btn btn-ghost btn-sm font-bold"
-				>닫기</button>
+				<div class="flex gap-2">
+					{#if !m.is_read}
+						<form method="POST" action="?/markRead" use:enhance={() => {
+							return async ({ update }) => {
+								await update();
+								viewingMemo = null;
+							};
+						}}>
+							<input type="hidden" name="id" value={m.id} />
+							<button type="submit" class="btn btn-primary btn-sm gap-1.5">
+								<Icon icon="lucide:check" class="w-4 h-4" />
+								읽음 확인
+							</button>
+						</form>
+					{/if}
+					<button type="button" onclick={() => { viewingMemo = null; }} class="btn btn-ghost btn-sm">닫기</button>
+				</div>
 			</div>
 		</div>
 		<form method="dialog" class="modal-backdrop">
 			<button onclick={() => { viewingMemo = null; }}>close</button>
-		</form>
-	</dialog>
-{/if}
-
-<!-- ───── 테스트 메모 작성 모달 ───── -->
-{#if showWriteModal}
-	<dialog class="modal modal-open" aria-modal="true">
-		<div class="modal-box w-full max-w-lg rounded-2xl p-6">
-			<div class="flex items-center justify-between mb-5">
-				<div>
-					<h3 class="text-base font-extrabold">메모 작성 (테스트)</h3>
-					<p class="text-xs text-base-content/40 mt-0.5">QR 없이 직접 출고 건을 선택해 메모를 남깁니다.</p>
-				</div>
-				<button
-					type="button"
-					onclick={() => { showWriteModal = false; }}
-					class="btn btn-ghost btn-sm btn-circle"
-				>
-					<Icon icon="lucide:x" class="w-4 h-4" />
-				</button>
-			</div>
-
-			<form
-				method="POST"
-				action="?/addMemo"
-				use:enhance={() => {
-					writeSubmitting = true;
-					writeError = '';
-					return async ({ result, update }) => {
-						writeSubmitting = false;
-						if (result.type === 'failure') {
-							writeError = (result.data as { error?: string })?.error ?? '오류 발생';
-						} else {
-							showWriteModal = false;
-							await update();
-						}
-					};
-				}}
-				class="flex flex-col gap-4"
-			>
-				<!-- 출고 건 선택 -->
-				<div class="form-control">
-					<label class="label label-text text-xs font-semibold" for="write-shipout">출고 건 선택</label>
-					<select
-						id="write-shipout"
-						name="shipout_id"
-						class="select select-bordered select-sm w-full"
-						bind:value={writeShipoutId}
-						required
-					>
-						{#each shipouts as s (s.id)}
-							<option value={s.id}>{fmtShipoutLabel(s)} — {s.id.slice(0,8)}...</option>
-						{/each}
-					</select>
-				</div>
-
-				<!-- 작성자 이름 -->
-				<div class="form-control">
-					<label class="label label-text text-xs font-semibold" for="write-author">작성자 이름</label>
-					<input
-						id="write-author"
-						name="author_name"
-						type="text"
-						placeholder="예: 홍길동"
-						class="input input-bordered input-sm w-full"
-						bind:value={writeAuthor}
-					/>
-				</div>
-
-				<!-- 제목 -->
-				<div class="form-control">
-					<label class="label label-text text-xs font-semibold" for="write-title">제목</label>
-					<input
-						id="write-title"
-						name="title"
-						type="text"
-						placeholder="메모 제목"
-						class="input input-bordered input-sm w-full"
-						bind:value={writeTitle}
-						required
-					/>
-				</div>
-
-				<!-- 내용 -->
-				<div class="form-control">
-					<label class="label label-text text-xs font-semibold" for="write-content">내용</label>
-					<textarea
-						id="write-content"
-						name="content"
-						rows="4"
-						placeholder="메모 내용을 입력하세요..."
-						class="textarea textarea-bordered textarea-sm w-full resize-none"
-						bind:value={writeContent}
-						required
-					></textarea>
-				</div>
-
-				{#if writeError}
-					<p class="text-xs text-error">{writeError}</p>
-				{/if}
-
-				<div class="flex justify-end gap-2 pt-1">
-					<button
-						type="button"
-						class="btn btn-ghost btn-sm"
-						onclick={() => { showWriteModal = false; }}
-					>취소</button>
-					<button
-						type="submit"
-						class="btn btn-primary btn-sm gap-1.5"
-						disabled={writeSubmitting}
-					>
-						{#if writeSubmitting}
-							<span class="loading loading-spinner loading-xs"></span>
-						{:else}
-							<Icon icon="lucide:send" class="w-4 h-4" />
-						{/if}
-						저장
-					</button>
-				</div>
-			</form>
-		</div>
-		<form method="dialog" class="modal-backdrop">
-			<button onclick={() => { showWriteModal = false; }}>close</button>
 		</form>
 	</dialog>
 {/if}
@@ -405,21 +293,17 @@
 					method="POST"
 					action="?/deleteMemo"
 					use:enhance={() => {
-							deleteSubmitting = true;
-							return async ({ update }) => {
-								deleteSubmitting = false;
-								deleteTargetId = null;
-								if (viewingMemo?.id === deleteTargetId) viewingMemo = null;
-								await update();
-							};
-						}}
+						deleteSubmitting = true;
+						return async ({ update }) => {
+							deleteSubmitting = false;
+							deleteTargetId = null;
+							if (viewingMemo?.id === deleteTargetId) viewingMemo = null;
+							await update();
+						};
+					}}
 				>
 					<input type="hidden" name="id" value={deleteTargetId} />
-					<button
-						type="submit"
-						class="btn btn-error btn-sm gap-1.5"
-						disabled={deleteSubmitting}
-					>
+					<button type="submit" class="btn btn-error btn-sm gap-1.5" disabled={deleteSubmitting}>
 						{#if deleteSubmitting}
 							<span class="loading loading-spinner loading-xs"></span>
 						{:else}

@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -513,6 +513,7 @@ export type Database = {
           content: string
           created_at: string
           id: string
+          is_read: boolean
           shipout_id: string
           title: string
         }
@@ -521,6 +522,7 @@ export type Database = {
           content?: string
           created_at?: string
           id?: string
+          is_read?: boolean
           shipout_id: string
           title?: string
         }
@@ -529,6 +531,7 @@ export type Database = {
           content?: string
           created_at?: string
           id?: string
+          is_read?: boolean
           shipout_id?: string
           title?: string
         }
