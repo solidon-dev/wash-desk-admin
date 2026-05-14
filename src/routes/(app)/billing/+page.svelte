@@ -1183,7 +1183,7 @@
 													</span>
 												</td>
 											</tr>
-											{#each catLines as line (line.category + line.itemName)}
+											{#each catLines as line (line.category + line.itemName + line.unitPrice)}
 												<tr class="hover">
 													<td class="pl-8 font-medium">{line.itemName}</td>
 													<td class="w-20 text-right">{line.quantity.toLocaleString()}</td>
