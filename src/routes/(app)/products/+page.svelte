@@ -241,16 +241,19 @@
     const form = new FormData();
     for (const [k, v] of Object.entries(payload)) form.append(k, v);
     try {
-      const res = await fetch(`/products?/${action}`, { method: 'POST', body: form });
-        if (!res.ok) {
-          onRollback?.();
-        showToast('저장 실패 — 변경사항이 취소됐습니다.');
+      const res  = await fetch(`/products?/${action}`, { method: 'POST', body: form });
+      const text = await res.text();
+      const result = deserialize(text);
+      if (result.type === 'failure' || result.type === 'error') {
+        onRollback?.();
+        const msg = (result as { data?: { error?: string } }).data?.error ?? '저장 실패';
+        showToast(`저장 실패 — ${msg}`);
         return false;
       }
       return true;
     } catch {
       onRollback?.();
-      showToast('네트워크 오류 — 변경사항이 취소됐습니다.');
+      showToast('네트워크 오류 — 변경사항이 취소되었습니다.');
       return false;
     }
   }
@@ -594,14 +597,14 @@
         const reordered = [...currentItems];
         const [moved] = reordered.splice(i, 1);
         reordered.splice(to, 0, moved);
-        // 낙관적으로 localItems 순서 변경
         const prevOrder = [...localItems];
         localItems = [
           ...localItems.filter(x => !reordered.find(r => r.id === x.id)),
           ...reordered.map((r, idx) => ({ ...r, sort_order: idx })),
         ].sort((a, b) => a.sort_order - b.sort_order);
-        submitBg('reorderItems', { ids: JSON.stringify(reordered.map(x => x.id)) },
+        const ok = await submitBg('reorderItems', { ids: JSON.stringify(reordered.map(x => x.id)) },
           () => { localItems = prevOrder; });
+        if (ok) await invalidateAll();
       }
     }
     editingOrderRow = null;
@@ -635,8 +638,9 @@
         ...localItems.filter(x => !reordered.find(r => r.id === x.id)),
         ...reordered.map((r, idx) => ({ ...r, sort_order: idx })),
       ].sort((a, b) => a.sort_order - b.sort_order);
-      submitBg('reorderItems', { ids: JSON.stringify(reordered.map(x => x.id)) },
+      const ok = await submitBg('reorderItems', { ids: JSON.stringify(reordered.map(x => x.id)) },
         () => { localItems = prevOrder; });
+      if (ok) await invalidateAll();
     }
     dragSrcIdx = null; dragOverIdx = null;
   }
@@ -665,8 +669,9 @@
       reordered.splice(i, 0, moved);
       const prev = [...localCategories];
       localCategories = reordered.map((c, idx) => ({ ...c, sort_order: idx }));
-      submitBg('reorderCategories', { ids: JSON.stringify(reordered.map(x => x.id)) },
+      const ok = await submitBg('reorderCategories', { ids: JSON.stringify(reordered.map(x => x.id)) },
         () => { localCategories = prev; });
+      if (ok) await invalidateAll();
     }
     catDragSrcIdx = null; catDragOverIdx = null;
   }
@@ -683,8 +688,9 @@
         reordered.splice(to, 0, moved);
         const prev = [...localCategories];
         localCategories = reordered.map((c, idx) => ({ ...c, sort_order: idx }));
-        submitBg('reorderCategories', { ids: JSON.stringify(reordered.map(x => x.id)) },
+        const ok = await submitBg('reorderCategories', { ids: JSON.stringify(reordered.map(x => x.id)) },
           () => { localCategories = prev; });
+        if (ok) await invalidateAll();
       }
     }
     editingCatOrderIdx = null;
