@@ -5,20 +5,17 @@ export const handle: Handle = async ({ event, resolve }) => {
 	const supabase = createSupabaseServerClient(event.cookies);
 	event.locals.supabase = supabase;
 
-	// getUser()를 써야 서버에서 실제 JWT 검증을 한다 (getSession은 캐시만 봄)
-	const { data: { user } } = await supabase.auth.getUser();
+	// getSession()은 JWT를 로컬에서 검증하므로 DB 왕복 없음
+	// role, factory_id는 JWT의 app_metadata 클레임에서 직접 읽음
+	const { data: { session } } = await supabase.auth.getSession();
 
-	if (user) {
-		const { data: profile } = await supabase
-			.from('profiles')
-			.select('role, factory_id')
-			.eq('id', user.id)
-			.single();
+	if (session?.user) {
+		const meta = session.user.app_metadata as Record<string, unknown>;
 
 		event.locals.session = {
-			user,
-			role: profile?.role ?? null,
-			factory_id: profile?.factory_id ?? null,
+			user: session.user,
+			role: (meta?.role as string) ?? null,
+			factory_id: (meta?.factory_id as string) ?? null,
 		};
 	} else {
 		event.locals.session = null;
