@@ -72,27 +72,33 @@
 	let deleteTargetId   = $state<string | null>(null);
 	let deleteSubmitting = $state(false);
 
-	// ── QR 링크 복사 ──
-	let copiedId = $state<string | null>(null);
-	function copyQrLink(shipoutId: string) {
-		navigator.clipboard.writeText(`${window.location.origin}/memo/${shipoutId}`).then(() => {
-			copiedId = shipoutId;
-			setTimeout(() => { copiedId = null; }, 2000);
-		});
+	// ── 삭제 확인 ──
+	function goMemoPage() {
+		window.open('/memo', '_blank');
 	}
 </script>
 
 <div class="min-h-full bg-base-200 px-8 py-10">
 
 	<!-- 헤더 -->
-	<div class="mb-6">
-		<h2 class="text-2xl font-extrabold text-base-content">
-			메모 확인
-			{#if unreadCount > 0}
-				<span class="badge badge-primary font-bold ml-2">{unreadCount}</span>
-			{/if}
-		</h2>
-		<p class="text-sm text-base-content/50 mt-0.5">출고 건별로 실무자가 남긴 메모를 확인합니다.</p>
+	<div class="flex items-start justify-between mb-6">
+		<div>
+			<h2 class="text-2xl font-extrabold text-base-content">
+				메모 확인
+				{#if unreadCount > 0}
+					<span class="badge badge-primary font-bold ml-2">{unreadCount}</span>
+				{/if}
+			</h2>
+			<p class="text-sm text-base-content/50 mt-0.5">출고 건별로 실무자가 남긴 메모를 확인합니다.</p>
+		</div>
+		<button
+			type="button"
+			class="btn btn-outline btn-sm gap-1.5"
+			onclick={goMemoPage}
+		>
+			<Icon icon="lucide:external-link" class="w-4 h-4" />
+			메모 작성 테스트
+		</button>
 	</div>
 
 	<!-- 검색 / 필터 바 -->
@@ -173,19 +179,7 @@
 								<td class="text-xs text-base-content/60 hidden md:table-cell">{memo.author_name}</td>
 								<td class="text-xs text-base-content/50 whitespace-nowrap hidden lg:table-cell">{fmtDate(memo.created_at)}</td>
 								<td onclick={(e) => e.stopPropagation()}>
-									<div class="flex items-center justify-center gap-0.5">
-										<button
-											type="button"
-											class="btn btn-ghost btn-xs"
-											title="QR 링크 복사"
-											onclick={() => copyQrLink(memo.shipout_id)}
-										>
-											{#if copiedId === memo.shipout_id}
-												<Icon icon="lucide:check" class="w-3.5 h-3.5 text-success" />
-											{:else}
-												<Icon icon="lucide:link" class="w-3.5 h-3.5" />
-											{/if}
-										</button>
+									<div class="flex items-center justify-center">
 										<button
 											type="button"
 											class="btn btn-ghost btn-xs text-error"
@@ -235,32 +229,22 @@
 				{m.content}
 			</div>
 			<div class="divider my-0"></div>
-			<div class="flex justify-between items-center pt-4">
-				<button
-					type="button"
-					class="btn btn-ghost btn-sm gap-1.5 text-base-content/50"
-					onclick={() => copyQrLink(m.shipout_id)}
-				>
-					<Icon icon="lucide:link" class="w-4 h-4" />
-					{copiedId === m.shipout_id ? '복사됨!' : 'QR 링크 복사'}
-				</button>
-				<div class="flex gap-2">
-					{#if !m.is_read}
-						<form method="POST" action="?/markRead" use:enhance={() => {
-							return async ({ update }) => {
-								await update();
-								viewingMemo = null;
-							};
-						}}>
-							<input type="hidden" name="id" value={m.id} />
-							<button type="submit" class="btn btn-primary btn-sm gap-1.5">
-								<Icon icon="lucide:check" class="w-4 h-4" />
-								읽음 확인
-							</button>
-						</form>
-					{/if}
-					<button type="button" onclick={() => { viewingMemo = null; }} class="btn btn-ghost btn-sm">닫기</button>
-				</div>
+			<div class="flex justify-end items-center gap-2 pt-4">
+				<button type="button" onclick={() => { viewingMemo = null; }} class="btn btn-ghost btn-sm">닫기</button>
+				{#if !m.is_read}
+					<form method="POST" action="?/markRead" use:enhance={() => {
+						return async ({ update }) => {
+							await update();
+							viewingMemo = null;
+						};
+					}}>
+						<input type="hidden" name="id" value={m.id} />
+						<button type="submit" class="btn btn-primary btn-sm gap-1.5">
+							<Icon icon="lucide:check" class="w-4 h-4" />
+							읽음 확인
+						</button>
+					</form>
+				{/if}
 			</div>
 		</div>
 		<form method="dialog" class="modal-backdrop">
