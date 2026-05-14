@@ -33,7 +33,6 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		.is('deleted_at', null)
 		.order('name', { ascending: true });
 
-	// factory_admin / worker 모두 자기 공장 소속만
 	if (myRole !== 'super_admin' && myFactoryId) {
 		clientsQuery = clientsQuery.eq('factory_id', myFactoryId);
 	}
@@ -45,13 +44,14 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			selectedClientId: null,
 			shipoutLogs: [] as ShipoutLog[],
 			categories: [] as { id: string; name: string; sort_order: number }[],
+			invoiceHistory: [],
 		};
 	}
 
 	const clientList = clients ?? [];
 
 	// ── 2. selectedClientId 결정 ──────────────────────────────────────────
-	const paramClientId  = url.searchParams.get('clientId');
+	const paramClientId    = url.searchParams.get('clientId');
 	const selectedClientId =
 		(paramClientId && clientList.some((c) => c.id === paramClientId))
 			? paramClientId
@@ -63,138 +63,77 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			selectedClientId: null,
 			shipoutLogs: [] as ShipoutLog[],
 			categories: [] as { id: string; name: string; sort_order: number }[],
+			invoiceHistory: [],
 		};
 	}
 
-	// ── 3. categories 조회 ────────────────────────────────────────────────
-	const { data: categories } = await locals.supabase
-		.from('categories')
-		.select('id, name, sort_order')
-		.eq('client_id', selectedClientId)
-		.order('sort_order', { ascending: true });
+	// ── 3. 페이지 데이터 일괄 조회 (RPC 1번) ─────────────────────────────
+	// categories + shipout_logs(단가 포함) + invoices 를 DB에서 한 번에
+	type RpcRow = {
+		categories:   { id: string; name: string; sort_order: number }[];
+		shipout_logs: {
+			shipout_id:      string;
+			processed_at:    string;
+			item_id:         string;
+			item_name_ko:    string;
+			category_id:     string;
+			item_sort_order: number;
+			quantity:        number;
+			unit_price:      number;
+			price_from:      string | null;
+			price_to:        string | null;
+		}[];
+		invoices: unknown[];
+	};
 
-	const categoryList = categories ?? [];
+	const { data: rpcRows, error: rpcError } = await (locals.supabase.rpc as unknown as (
+		fn: string, args: Record<string, unknown>
+	) => Promise<{ data: RpcRow[] | null; error: unknown }>)(
+		'get_billing_page_data',
+		{ p_client_id: selectedClientId }
+	);
 
-	// category_id → category_name 매핑
+	if (rpcError || !rpcRows || rpcRows.length === 0) {
+		return {
+			clients: clientList,
+			selectedClientId,
+			shipoutLogs: [] as ShipoutLog[],
+			categories: [] as { id: string; name: string; sort_order: number }[],
+			invoiceHistory: [],
+		};
+	}
+
+	const row          = rpcRows[0];
+	const categoryList = row.categories   ?? [];
+	const rawLogs      = row.shipout_logs ?? [];
+	const invoiceHistory = row.invoices   ?? [];
+
+	// category_id → name 매핑
 	const categoryMap = new Map<string, string>(
 		categoryList.map((c) => [c.id, c.name])
 	);
 
-	// ── 4. inventory_logs 조회 (out, 삭제되지 않은 shipout 소속) ──────────
-	const { data: rawLogs } = await locals.supabase
-		.from('inventory_logs')
-		.select(`
-			id,
-			shipout_id,
-			processed_at,
-			item_id,
-			quantity,
-			items!inner ( name_ko, category_id, sort_order )
-		`)
-		.eq('client_id', selectedClientId)
-		.eq('log_type', 'out')
-		.not('shipout_id', 'is', null)
-		.order('processed_at', { ascending: false });
-
-	// shipout_id가 존재하는 로그만 추려서, 유효한(삭제 안 된) shipout 목록과 교차
-	// → shipouts 테이블에서 deleted_at IS NULL인 id 목록을 가져와 필터
-	const allShipoutIds = [
-		...new Set(
-			(rawLogs ?? [])
-				.map((l) => l.shipout_id)
-				.filter((id): id is string => !!id)
-		),
-	];
-
-	let validShipoutIds = new Set<string>();
-	if (allShipoutIds.length > 0) {
-		const { data: validShipouts } = await locals.supabase
-			.from('shipouts')
-			.select('id')
-			.in('id', allShipoutIds)
-			.is('deleted_at', null);
-		validShipoutIds = new Set((validShipouts ?? []).map((s) => s.id));
-	}
-
-	const filteredLogs = (rawLogs ?? []).filter(
-		(l) => l.shipout_id && validShipoutIds.has(l.shipout_id)
-	);
-
-	// ── 5. 단가 계산: item_prices 조인으로 일괄 처리 ─────────────────────
-	// 각 log의 (item_id, processed_at의 date) 조합에 대한 단가를 구해야 함.
-	type LogWithItem = typeof filteredLogs[number];
-
-	// 단가 배치 조회: N번 개별 RPC → 1번 배치 RPC로 최적화
-	const priceRequests = filteredLogs.map((log: LogWithItem) => ({
-		item_id: log.item_id,
-		date: log.processed_at
-			? log.processed_at.slice(0, 10)
-			: new Date().toISOString().slice(0, 10),
+	// ── 4. shipoutLogs 조립 ───────────────────────────────────────────────
+	const shipoutLogs: ShipoutLog[] = rawLogs.map((log) => ({
+		shipout_id:      log.shipout_id,
+		processed_at:    log.processed_at,
+		item_id:         log.item_id,
+		item_name_ko:    log.item_name_ko,
+		category_id:     log.category_id,
+		category_name:   categoryMap.get(log.category_id) ?? '',
+		item_sort_order: log.item_sort_order,
+		quantity:        log.quantity,
+		unit_price:      log.unit_price,
+		price_from:      log.price_from,
+		price_to:        log.price_to,
 	}));
 
-	type PriceResult = { unit_price: number; price_from: string | null; price_to: string | null };
-	const priceMap = new Map<string, PriceResult>(); // key: "item_id|date"
-
-	if (priceRequests.length > 0) {
-		const { data: batchData } = await locals.supabase.rpc('batch_get_unit_prices', {
-			p_requests: priceRequests,
-		});
-		for (const row of (batchData ?? []) as { item_id: string; req_date: string; unit_price: number; price_from: string | null; price_to: string | null }[]) {
-			priceMap.set(`${row.item_id}|${row.req_date}`, {
-				unit_price: row.unit_price ?? 0,
-				price_from: row.price_from ?? null,
-				price_to:   row.price_to   ?? null,
-			});
-		}
-	}
-
-	const unitPriceResults = priceRequests.map((req) => {
-		const key = `${req.item_id}|${req.date}`;
-		return priceMap.get(key) ?? { unit_price: 0, price_from: null, price_to: null };
-	});
-
-	// ── 6. shipoutLogs 조립 ───────────────────────────────────────────────
-	const shipoutLogs: ShipoutLog[] = filteredLogs.map((log: LogWithItem, idx: number) => {
-		const itemData = Array.isArray(log.items) ? log.items[0] : log.items;
-		const categoryId   = (itemData as { name_ko: string; category_id: string; sort_order: number } | null)?.category_id ?? '';
-		const itemNameKo   = (itemData as { name_ko: string; category_id: string; sort_order: number } | null)?.name_ko    ?? '';
-		const itemSortOrder = (itemData as { name_ko: string; category_id: string; sort_order: number } | null)?.sort_order ?? 0;
-
-		return {
-			shipout_id:      log.shipout_id ?? '',
-			processed_at:    log.processed_at ?? '',
-			item_id:         log.item_id,
-			item_name_ko:    itemNameKo,
-			category_id:     categoryId,
-			category_name:   categoryMap.get(categoryId) ?? '',
-			item_sort_order: itemSortOrder,
-			quantity:        log.quantity ?? 0,
-			unit_price:      unitPriceResults[idx].unit_price,
-			price_from:      unitPriceResults[idx].price_from,
-			price_to:        unitPriceResults[idx].price_to,
-		};
-	});
-
-	// ── 7. 발행 내역 조회 ─────────────────────────────────────────────────
-	const { data: invoiceHistoryRaw } = await locals.supabase
-		.from('invoices')
-		.select(`
-			id, period_start, period_end,
-			subtotal, vat, jeolsa, total,
-			created_at,
-			snapshot_factory, snapshot_client,
-			invoice_items ( id, item_name_ko, category_name, quantity, unit_price, amount, sort_order )
-		`)
-		.eq('client_id', selectedClientId)
-		.order('created_at', { ascending: false })
-		.limit(50);
-
 	return {
-		clients:          clientList,
+		clients:         clientList,
 		selectedClientId,
 		shipoutLogs,
-		categories:       categoryList,
-		invoiceHistory:   invoiceHistoryRaw ?? [],
+		categories:      categoryList,
+		invoiceHistory,
 	};
 };
 
