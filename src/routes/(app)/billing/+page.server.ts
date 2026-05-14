@@ -122,30 +122,36 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 	// ── 5. 단가 계산: item_prices 조인으로 일괄 처리 ─────────────────────
 	// 각 log의 (item_id, processed_at의 date) 조합에 대한 단가를 구해야 함.
-	// 로그가 최대 200건 이하라 가정하고, get_unit_price RPC를 Promise.all로 병렬 호출
 	type LogWithItem = typeof filteredLogs[number];
 
+	// 단가 배치 조회: N번 개별 RPC → 1번 배치 RPC로 최적화
+	const priceRequests = filteredLogs.map((log: LogWithItem) => ({
+		item_id: log.item_id,
+		date: log.processed_at
+			? log.processed_at.slice(0, 10)
+			: new Date().toISOString().slice(0, 10),
+	}));
 
+	type PriceResult = { unit_price: number; price_from: string | null; price_to: string | null };
+	const priceMap = new Map<string, PriceResult>(); // key: "item_id|date"
 
-	const unitPriceResults = await Promise.all(
-		filteredLogs.map(async (log: LogWithItem) => {
-			const processedDate = log.processed_at
-				? log.processed_at.slice(0, 10)
-				: new Date().toISOString().slice(0, 10);
+	if (priceRequests.length > 0) {
+		const { data: batchData } = await locals.supabase.rpc('batch_get_unit_prices', {
+			p_requests: priceRequests,
+		});
+		for (const row of (batchData ?? []) as { item_id: string; req_date: string; unit_price: number; price_from: string | null; price_to: string | null }[]) {
+			priceMap.set(`${row.item_id}|${row.req_date}`, {
+				unit_price: row.unit_price ?? 0,
+				price_from: row.price_from ?? null,
+				price_to:   row.price_to   ?? null,
+			});
+		}
+	}
 
-			try {
-				const { data, error } = await locals.supabase.rpc('get_unit_price_with_range', {
-					p_item_id: log.item_id,
-					p_date:    processedDate,
-				});
-				if (error || !data || (data as unknown[]).length === 0) return { unit_price: 0, price_from: null, price_to: null };
-				const row = (data as { unit_price: number; price_from: string | null; price_to: string | null }[])[0];
-				return { unit_price: row.unit_price ?? 0, price_from: row.price_from ?? null, price_to: row.price_to ?? null };
-			} catch {
-				return { unit_price: 0, price_from: null, price_to: null };
-			}
-		})
-	);
+	const unitPriceResults = priceRequests.map((req) => {
+		const key = `${req.item_id}|${req.date}`;
+		return priceMap.get(key) ?? { unit_price: 0, price_from: null, price_to: null };
+	});
 
 	// ── 6. shipoutLogs 조립 ───────────────────────────────────────────────
 	const shipoutLogs: ShipoutLog[] = filteredLogs.map((log: LogWithItem, idx: number) => {
