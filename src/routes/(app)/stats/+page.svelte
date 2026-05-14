@@ -6,7 +6,6 @@
 	import DonutChart from './_components/DonutChart.svelte';
 	import StackBarChart from './_components/StackBarChart.svelte';
 
-	import { getStatsData } from '$lib/api/stats';
 	import type { StatsShipout } from '$lib/api/stats';
 	import {
 		calcStats,
@@ -25,9 +24,12 @@
 		CATEGORY_COLORS,
 	} from './_lib/stats';
 
+	// ─── SSR load 데이터 ────────────────────────────────────────────────────
+	const { data } = $props<{ data: import('./$types').PageData }>();
+
 	// ─── 기준일 ───────────────────────────────────────────────────────────────
 	const NOW        = new Date();
-	const TODAY      = `${NOW.getFullYear()}-${pad(NOW.getMonth() + 1)}-${pad(NOW.getDate())}`;
+	const TODAY      = $derived(data.today);
 	const THIS_YEAR  = NOW.getFullYear();
 	const THIS_MONTH = NOW.getMonth() + 1;
 	const MONTH_FROM = `${THIS_YEAR}-${pad(THIS_MONTH)}-01`;
@@ -42,22 +44,21 @@
 	let loading        = $state(false);
 	let error          = $state<string | null>(null);
 
-	// 전체 기간 데이터 캐시 (필터링은 클라이언트에서)
-	// 범위 변경 시 필요한 구간만 fetch
-	let allShipouts    = $state<StatsShipout[]>([]);
-	let fetchedFrom    = $state('');
-	let fetchedTo      = $state('');
+	// SSR에서 받은 데이터로 초기화 — 로딩 없이 바로 표시
+	const allShipoutsBase = $derived(data.shipouts as StatsShipout[]);
+	let allShipouts = $state<StatsShipout[]>([]);
+	$effect(() => { allShipouts = allShipoutsBase; });
 
 	type PresetKey = '7d' | '30d' | 'month' | 'ytd' | 'all';
 	let activePreset = $state<PresetKey>('month');
 
 	function applyPreset(k: PresetKey) {
 		activePreset = k;
-		if (k === '7d')        { fromDate = offsetDate(NOW, -6);       toDate = TODAY; }
-		else if (k === '30d')  { fromDate = offsetDate(NOW, -29);      toDate = TODAY; }
-		else if (k === 'month'){ fromDate = MONTH_FROM;                 toDate = MONTH_TO; }
-		else if (k === 'ytd')  { fromDate = `${THIS_YEAR}-01-01`;      toDate = TODAY; }
-		else                   { fromDate = DATA_FROM;                  toDate = TODAY; }
+		if (k === '7d')        { fromDate = offsetDate(NOW, -6);   toDate = TODAY; }
+		else if (k === '30d')  { fromDate = offsetDate(NOW, -29);  toDate = TODAY; }
+		else if (k === 'month'){ fromDate = MONTH_FROM;             toDate = MONTH_TO; }
+		else if (k === 'ytd')  { fromDate = `${THIS_YEAR}-01-01`;  toDate = TODAY; }
+		else                   { fromDate = DATA_FROM;              toDate = TODAY; }
 	}
 
 	// ─── 데이트픽커 ──────────────────────────────────────────────────────────
@@ -71,36 +72,6 @@
 		activePreset = '' as unknown as PresetKey;
 		pickerOpen = false;
 	}
-
-	// ─── 데이터 fetch ────────────────────────────────────────────────────────
-	// fromDate / toDate 변경 감지 → 필요 시 재fetch
-	// $effect 안에서 직접 읽어야 Svelte 반응성 추적이 됨
-	$effect(() => {
-		const from = fromDate;
-		const to   = toDate;
-
-		// 이미 fetch된 범위가 커버하면 skip
-		if (fetchedFrom && fetchedTo && from >= fetchedFrom && to <= fetchedTo) return;
-
-		// 항상 DATA_FROM ~ TODAY 전체를 한 번에 가져와 캐시
-		const expandedFrom = DATA_FROM;
-		const expandedTo   = TODAY;
-
-		loading = true;
-		error   = null;
-		getStatsData(expandedFrom, expandedTo)
-			.then((data) => {
-				allShipouts = data.shipouts;
-				fetchedFrom = expandedFrom;
-				fetchedTo   = expandedTo;
-			})
-			.catch((e: unknown) => {
-				error = e instanceof Error ? e.message : '데이터를 불러오지 못했습니다';
-			})
-			.finally(() => {
-				loading = false;
-			});
-	});
 
 	// ─── 파생 데이터 ─────────────────────────────────────────────────────────
 	const cid = $derived(filterClientId || undefined);
