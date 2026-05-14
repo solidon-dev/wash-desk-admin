@@ -685,13 +685,21 @@
 			startY: y,
 			margin: { left: margin, right: margin },
 			head: [['품목명', '구분', '수량', '단가', '금액']],
-			body: lines.map(l => [
-				l.itemName,
-				catLabelMap[l.category] ?? l.category,
-				l.quantity.toLocaleString(),
-				l.unitPrice > 0 ? `${l.unitPrice.toLocaleString()} 원` : '-',
-				`${l.amount.toLocaleString()} 원`,
-			]),
+			body: lines.map(l => {
+				const hasDup = lines.filter(x => x.itemName === l.itemName).length > 1;
+				const dateLabel = hasDup
+					? (l.dateMin === l.dateMax
+						? ` (${l.dateMin.slice(5).replace('-', '.')})`
+						: ` (${l.dateMin.slice(5).replace('-', '.')}~${l.dateMax.slice(5).replace('-', '.')})`)
+					: '';
+				return [
+					l.itemName + dateLabel,
+					catLabelMap[l.category] ?? l.category,
+					l.quantity.toLocaleString(),
+					l.unitPrice > 0 ? `${l.unitPrice.toLocaleString()} 원` : '-',
+					`${l.amount.toLocaleString()} 원`,
+				];
+			}),
 			foot: [['품목합계', '', totalQty.toLocaleString(), '', `${supplyAmount.toLocaleString()} 원`]],
 			styles:            { font: 'NanumGothic', fontSize: 8, valign: 'middle' },
 			headStyles:        { fillColor: [225, 232, 245], textColor: [60, 80, 130], fontStyle: 'bold', fontSize: 8 },
