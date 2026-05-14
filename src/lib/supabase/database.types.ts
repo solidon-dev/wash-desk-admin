@@ -263,7 +263,6 @@ export type Database = {
           },
         ]
       }
-
       invoice_items: {
         Row: {
           amount: number
@@ -314,11 +313,8 @@ export type Database = {
           },
         ]
       }
-
       invoices: {
         Row: {
-          cancelled_at: string | null
-          cancelled_by: string | null
           client_id: string
           created_at: string
           created_by: string | null
@@ -330,14 +326,11 @@ export type Database = {
           period_start: string
           snapshot_client: Json | null
           snapshot_factory: Json | null
-          status: string
           subtotal: number
           total: number
           vat: number
         }
         Insert: {
-          cancelled_at?: string | null
-          cancelled_by?: string | null
           client_id: string
           created_at?: string
           created_by?: string | null
@@ -349,14 +342,11 @@ export type Database = {
           period_start: string
           snapshot_client?: Json | null
           snapshot_factory?: Json | null
-          status?: string
           subtotal?: number
           total?: number
           vat?: number
         }
         Update: {
-          cancelled_at?: string | null
-          cancelled_by?: string | null
           client_id?: string
           created_at?: string
           created_by?: string | null
@@ -368,7 +358,6 @@ export type Database = {
           period_start?: string
           snapshot_client?: Json | null
           snapshot_factory?: Json | null
-          status?: string
           subtotal?: number
           total?: number
           vat?: number
@@ -480,6 +469,44 @@ export type Database = {
           },
         ]
       }
+      profiles: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          factory_id: string | null
+          full_name: string | null
+          id: string
+          phone: string | null
+          role: Database["public"]["Enums"]["user_role"]
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          factory_id?: string | null
+          full_name?: string | null
+          id: string
+          phone?: string | null
+          role?: Database["public"]["Enums"]["user_role"]
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          factory_id?: string | null
+          full_name?: string | null
+          id?: string
+          phone?: string | null
+          role?: Database["public"]["Enums"]["user_role"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_factory_id_fkey"
+            columns: ["factory_id"]
+            isOneToOne: false
+            referencedRelation: "factories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shipouts: {
         Row: {
           client_id: string
@@ -532,84 +559,49 @@ export type Database = {
           },
         ]
       }
-      profiles: {
-        Row: {
-          created_at: string
-          deleted_at: string | null
-          factory_id: string | null
-          full_name: string | null
-          id: string
-          phone: string | null
-          role: Database["public"]["Enums"]["user_role"]
-        }
-        Insert: {
-          created_at?: string
-          deleted_at?: string | null
-          factory_id?: string | null
-          full_name?: string | null
-          id: string
-          phone?: string | null
-          role?: Database["public"]["Enums"]["user_role"]
-        }
-        Update: {
-          created_at?: string
-          deleted_at?: string | null
-          factory_id?: string | null
-          full_name?: string | null
-          id?: string
-          phone?: string | null
-          role?: Database["public"]["Enums"]["user_role"]
-        }
-        Relationships: [
-          {
-            foreignKeyName: "profiles_factory_id_fkey"
-            columns: ["factory_id"]
-            isOneToOne: false
-            referencedRelation: "factories"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      create_item_with_price: {
-        Args:
-          | {
-              p_client_id: string
+      create_item_with_price:
+        | {
+            Args: {
               p_category_id: string
-              p_name_ko: string
-              p_unit_price: number
-            }
-          | {
               p_client_id: string
-              p_category_id: string
-              p_name_ko: string
+              p_effective_from: string
               p_name_en: string
+              p_name_ko: string
               p_name_zh: string
               p_nickname: string
               p_sort_order: number
               p_unit_price: number
-              p_effective_from: string
             }
-        Returns: Json
-      }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_category_id: string
+              p_client_id: string
+              p_name_ko: string
+              p_unit_price?: number
+            }
+            Returns: Json
+          }
       delete_shipout: {
         Args: {
-          p_shipout_id: string
           p_deleted_by: string
           p_restore_inventory?: boolean
+          p_shipout_id: string
         }
         Returns: Json
       }
       execute_shipout: {
         Args: {
-          p_factory_id: string
           p_client_id: string
-          p_items: Json
           p_created_by: string
+          p_factory_id: string
+          p_items: Json
           p_memo?: string
         }
         Returns: Json
@@ -620,7 +612,11 @@ export type Database = {
       }
       get_unit_price_with_range: {
         Args: { p_date: string; p_item_id: string }
-        Returns: { unit_price: number; price_from: string | null; price_to: string | null }[]
+        Returns: {
+          price_from: string
+          price_to: string
+          unit_price: number
+        }[]
       }
       my_factory_id: { Args: never; Returns: string }
       my_role: {
@@ -648,11 +644,7 @@ export type Database = {
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       update_shipout: {
-        Args: {
-          p_shipout_id: string
-          p_items: Json
-          p_updated_by: string
-        }
+        Args: { p_items: Json; p_shipout_id: string; p_updated_by: string }
         Returns: Json
       }
     }

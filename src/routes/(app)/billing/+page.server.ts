@@ -174,8 +174,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		.from('invoices')
 		.select(`
 			id, period_start, period_end,
-			subtotal, vat, jeolsa, total, status,
-			created_at, cancelled_at,
+			subtotal, vat, jeolsa, total,
+			created_at,
 			snapshot_factory, snapshot_client,
 			invoice_items ( id, item_name_ko, category_name, quantity, unit_price, amount, sort_order )
 		`)
@@ -243,7 +243,6 @@ export const actions: Actions = {
 				discount:        0,
 				snapshot_factory,
 				snapshot_client,
-				status:          'issued',
 			})
 			.select('id')
 			.single();

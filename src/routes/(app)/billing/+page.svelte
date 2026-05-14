@@ -19,9 +19,7 @@
 		vat: number;
 		jeolsa: number;
 		total: number;
-		status: string;
 		created_at: string;
-		cancelled_at: string | null;
 		snapshot_factory: unknown;
 		snapshot_client: unknown;
 		invoice_items: { id: string; item_name_ko: string; category_name: string | null; quantity: number; unit_price: number; amount: number; sort_order: number }[];
@@ -1573,7 +1571,6 @@
 									<th class="text-xs text-right">공급가액</th>
 									<th class="text-xs text-right">VAT</th>
 									<th class="text-xs text-right">합계</th>
-									<th class="text-xs text-center">상태</th>
 									<th class="text-xs text-center">액션</th>
 								</tr>
 							</thead>
@@ -1586,13 +1583,6 @@
 										<td class="text-xs text-right tabular-nums">{inv.subtotal.toLocaleString('ko-KR')}</td>
 										<td class="text-xs text-right tabular-nums">{inv.vat.toLocaleString('ko-KR')}</td>
 										<td class="text-xs text-right font-bold tabular-nums">{inv.total.toLocaleString('ko-KR')}</td>
-										<td class="text-center">
-											{#if inv.status === 'issued'}
-												<span class="badge badge-success badge-sm">발행</span>
-											{:else}
-												<span class="badge badge-error badge-sm">취소</span>
-											{/if}
-										</td>
 										<td class="text-center">
 											<div class="flex items-center justify-center gap-1">
 												<button
@@ -1633,15 +1623,13 @@
 												>
 													<Icon icon="lucide:file-text" class="h-3 w-3" />재출력
 												</button>
-												{#if inv.status === 'issued'}
-													<button
-														type="button"
-														class="btn btn-xs btn-error btn-ghost gap-1"
-														onclick={() => { deleteTargetId = inv.id; deleteConfirmModal = true; }}
-													>
-														<Icon icon="lucide:trash-2" class="h-3 w-3" />삭제
-													</button>
-												{/if}
+												<button
+													type="button"
+													class="btn btn-xs btn-error btn-ghost gap-1"
+													onclick={() => { deleteTargetId = inv.id; deleteConfirmModal = true; }}
+												>
+													<Icon icon="lucide:trash-2" class="h-3 w-3" />삭제
+												</button>
 											</div>
 										</td>
 									</tr>
