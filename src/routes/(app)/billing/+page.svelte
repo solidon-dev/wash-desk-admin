@@ -7,6 +7,7 @@
 	import type { Cell, Sheet, MergeRegion, ColumnDef } from './excel.js';
 	import DatePicker from '../stats/_components/DatePicker.svelte';
 	import { SvelteMap } from 'svelte/reactivity';
+	import { invalidateAll } from '$app/navigation';
 	import type { PageData } from './$types';
 	import type { ShipoutLog } from './+page.server';
 
@@ -39,7 +40,10 @@
 
 	const clients = $derived(data.clients);
 
-	let selectedClientId = $state<string>(data.selectedClientId ?? data.clients[0]?.id ?? '');
+	let selectedClientId = $state<string>('');
+	$effect.pre(() => {
+		selectedClientId = data.selectedClientId ?? data.clients[0]?.id ?? '';
+	});
 
 	// shipoutLogs → Shipment[] 변환
 	const shipments = $derived.by((): Shipment[] => {
@@ -99,7 +103,10 @@
 
 	function selectClient(id: string) {
 		selectedClientId = id;
-		window.location.href = `/billing?clientId=${id}`;
+		const url = new URL(window.location.href);
+		url.searchParams.set('clientId', id);
+		history.replaceState({}, '', url.toString());
+		invalidateAll();
 	}
 
 	// ── 기간 설정 (공통): 오늘 기준 전달 동일+1일 ~ 오늘
