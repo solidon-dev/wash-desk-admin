@@ -30,7 +30,7 @@ export type Inventory        = Tables<'inventory'>;
 export type InventoryLog     = Tables<'inventory_logs'>;
 export type InvoiceAttachment = Tables<'invoice_attachments'>;
 export type InvoiceItem      = Tables<'invoice_items'>;
-export type InvoiceMemo      = Tables<'invoice_memos'>;
+
 export type Invoice          = Tables<'invoices'>;
 export type ItemPrice        = Tables<'item_prices'>;
 export type Item             = Tables<'items'>;
@@ -48,7 +48,7 @@ export type InventoryInsert         = TablesInsert<'inventory'>;
 export type InventoryLogInsert      = TablesInsert<'inventory_logs'>;
 export type InvoiceAttachmentInsert = TablesInsert<'invoice_attachments'>;
 export type InvoiceItemInsert       = TablesInsert<'invoice_items'>;
-export type InvoiceMemoInsert       = TablesInsert<'invoice_memos'>;
+
 export type InvoiceInsert           = TablesInsert<'invoices'>;
 export type ItemPriceInsert         = TablesInsert<'item_prices'>;
 export type ItemInsert              = TablesInsert<'items'>;
@@ -66,7 +66,7 @@ export type InventoryUpdate         = TablesUpdate<'inventory'>;
 export type InventoryLogUpdate      = TablesUpdate<'inventory_logs'>;
 export type InvoiceAttachmentUpdate = TablesUpdate<'invoice_attachments'>;
 export type InvoiceItemUpdate       = TablesUpdate<'invoice_items'>;
-export type InvoiceMemoUpdate       = TablesUpdate<'invoice_memos'>;
+
 export type InvoiceUpdate           = TablesUpdate<'invoices'>;
 export type ItemPriceUpdate         = TablesUpdate<'item_prices'>;
 export type ItemUpdate              = TablesUpdate<'items'>;

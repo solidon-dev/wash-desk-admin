@@ -11,11 +11,28 @@
 	import type { PageData } from './$types';
 	import type { ShipoutLog } from './+page.server';
 
+	type InvoiceHistoryItem = {
+		id: string;
+		period_start: string;
+		period_end: string;
+		subtotal: number;
+		vat: number;
+		jeolsa: number;
+		total: number;
+		status: string;
+		created_at: string;
+		cancelled_at: string | null;
+		snapshot_factory: unknown;
+		snapshot_client: unknown;
+		invoice_items: { id: string; item_name_ko: string; category_name: string | null; quantity: number; unit_price: number; amount: number; sort_order: number }[];
+	};
+
 	type BillingPageData = {
 		clients: { id: string; name: string }[];
 		selectedClientId: string | null;
 		shipoutLogs: ShipoutLog[];
 		categories: { id: string; name: string; sort_order: number }[];
+		invoiceHistory: InvoiceHistoryItem[];
 		[key: string]: unknown;
 	};
 
@@ -107,7 +124,7 @@
 	function formatMoney(n: number) { return n.toLocaleString('ko-KR') + '원'; }
 
 	// ── 탭 ──
-	type BillingTab = 'invoice' | 'statement';
+	type BillingTab = 'invoice' | 'statement' | 'history';
 	const tabState = $state({ active: 'invoice' as BillingTab });
 	function switchTab(t: BillingTab) { tabState.active = t; }
 
@@ -372,6 +389,11 @@
 	let showPdfModal  = $state(false);
 	let pdfBlobUrl    = $state<string | null>(null);
 	let pdfGenerating = $state(false);
+	let issuingInvoice = $state(false);
+	let invoiceHistory = $derived((data as BillingPageData).invoiceHistory ?? []);
+	let historyPdfModal = $state(false);
+	let historyPdfUrl   = $state<string | null>(null);
+	let historyPdfLoading = $state(false);
 
 	function openSupplierThenPdf() {
 		if (!selectedClient || invoiceLines.length === 0) return;
@@ -387,8 +409,49 @@
 		pdfBlobUrl    = null;
 		await tick();
 		try {
-			const url = await generateInvoicePdf();
-			pdfBlobUrl = url;
+			const blobUrl = await generateInvoicePdf({
+				supplier: supplierEdit,
+				clientName: selectedClient?.name ?? '',
+				periodFrom,
+				periodTo,
+				lines: invoiceLines,
+				supplyAmount: invoiceTotal,
+			});
+			pdfBlobUrl = blobUrl;
+
+			// DB 저장 — 텍스트 데이터만 전송
+			issuingInvoice = true;
+			try {
+				const supplyAmount = invoiceTotal;
+				const vatRaw = Math.floor(supplyAmount * 0.1);
+				const vat    = Math.floor(vatRaw / 10) * 10;
+				const jeolsa = vatRaw - vat;
+				const total  = supplyAmount + vat;
+
+				const fd = new FormData();
+				fd.append('client_id',        selectedClientId);
+				fd.append('period_from',       periodFrom);
+				fd.append('period_to',         periodTo);
+				fd.append('subtotal',          String(supplyAmount));
+				fd.append('vat',               String(vat));
+				fd.append('jeolsa',            String(jeolsa));
+				fd.append('total',             String(total));
+				fd.append('snapshot_factory',  JSON.stringify(supplierEdit));
+				fd.append('snapshot_client',   JSON.stringify({ id: selectedClientId, name: selectedClient?.name ?? '' }));
+				fd.append('items',             JSON.stringify(invoiceLines));
+
+				const res  = await fetch('?/issueInvoice', { method: 'POST', body: fd });
+				const json = await res.json();
+				if (!res.ok || json?.type === 'failure') {
+					console.error('청구서 저장 실패:', json);
+				} else {
+					await invalidateAll();
+				}
+			} catch (e) {
+				console.error('청구서 저장 중 오류:', e);
+			} finally {
+				issuingInvoice = false;
+			}
 		} finally {
 			pdfGenerating = false;
 		}
@@ -425,7 +488,17 @@
 		a.click();
 	}
 
-	async function generateInvoicePdf(): Promise<string> {
+	type PdfParams = {
+		supplier: typeof SUPPLIER_DEFAULT;
+		clientName: string;
+		periodFrom: string;
+		periodTo: string;
+		lines: InvoiceLine[];
+		supplyAmount: number;
+	};
+
+	async function generateInvoicePdf(params: PdfParams): Promise<string> {
+		const { supplier: SUPPLIER, clientName, periodFrom: pFrom, periodTo: pTo, lines, supplyAmount } = params;
 		const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
 		// ── 나눔고딕 Regular + Bold 로드 ──
@@ -446,11 +519,7 @@
 		const cW      = pageW - margin * 2; // 186mm
 		let   y       = margin;
 
-		// ── 공급자 상태 사용 ──
-		const SUPPLIER = supplierEdit;
-
 		// ── 금액 계산 ──
-		const supplyAmount = invoiceTotal;
 		const vatRaw     = Math.floor(supplyAmount * 0.1);
 		const vat        = Math.floor(vatRaw / 10) * 10;   // 10원 미만 절사
 		const jeolsa     = vatRaw - vat;                    // 절사액 (양수, 표시는 음수)
@@ -461,7 +530,7 @@
 		// ═══════════════════════════════════════
 		// ── 제목 텍스트: YYYY년 MM월 청구서 ──
 		const titleDate = (() => {
-			const d = new Date(periodTo + 'T00:00:00');
+			const d = new Date(pTo + 'T00:00:00');
 			return `${d.getFullYear()}년 ${d.getMonth() + 1}월`;
 		})();
 		doc.setFillColor(10, 36, 99);
@@ -489,7 +558,7 @@
 
 		// ─ 좌측: 날짜 / 수신자 / 청구 안내 ─
 		const dateStr = (() => {
-			const d = new Date(periodTo + 'T00:00:00');
+			const d = new Date(pTo + 'T00:00:00');
 			return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
 		})();
 		doc.setFont('NanumGothic', 'normal');
@@ -500,7 +569,7 @@
 		doc.setFont('NanumGothic', 'bold');
 		doc.setFontSize(13);
 		doc.setTextColor(10, 20, 45);
-		doc.text(selectedClient?.name ?? '-', margin + 5, y + 24);
+		doc.text(clientName || '-', margin + 5, y + 24);
 		doc.setFontSize(10);
 		doc.text('귀하', margin + 5, y + 33);
 
@@ -597,7 +666,7 @@
 		doc.text(`${grandTotal.toLocaleString()} 원`, pageW / 2, y + 7.5, { align: 'center' });
 		doc.setFontSize(7.5);
 		doc.setTextColor(100, 125, 160);
-		doc.text(`청구기간: ${periodFrom} ~ ${periodTo}`, margin + cW - 3, y + 7.2, { align: 'right' });
+		doc.text(`청구기간: ${pFrom} ~ ${pTo}`, margin + cW - 3, y + 7.2, { align: 'right' });
 		y += 15;
 
 		// ═══════════════════════════════════════
@@ -606,12 +675,12 @@
 		const catLabelMap: Record<string, string> = Object.fromEntries(data.categories.map(c => [c.name, c.name]));
 		const col1 = 24; const col2 = 20; const col3 = 36; const col4 = 40;
 		const col0 = cW - col1 - col2 - col3 - col4;
-		const totalQty = invoiceLines.reduce((s, l) => s + l.quantity, 0);
+		const totalQty = lines.reduce((s, l) => s + l.quantity, 0);
 		autoTable(doc, {
 			startY: y,
 			margin: { left: margin, right: margin },
 			head: [['품목명', '구분', '수량', '단가', '금액']],
-			body: invoiceLines.map(l => [
+			body: lines.map(l => [
 				l.itemName,
 				catLabelMap[l.category] ?? l.category,
 				l.quantity.toLocaleString(),
@@ -1059,7 +1128,8 @@
 			<div class="ml-auto flex items-center pl-6">
 				<div role="tablist" class="tabs tabs-boxed bg-base-200">
 					<button type="button" class="tab {tabState.active === 'invoice' ? 'tab-active' : ''}" onclick={() => switchTab('invoice')}>청구서</button>
-					<button type="button" class="tab {tabState.active === 'statement' ? 'tab-active' : ''}" onclick={() => switchTab('statement')}>거래내역서</button>
+						<button type="button" class="tab {tabState.active === 'statement' ? 'tab-active' : ''}" onclick={() => switchTab('statement')}>거래내역서</button>
+						<button type="button" class="tab {tabState.active === 'history' ? 'tab-active' : ''}" onclick={() => switchTab('history')}>발행 내역</button>
 
 				</div>
 			</div>
@@ -1436,6 +1506,111 @@
 					{/if}
 			{/if}
 		</div>
+	{:else if tabState.active === 'history'}
+		<div class="space-y-4">
+			<div class="card bg-base-100 shadow-sm overflow-hidden">
+				<div class="flex items-center gap-3 border-b border-base-200 px-5 py-3">
+					<h3 class="text-base font-bold">발행 내역</h3>
+					<span class="badge badge-ghost badge-sm">{invoiceHistory.length}건</span>
+				</div>
+				{#if invoiceHistory.length === 0}
+					<div class="flex flex-col items-center justify-center py-16">
+						<p class="text-base-content/40">발행된 청구서가 없습니다.</p>
+					</div>
+				{:else}
+					<div class="overflow-x-auto">
+						<table class="table table-sm w-full">
+							<thead class="bg-base-200">
+								<tr>
+									<th class="text-xs">발행일</th>
+									<th class="text-xs">청구 기간</th>
+									<th class="text-xs text-right">품목수</th>
+									<th class="text-xs text-right">공급가액</th>
+									<th class="text-xs text-right">VAT</th>
+									<th class="text-xs text-right">합계</th>
+									<th class="text-xs text-center">상태</th>
+									<th class="text-xs text-center">액션</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each invoiceHistory as inv (inv.id)}
+									<tr class="hover {inv.status === 'cancelled' ? 'opacity-50' : ''}">
+										<td class="text-xs">{formatDate(inv.created_at.slice(0, 10))}</td>
+										<td class="text-xs font-mono">{formatDate(inv.period_start)} ~ {formatDate(inv.period_end)}</td>
+										<td class="text-xs text-right">{inv.invoice_items.length}</td>
+										<td class="text-xs text-right tabular-nums">{inv.subtotal.toLocaleString('ko-KR')}</td>
+										<td class="text-xs text-right tabular-nums">{inv.vat.toLocaleString('ko-KR')}</td>
+										<td class="text-xs text-right font-bold tabular-nums">{inv.total.toLocaleString('ko-KR')}</td>
+										<td class="text-center">
+											{#if inv.status === 'issued'}
+												<span class="badge badge-success badge-sm">발행</span>
+											{:else}
+												<span class="badge badge-error badge-sm">취소</span>
+											{/if}
+										</td>
+										<td class="text-center">
+											<div class="flex items-center justify-center gap-1">
+												<button
+													type="button"
+													class="btn btn-xs btn-ghost gap-1"
+													onclick={async () => {
+														const sf = inv.snapshot_factory as typeof SUPPLIER_DEFAULT | null;
+														const sc = inv.snapshot_client as { name?: string } | null;
+														const histLines: InvoiceLine[] = [...inv.invoice_items]
+															.sort((a, b) => a.sort_order - b.sort_order)
+															.map(it => ({
+																category:      it.category_name ?? '',
+																catSortOrder:  0,
+																itemName:      it.item_name_ko,
+																itemSortOrder: it.sort_order,
+																quantity:      it.quantity,
+																unitPrice:     it.unit_price,
+																amount:        it.amount,
+															}));
+														historyPdfLoading = true;
+														historyPdfModal = true;
+														historyPdfUrl = null;
+														try {
+															historyPdfUrl = await generateInvoicePdf({
+																supplier:     sf ?? SUPPLIER_DEFAULT,
+																clientName:   sc?.name ?? '',
+																periodFrom:   inv.period_start,
+																periodTo:     inv.period_end,
+																lines:        histLines,
+																supplyAmount: inv.subtotal,
+															});
+														} finally {
+															historyPdfLoading = false;
+														}
+													}}
+												>
+													<Icon icon="lucide:file-text" class="h-3 w-3" />재출력
+												</button>
+												{#if inv.status === 'issued'}
+													<button
+														type="button"
+														class="btn btn-xs btn-error btn-ghost gap-1"
+														onclick={async () => {
+															if (!confirm('이 청구서를 취소하시겠습니까?')) return;
+															const fdx = new FormData();
+															fdx.append('invoice_id', inv.id);
+															await fetch('?/cancelInvoice', { method: 'POST', body: fdx });
+															await invalidateAll();
+														}}
+													>
+														<Icon icon="lucide:x-circle" class="h-3 w-3" />취소
+													</button>
+												{/if}
+											</div>
+										</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				{/if}
+			</div>
+		</div>
 	{/if}
 	</div><!-- /flex-1 overflow-auto -->
 </div>
@@ -1532,6 +1707,10 @@
 					{/if}
 				</div>
 				<div class="flex items-center gap-2">
+					{#if issuingInvoice}
+						<span class="loading loading-spinner loading-xs text-primary"></span>
+						<span class="text-xs text-base-content/50">저장 중...</span>
+					{/if}
 					{#if pdfBlobUrl}
 						<button type="button" class="btn btn-primary btn-sm gap-1.5" onclick={downloadPdf}>
 							<Icon icon="lucide:download" class="h-4 w-4" />
@@ -1566,6 +1745,39 @@
 			</div>
 		</div>
 		<form method="dialog" class="modal-backdrop"><button onclick={closePdfModal}>close</button></form>
+	</dialog>
+{/if}
+
+{#if historyPdfModal}
+	<dialog class="modal modal-open" aria-modal="true">
+		<div class="modal-box flex w-full max-w-4xl flex-col gap-0 overflow-hidden p-0" style="max-height: 90vh;">
+			<div class="flex shrink-0 items-center justify-between border-b border-base-200 bg-base-100 px-5 py-4">
+				<div class="flex items-center gap-2">
+					<Icon icon="lucide:file-text" class="h-5 w-5 text-primary" />
+					<h3 class="text-base font-extrabold">청구서 재출력</h3>
+				</div>
+				<button type="button" class="btn btn-ghost btn-sm btn-square" onclick={() => { historyPdfModal = false; historyPdfUrl = null; }} aria-label="닫기">
+					<Icon icon="lucide:x" class="h-4 w-4" />
+				</button>
+			</div>
+			<div class="flex-1 overflow-hidden bg-base-200/50" style="min-height: 70vh;">
+				{#if historyPdfLoading}
+					<div class="flex h-full min-h-96 items-center justify-center gap-3">
+						<span class="loading loading-spinner loading-md text-primary"></span>
+						<span class="text-sm font-semibold text-base-content/60">PDF 불러오는 중...</span>
+					</div>
+				{:else if historyPdfUrl}
+					<iframe src={historyPdfUrl} title="청구서 PDF" class="h-full w-full" style="min-height: 70vh;"></iframe>
+				{:else}
+					<div class="flex h-full min-h-96 items-center justify-center">
+						<p class="text-sm text-base-content/40">PDF를 불러올 수 없습니다.</p>
+					</div>
+				{/if}
+			</div>
+		</div>
+		<form method="dialog" class="modal-backdrop">
+			<button onclick={() => { historyPdfModal = false; historyPdfUrl = null; }} aria-label="닫기"></button>
+		</form>
 	</dialog>
 {/if}
 

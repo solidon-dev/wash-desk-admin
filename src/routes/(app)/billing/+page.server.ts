@@ -1,4 +1,5 @@
-import type { PageServerLoad } from './$types';
+import { fail } from '@sveltejs/kit';
+import type { Actions, PageServerLoad } from './$types';
 
 // ── 타입 ──────────────────────────────────────────────────────────────────
 export interface ShipoutLog {
@@ -161,10 +162,137 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		};
 	});
 
+	// ── 7. 발행 내역 조회 ─────────────────────────────────────────────────
+	const { data: invoiceHistoryRaw } = await locals.supabase
+		.from('invoices')
+		.select(`
+			id, period_start, period_end,
+			subtotal, vat, jeolsa, total, status,
+			created_at, cancelled_at,
+			snapshot_factory, snapshot_client,
+			invoice_items ( id, item_name_ko, category_name, quantity, unit_price, amount, sort_order )
+		`)
+		.eq('client_id', selectedClientId)
+		.order('created_at', { ascending: false })
+		.limit(50);
+
 	return {
 		clients:          clientList,
 		selectedClientId,
 		shipoutLogs,
 		categories:       categoryList,
+		invoiceHistory:   invoiceHistoryRaw ?? [],
 	};
+};
+
+// ── actions ───────────────────────────────────────────────────────────────
+export const actions: Actions = {
+
+	// ── 청구서 발행 ─────────────────────────────────────────────────────
+	issueInvoice: async ({ request, locals }) => {
+		const myRole      = locals.session?.role;
+		const myFactoryId = (locals.session?.factory_id ?? null) as string | null;
+		const myUserId    = locals.session?.user?.id ?? null;
+
+		if (!myFactoryId || !myUserId) {
+			return fail(401, { error: '인증 정보가 없습니다.' });
+		}
+		if (myRole === 'worker') {
+			return fail(403, { error: '권한이 없습니다.' });
+		}
+
+		const fd = await request.formData();
+
+		const client_id       = fd.get('client_id') as string;
+		const period_from     = fd.get('period_from') as string;
+		const period_to       = fd.get('period_to') as string;
+		const subtotal        = parseInt(fd.get('subtotal') as string, 10);
+		const vat             = parseInt(fd.get('vat') as string, 10);
+		const jeolsa          = parseInt(fd.get('jeolsa') as string, 10);
+		const total           = parseInt(fd.get('total') as string, 10);
+		const snapshot_factory = JSON.parse(fd.get('snapshot_factory') as string);
+		const snapshot_client  = JSON.parse(fd.get('snapshot_client') as string);
+		const items            = JSON.parse(fd.get('items') as string) as {
+			category: string;
+			itemName: string;
+			itemSortOrder: number;
+			quantity: number;
+			unitPrice: number;
+			amount: number;
+		}[];
+		// 1. invoices INSERT
+		const { data: invoice, error: invoiceError } = await locals.supabase
+			.from('invoices')
+			.insert({
+				client_id,
+				factory_id:      myFactoryId,
+				created_by:      myUserId,
+				period_start:    period_from,
+				period_end:      period_to,
+				subtotal,
+				vat,
+				jeolsa,
+				total,
+				discount:        0,
+				snapshot_factory,
+				snapshot_client,
+				status:          'issued',
+			})
+			.select('id')
+			.single();
+
+		if (invoiceError || !invoice) {
+			return fail(500, { error: '청구서 저장 실패: ' + (invoiceError?.message ?? '') });
+		}
+
+		const invoiceId = invoice.id;
+
+		// 2. invoice_items INSERT
+		const invoiceItemRows = items.map((line, idx) => ({
+			invoice_id:    invoiceId,
+			item_name_ko:  line.itemName,
+			category_name: line.category,
+			quantity:      line.quantity,
+			unit_price:    line.unitPrice,
+			amount:        line.amount,
+			sort_order:    idx,
+		}));
+
+		await locals.supabase.from('invoice_items').insert(invoiceItemRows);
+
+		return { success: true, invoiceId };
+	},
+
+	// ── 청구서 취소 ─────────────────────────────────────────────────────
+	cancelInvoice: async ({ request, locals }) => {
+		const myRole   = locals.session?.role;
+		const myUserId = locals.session?.user?.id ?? null;
+
+		if (!myUserId) {
+			return fail(401, { error: '인증 정보가 없습니다.' });
+		}
+		if (myRole === 'worker') {
+			return fail(403, { error: '권한이 없습니다.' });
+		}
+
+		const fd         = await request.formData();
+		const invoice_id = fd.get('invoice_id') as string;
+
+		const { error } = await locals.supabase
+			.from('invoices')
+			.update({
+				status:       'cancelled',
+				cancelled_at: new Date().toISOString(),
+				cancelled_by: myUserId,
+			})
+			.eq('id', invoice_id);
+
+		if (error) {
+			return fail(500, { error: '취소 실패: ' + error.message });
+		}
+
+		return { success: true };
+	},
+
+
 };

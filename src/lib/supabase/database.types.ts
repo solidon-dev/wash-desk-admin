@@ -271,6 +271,7 @@ export type Database = {
           id: string
           invoice_id: string
           mime_type: string | null
+          storage_path: string | null
         }
         Insert: {
           created_at?: string
@@ -279,6 +280,7 @@ export type Database = {
           id?: string
           invoice_id: string
           mime_type?: string | null
+          storage_path?: string | null
         }
         Update: {
           created_at?: string
@@ -287,6 +289,7 @@ export type Database = {
           id?: string
           invoice_id?: string
           mime_type?: string | null
+          storage_path?: string | null
         }
         Relationships: [
           {
@@ -348,90 +351,61 @@ export type Database = {
           },
         ]
       }
-      invoice_memos: {
-        Row: {
-          content: string | null
-          created_at: string
-          created_by: string | null
-          id: string
-          invoice_id: string
-          title: string | null
-        }
-        Insert: {
-          content?: string | null
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          invoice_id: string
-          title?: string | null
-        }
-        Update: {
-          content?: string | null
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          invoice_id?: string
-          title?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "invoice_memos_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "invoice_memos_invoice_id_fkey"
-            columns: ["invoice_id"]
-            isOneToOne: false
-            referencedRelation: "invoices"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
+
       invoices: {
         Row: {
+          cancelled_at: string | null
+          cancelled_by: string | null
           client_id: string
           created_at: string
           created_by: string | null
           discount: number
           factory_id: string
           id: string
+          jeolsa: number
           period_end: string
           period_start: string
           snapshot_client: Json | null
           snapshot_factory: Json | null
+          status: string
           subtotal: number
           total: number
           vat: number
         }
         Insert: {
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           client_id: string
           created_at?: string
           created_by?: string | null
           discount?: number
           factory_id: string
           id?: string
+          jeolsa?: number
           period_end: string
           period_start: string
           snapshot_client?: Json | null
           snapshot_factory?: Json | null
+          status?: string
           subtotal?: number
           total?: number
           vat?: number
         }
         Update: {
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           client_id?: string
           created_at?: string
           created_by?: string | null
           discount?: number
           factory_id?: string
           id?: string
+          jeolsa?: number
           period_end?: string
           period_start?: string
           snapshot_client?: Json | null
           snapshot_factory?: Json | null
+          status?: string
           subtotal?: number
           total?: number
           vat?: number
