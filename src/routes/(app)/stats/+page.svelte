@@ -73,32 +73,33 @@
 	}
 
 	// ─── 데이터 fetch ────────────────────────────────────────────────────────
-	// fromDate / toDate가 이미 fetch된 범위를 벗어나면 다시 fetch
-	async function fetchIfNeeded(from: string, to: string) {
-		// 기존 fetch 범위가 현재 요청 범위를 커버하면 skip
+	// fromDate / toDate 변경 감지 → 필요 시 재fetch
+	// $effect 안에서 직접 읽어야 Svelte 반응성 추적이 됨
+	$effect(() => {
+		const from = fromDate;
+		const to   = toDate;
+
+		// 이미 fetch된 범위가 커버하면 skip
 		if (fetchedFrom && fetchedTo && from >= fetchedFrom && to <= fetchedTo) return;
 
-		// 요청 범위를 여유 있게 확장해서 fetch (앞뒤 1달 버퍼 추가)
-		const expandedFrom = DATA_FROM < from ? DATA_FROM : from;
-		const expandedTo   = TODAY > to       ? TODAY     : to;
+		// 항상 DATA_FROM ~ TODAY 전체를 한 번에 가져와 캐시
+		const expandedFrom = DATA_FROM;
+		const expandedTo   = TODAY;
 
 		loading = true;
-		error = null;
-		try {
-			const data = await getStatsData(expandedFrom, expandedTo);
-			allShipouts  = data.shipouts;
-			fetchedFrom  = expandedFrom;
-			fetchedTo    = expandedTo;
-		} catch (e) {
-			error = e instanceof Error ? e.message : '데이터를 불러오지 못했습니다';
-		} finally {
-			loading = false;
-		}
-	}
-
-	// 초기 로드
-	$effect(() => {
-		fetchIfNeeded(fromDate, toDate);
+		error   = null;
+		getStatsData(expandedFrom, expandedTo)
+			.then((data) => {
+				allShipouts = data.shipouts;
+				fetchedFrom = expandedFrom;
+				fetchedTo   = expandedTo;
+			})
+			.catch((e: unknown) => {
+				error = e instanceof Error ? e.message : '데이터를 불러오지 못했습니다';
+			})
+			.finally(() => {
+				loading = false;
+			});
 	});
 
 	// ─── 파생 데이터 ─────────────────────────────────────────────────────────
