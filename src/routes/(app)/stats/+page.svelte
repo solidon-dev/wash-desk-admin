@@ -6,7 +6,8 @@
 	import DonutChart from './_components/DonutChart.svelte';
 	import StackBarChart from './_components/StackBarChart.svelte';
 
-	import { shipments, clients, CATEGORY_KEYS, CATEGORY_COLORS, CATEGORY_LABELS } from './_lib/data';
+	import { getStatsData } from '$lib/api/stats';
+	import type { StatsShipout } from '$lib/api/stats';
 	import {
 		calcStats,
 		calcDaily,
@@ -20,108 +21,118 @@
 		fmtAmt,
 		fmtAmtFull,
 		pad,
+		CATEGORY_KEYS,
+		CATEGORY_COLORS,
 	} from './_lib/stats';
 
 	// ─── 기준일 ───────────────────────────────────────────────────────────────
-	const NOW = new Date('2026-05-12T00:00:00');
-	const TODAY = `${NOW.getFullYear()}-${pad(NOW.getMonth() + 1)}-${pad(NOW.getDate())}`;
-	const THIS_YEAR = NOW.getFullYear();
+	const NOW        = new Date();
+	const TODAY      = `${NOW.getFullYear()}-${pad(NOW.getMonth() + 1)}-${pad(NOW.getDate())}`;
+	const THIS_YEAR  = NOW.getFullYear();
 	const THIS_MONTH = NOW.getMonth() + 1;
 	const MONTH_FROM = `${THIS_YEAR}-${pad(THIS_MONTH)}-01`;
 	const MONTH_TO   = `${THIS_YEAR}-${pad(THIS_MONTH)}-${pad(new Date(THIS_YEAR, THIS_MONTH, 0).getDate())}`;
+	const DATA_FROM  = '2025-01-01';
 
 	// ─── 상태 ────────────────────────────────────────────────────────────────
-	let fromDate = $state(MONTH_FROM);
-	let toDate   = $state(MONTH_TO);
+	let fromDate       = $state(MONTH_FROM);
+	let toDate         = $state(MONTH_TO);
 	let filterClientId = $state('');
-	let metric = $state<'qty' | 'amount'>('amount');
+	let metric         = $state<'qty' | 'amount'>('amount');
+	let loading        = $state(false);
+	let error          = $state<string | null>(null);
 
-	// 데이터 폭 = 2025-01 ~ 2026-05
-	const DATA_FROM = '2025-01-01';
-	const DATA_TO   = TODAY;
+	// 전체 기간 데이터 캐시 (필터링은 클라이언트에서)
+	// 범위 변경 시 필요한 구간만 fetch
+	let allShipouts    = $state<StatsShipout[]>([]);
+	let fetchedFrom    = $state('');
+	let fetchedTo      = $state('');
 
 	type PresetKey = '7d' | '30d' | 'month' | 'ytd' | 'all';
 	let activePreset = $state<PresetKey>('month');
 
 	function applyPreset(k: PresetKey) {
 		activePreset = k;
-		if (k === '7d') {
-			fromDate = offsetDate(NOW, -6);
-			toDate   = TODAY;
-		} else if (k === '30d') {
-			fromDate = offsetDate(NOW, -29);
-			toDate   = TODAY;
-		} else if (k === 'month') {
-			fromDate = MONTH_FROM;
-			toDate   = MONTH_TO;
-		} else if (k === 'ytd') {
-			fromDate = `${THIS_YEAR}-01-01`;
-			toDate   = TODAY;
-		} else {
-			fromDate = DATA_FROM;
-			toDate   = DATA_TO;
-		}
+		if (k === '7d')        { fromDate = offsetDate(NOW, -6);       toDate = TODAY; }
+		else if (k === '30d')  { fromDate = offsetDate(NOW, -29);      toDate = TODAY; }
+		else if (k === 'month'){ fromDate = MONTH_FROM;                 toDate = MONTH_TO; }
+		else if (k === 'ytd')  { fromDate = `${THIS_YEAR}-01-01`;      toDate = TODAY; }
+		else                   { fromDate = DATA_FROM;                  toDate = TODAY; }
 	}
 
 	// ─── 데이트픽커 ──────────────────────────────────────────────────────────
 	type PickerTarget = 'from' | 'to';
-	let pickerOpen = $state(false);
+	let pickerOpen   = $state(false);
 	let pickerTarget = $state<PickerTarget>('from');
 	function openPicker(t: PickerTarget) { pickerTarget = t; pickerOpen = true; }
 	function handlePickerSelect(_t: 'from' | 'to' | 'single', ymd: string) {
 		if (pickerTarget === 'from') { fromDate = ymd; if (ymd > toDate) toDate = ymd; }
-		else                          { toDate = ymd; if (ymd < fromDate) fromDate = ymd; }
-		activePreset = '' as unknown as PresetKey; // 수동 변경 시 프리셋 해제
+		else                          { toDate = ymd;   if (ymd < fromDate) fromDate = ymd; }
+		activePreset = '' as unknown as PresetKey;
 		pickerOpen = false;
 	}
+
+	// ─── 데이터 fetch ────────────────────────────────────────────────────────
+	// fromDate / toDate가 이미 fetch된 범위를 벗어나면 다시 fetch
+	async function fetchIfNeeded(from: string, to: string) {
+		// 기존 fetch 범위가 현재 요청 범위를 커버하면 skip
+		if (fetchedFrom && fetchedTo && from >= fetchedFrom && to <= fetchedTo) return;
+
+		// 요청 범위를 여유 있게 확장해서 fetch (앞뒤 1달 버퍼 추가)
+		const expandedFrom = DATA_FROM < from ? DATA_FROM : from;
+		const expandedTo   = TODAY > to       ? TODAY     : to;
+
+		loading = true;
+		error = null;
+		try {
+			const data = await getStatsData(expandedFrom, expandedTo);
+			allShipouts  = data.shipouts;
+			fetchedFrom  = expandedFrom;
+			fetchedTo    = expandedTo;
+		} catch (e) {
+			error = e instanceof Error ? e.message : '데이터를 불러오지 못했습니다';
+		} finally {
+			loading = false;
+		}
+	}
+
+	// 초기 로드
+	$effect(() => {
+		fetchIfNeeded(fromDate, toDate);
+	});
 
 	// ─── 파생 데이터 ─────────────────────────────────────────────────────────
 	const cid = $derived(filterClientId || undefined);
 
-	const periodStats = $derived(calcStats(shipments, fromDate, toDate, cid));
-	const yearStats   = $derived(calcStats(shipments, `${THIS_YEAR}-01-01`, `${THIS_YEAR}-12-31`, cid));
+	const periodStats = $derived(calcStats(allShipouts, fromDate, toDate, cid));
+	const yearStats   = $derived(calcStats(allShipouts, `${THIS_YEAR}-01-01`, `${THIS_YEAR}-12-31`, cid));
 
-	const prev = $derived(prevPeriod(fromDate, toDate));
-	const prevStats = $derived(calcStats(shipments, prev.from, prev.to, cid));
+	const prev      = $derived(prevPeriod(fromDate, toDate));
+	const prevStats = $derived(calcStats(allShipouts, prev.from, prev.to, cid));
 
 	const periodDays = $derived(daysBetween(fromDate, toDate));
-	// 추이 모드: 60일 이하 → 일별, 그 이상 → 월별
-	const trendMode = $derived(periodDays <= 60 ? 'daily' : 'monthly');
+	const trendMode  = $derived(periodDays <= 60 ? 'daily' : 'monthly');
 
-	const dailyCurr = $derived(calcDaily(shipments, fromDate, toDate, cid));
-	const dailyPrev = $derived(calcDaily(shipments, prev.from, prev.to, cid));
-	const monthlyCurr = $derived(calcRangeMonthly(shipments, fromDate, toDate, cid));
-	const monthlyPrev = $derived(calcRangeMonthly(shipments, prev.from, prev.to, cid));
+	const dailyCurr   = $derived(calcDaily(allShipouts, fromDate, toDate, cid));
+	const dailyPrev   = $derived(calcDaily(allShipouts, prev.from, prev.to, cid));
+	const monthlyCurr = $derived(calcRangeMonthly(allShipouts, fromDate, toDate, cid));
+	const monthlyPrev = $derived(calcRangeMonthly(allShipouts, prev.from, prev.to, cid));
 
-	// 라인 차트 시리즈
 	const trendSeries = $derived(
 		trendMode === 'daily'
 			? [
-				{ label: '현재',
-				  color: metric === 'amount' ? 'var(--color-success)' : 'var(--color-primary)',
-				  dash: false,
-				  data: dailyCurr.map((r) => (metric === 'amount' ? r.amount : r.qty)) },
-				{ label: '직전',
-				  color: 'var(--color-base-content)',
-				  dash: true,
-				  data: dailyPrev.map((r) => (metric === 'amount' ? r.amount : r.qty)) },
+				{ label: '현재',  color: metric === 'amount' ? 'var(--color-success)' : 'var(--color-primary)', dash: false, data: dailyCurr.map((r) => (metric === 'amount' ? r.amount : r.qty)) },
+				{ label: '직전',  color: 'var(--color-base-content)', dash: true,  data: dailyPrev.map((r) => (metric === 'amount' ? r.amount : r.qty)) },
 			]
 			: [
-				{ label: '현재',
-				  color: metric === 'amount' ? 'var(--color-success)' : 'var(--color-primary)',
-				  dash: false,
-				  data: monthlyCurr.map((r) => (metric === 'amount' ? r.amount : r.qty)) },
-				{ label: '직전',
-				  color: 'var(--color-base-content)',
-				  dash: true,
-				  data: monthlyPrev.map((r) => (metric === 'amount' ? r.amount : r.qty)) },
+				{ label: '현재',  color: metric === 'amount' ? 'var(--color-success)' : 'var(--color-primary)', dash: false, data: monthlyCurr.map((r) => (metric === 'amount' ? r.amount : r.qty)) },
+				{ label: '직전',  color: 'var(--color-base-content)', dash: true,  data: monthlyPrev.map((r) => (metric === 'amount' ? r.amount : r.qty)) },
 			]
 	);
 
-	// X 축 레이블 (조밀하면 일부만)
 	const trendLabels = $derived.by(() => {
 		if (trendMode === 'daily') {
-			const labels = dailyCurr.map((r) => r.date.slice(5)); // 'MM-DD'
+			const labels = dailyCurr.map((r) => r.date.slice(5));
 			const step = labels.length <= 14 ? 1 : labels.length <= 31 ? 3 : 5;
 			return labels.map((l, i) => (i % step === 0 || i === labels.length - 1 ? l : ''));
 		}
@@ -129,20 +140,17 @@
 	});
 
 	// 카테고리 도넛
-	const catTotal = $derived(periodStats.byCategory.reduce((s, r) => s + r.qty, 0));
-	const donutSegments = $derived(
-		periodStats.byCategory.map((r) => ({ label: r.label, value: r.qty, color: r.color })),
-	);
+	const catTotal      = $derived(periodStats.byCategory.reduce((s, r) => s + r.qty, 0));
+	const donutSegments = $derived(periodStats.byCategory.map((r) => ({ label: r.label, value: r.qty, color: r.color })));
+	const catSorted     = $derived([...periodStats.byCategory].sort((a, b) => b.qty - a.qty));
 
-	// 거래처 색상 (semantic 6색 순환)
+	// 거래처 색상 순환
 	const CC = [
-		'var(--color-primary)',
-		'var(--color-secondary)',
-		'var(--color-accent)',
-		'var(--color-success)',
-		'var(--color-warning)',
-		'var(--color-info)',
+		'var(--color-primary)', 'var(--color-secondary)', 'var(--color-accent)',
+		'var(--color-success)', 'var(--color-warning)',   'var(--color-info)',
 	];
+
+	// 거래처 바 차트
 	const clientBars = $derived(
 		periodStats.byClient.map((c, i) => ({
 			label: c.name,
@@ -151,59 +159,60 @@
 		})),
 	);
 
-	// 연간 카테고리 스택 (월별)
-	const stackData = $derived(calcMonthlyCategoryStack(shipments, THIS_YEAR, cid));
+	// 연간 카테고리 스택
+	const stackData   = $derived(calcMonthlyCategoryStack(allShipouts, THIS_YEAR, cid));
 	const stackSeries = $derived(
 		CATEGORY_KEYS.map((k) => ({
-			label: CATEGORY_LABELS[k],
+			label: k,
 			color: CATEGORY_COLORS[k],
-			data: stackData[k] ?? new Array(12).fill(0),
+			data:  stackData[k] ?? new Array(12).fill(0),
 		})),
 	);
 
 	// KPI diff
-	const dCount = $derived(diff(periodStats.count,  prevStats.count));
-	const dQty   = $derived(diff(periodStats.qty,    prevStats.qty));
-	const dAmt   = $derived(diff(periodStats.amount, prevStats.amount));
-	const dClient= $derived(diff(periodStats.byClient.length, prevStats.byClient.length));
+	const dCount  = $derived(diff(periodStats.count,              prevStats.count));
+	const dQty    = $derived(diff(periodStats.qty,                prevStats.qty));
+	const dAmt    = $derived(diff(periodStats.amount,             prevStats.amount));
+	const dClient = $derived(diff(periodStats.byClient.length,    prevStats.byClient.length));
 
 	function dcls(c: string) {
 		return c === 'up' ? 'text-success' : c === 'down' ? 'text-error' : 'text-base-content/40';
 	}
 
-	// 일평균 / 건당
-	const avgDaily = $derived(periodDays > 0 ? Math.round(periodStats.qty / periodDays) : 0);
-	const avgPerOrder = $derived(periodStats.count > 0 ? Math.round(periodStats.qty / periodStats.count) : 0);
+	// 부가 KPI
+	const avgDaily    = $derived(periodDays > 0         ? Math.round(periodStats.qty   / periodDays)         : 0);
+	const avgPerOrder = $derived(periodStats.count > 0  ? Math.round(periodStats.qty   / periodStats.count)  : 0);
 
-	// 카테고리 점유율 정렬
-	const catSorted = $derived([...periodStats.byCategory].sort((a, b) => b.qty - a.qty));
-
-	// 스파크라인 헬퍼
+	// 스파크라인
 	function sparklinePath(values: number[], w = 100, h = 24): string {
 		if (values.length === 0) return '';
 		const max = Math.max(...values, 1);
-		const n = values.length;
-		return values
-			.map((v, i) => {
-				const x = n === 1 ? w / 2 : (i / (n - 1)) * w;
-				const y = h - (v / max) * h;
-				return `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
-			})
-			.join(' ');
+		const n   = values.length;
+		return values.map((v, i) => {
+			const x = n === 1 ? w / 2 : (i / (n - 1)) * w;
+			const y = h - (v / max) * h;
+			return `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
+		}).join(' ');
 	}
-	const sparkQty = $derived(dailyCurr.map((r) => r.qty));
-	const sparkAmt = $derived(dailyCurr.map((r) => r.amount));
+
+	const sparkQty   = $derived(dailyCurr.map((r) => r.qty));
+	const sparkAmt   = $derived(dailyCurr.map((r) => r.amount));
 	const sparkCount = $derived(
 		(() => {
-			// 일별 처리건수 (출고 row 수)
 			const idx: Record<string, number> = Object.fromEntries(dailyCurr.map((r) => [r.date, 0]));
-			for (const s of shipments) {
-				if (cid && s.clientId !== cid) continue;
-				const d = s.shippedAt.slice(0, 10);
+			for (const s of allShipouts) {
+				if (cid && s.client_id !== cid) continue;
+				const d = s.created_at.slice(0, 10);
 				if (idx[d] != null) idx[d] += 1;
 			}
 			return dailyCurr.map((r) => idx[r.date]);
 		})(),
+	);
+
+	// 거래처 목록 (셀렉트박스용, DB 데이터에서 추출)
+	const clientList = $derived(
+		[...new Map(allShipouts.map((s) => [s.client_id, { id: s.client_id, name: s.client_name }])).values()]
+			.sort((a, b) => a.name.localeCompare(b.name, 'ko')),
 	);
 </script>
 
@@ -253,15 +262,19 @@
 		</div>
 
 		<!-- 거래처 -->
-		<select bind:value={filterClientId}
-			class="select select-bordered select-sm h-7 min-h-0 text-xs w-32">
+		<select bind:value={filterClientId} class="select select-bordered select-sm h-7 min-h-0 text-xs w-36">
 			<option value="">전체 거래처</option>
-			{#each clients as c (c.id)}
+			{#each clientList as c (c.id)}
 				<option value={c.id}>{c.name}</option>
 			{/each}
 		</select>
 
 		<div class="flex-1"></div>
+
+		<!-- 로딩 인디케이터 -->
+		{#if loading}
+			<span class="loading loading-spinner loading-xs text-primary"></span>
+		{/if}
 
 		<!-- 비교 표시 -->
 		<div class="text-[10px] text-base-content/40 hidden md:flex items-center gap-1">
@@ -272,15 +285,24 @@
 
 	<!-- ═══════════ 본문 ═══════════ -->
 	<div class="flex-1 min-h-0 overflow-y-auto px-5 py-4">
+
+		<!-- 에러 -->
+		{#if error}
+			<div class="alert alert-error mb-3 text-sm">
+				<Icon icon="heroicons:exclamation-triangle" class="w-5 h-5" />
+				{error}
+			</div>
+		{/if}
+
 		<div class="flex flex-col gap-3 min-h-full">
 
 			<!-- ── KPI 카드 4개 ── -->
 			<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
 				{#each [
-					{ label: '매출', val: fmtAmt(periodStats.amount), unit: '원', cls: 'text-success', d: dAmt, spark: sparkAmt, color: 'var(--color-success)', icon: 'heroicons:banknotes' },
-					{ label: '출고량', val: fmtQty(periodStats.qty), unit: '개', cls: 'text-primary', d: dQty, spark: sparkQty, color: 'var(--color-primary)', icon: 'heroicons:cube' },
-					{ label: '처리건수', val: fmtQty(periodStats.count), unit: '건', cls: 'text-base-content', d: dCount, spark: sparkCount, color: 'var(--color-base-content)', icon: 'heroicons:document-check' },
-					{ label: '활성 거래처', val: String(periodStats.byClient.length), unit: '개사', cls: 'text-accent', d: dClient, spark: [] as number[], color: 'var(--color-accent)', icon: 'heroicons:building-storefront' },
+					{ label: '매출',       val: fmtAmt(periodStats.amount),             unit: '원',   cls: 'text-success',      d: dAmt,    spark: sparkAmt,   color: 'var(--color-success)',      icon: 'heroicons:banknotes' },
+					{ label: '출고량',     val: fmtQty(periodStats.qty),                unit: '개',   cls: 'text-primary',      d: dQty,    spark: sparkQty,   color: 'var(--color-primary)',      icon: 'heroicons:cube' },
+					{ label: '처리건수',   val: fmtQty(periodStats.count),              unit: '건',   cls: 'text-base-content', d: dCount,  spark: sparkCount, color: 'var(--color-base-content)', icon: 'heroicons:document-check' },
+					{ label: '활성 거래처',val: String(periodStats.byClient.length),    unit: '개사', cls: 'text-accent',       d: dClient, spark: [] as number[], color: 'var(--color-accent)',   icon: 'heroicons:building-storefront' },
 				] as k (k.label)}
 					<div class="bg-base-100 rounded-xl p-4 shadow-sm relative overflow-hidden">
 						<div class="flex items-start justify-between mb-1">
@@ -310,8 +332,6 @@
 
 			<!-- ── 추이 + 카테고리 ── -->
 			<div class="grid grid-cols-1 lg:grid-cols-3 gap-3" style="min-height:260px">
-
-				<!-- 추이 라인 (2/3) -->
 				<div class="lg:col-span-2 bg-base-100 rounded-xl shadow-sm flex flex-col overflow-hidden">
 					<div class="px-4 pt-3 pb-2 border-b border-base-200 shrink-0 flex items-center justify-between">
 						<div>
@@ -320,12 +340,8 @@
 						</div>
 						<div class="flex items-center gap-3">
 							<div class="flex gap-2 text-[10px] text-base-content/40">
-								<span class="flex items-center gap-1">
-									<span class="inline-block h-1.5 w-3 rounded {metric === 'amount' ? 'bg-success' : 'bg-primary'}"></span>현재
-								</span>
-								<span class="flex items-center gap-1">
-									<span class="inline-block h-1.5 w-3 rounded bg-base-content/30"></span>직전
-								</span>
+								<span class="flex items-center gap-1"><span class="inline-block h-1.5 w-3 rounded {metric === 'amount' ? 'bg-success' : 'bg-primary'}"></span>현재</span>
+								<span class="flex items-center gap-1"><span class="inline-block h-1.5 w-3 rounded bg-base-content/30"></span>직전</span>
 							</div>
 							<div class="join">
 								<button type="button" class="join-item btn btn-xs h-6 px-2 text-[10px] font-bold {metric === 'amount' ? 'btn-primary' : 'btn-ghost border border-base-300'}" onclick={() => (metric = 'amount')}>매출</button>
@@ -334,7 +350,9 @@
 						</div>
 					</div>
 					<div class="flex-1 min-h-0 px-2 pb-1">
-						{#if trendSeries[0].data.every((v) => v === 0)}
+						{#if loading}
+							<div class="h-full flex items-center justify-center"><span class="loading loading-spinner loading-sm text-primary"></span></div>
+						{:else if trendSeries[0].data.every((v) => v === 0)}
 							<div class="h-full flex items-center justify-center text-sm text-base-content/30">데이터 없음</div>
 						{:else}
 							<LineChart series={trendSeries} labels={trendLabels} showArea={true} />
@@ -342,7 +360,7 @@
 					</div>
 				</div>
 
-				<!-- 카테고리 도넛 (1/3) -->
+				<!-- 카테고리 도넛 -->
 				<div class="bg-base-100 rounded-xl shadow-sm flex flex-col overflow-hidden">
 					<div class="px-4 pt-3 pb-2 border-b border-base-200 shrink-0 flex items-center justify-between">
 						<p class="text-[11px] font-bold uppercase tracking-widest text-base-content/40">카테고리 구성</p>
@@ -424,7 +442,7 @@
 					{/if}
 				</div>
 
-				<!-- 품목 TOP -->
+				<!-- 품목 TOP 10 -->
 				<div class="bg-base-100 rounded-xl shadow-sm flex flex-col overflow-hidden">
 					<div class="px-4 pt-3 pb-2 border-b border-base-200 shrink-0 flex items-center justify-between">
 						<p class="text-[11px] font-bold uppercase tracking-widest text-base-content/40">품목 TOP 10</p>
@@ -484,13 +502,12 @@
 					<div class="px-4 pt-3 pb-2 border-b border-base-200 shrink-0">
 						<div class="flex items-center justify-between">
 							<p class="text-[11px] font-bold uppercase tracking-widest text-base-content/40">{THIS_YEAR}년 월별 카테고리</p>
-							<span class="text-[10px] text-base-content/30">전체 누적</span>
+							<span class="text-[10px] text-base-content/30">연간 누적</span>
 						</div>
 						<div class="flex flex-wrap gap-x-2 gap-y-0.5 mt-1.5">
 							{#each CATEGORY_KEYS as k (k)}
 								<span class="flex items-center gap-1 text-[9px] text-base-content/40">
-									<span class="h-1.5 w-1.5 rounded-sm" style="background:{CATEGORY_COLORS[k]}"></span>
-									{CATEGORY_LABELS[k]}
+									<span class="h-1.5 w-1.5 rounded-sm" style="background:{CATEGORY_COLORS[k]}"></span>{k}
 								</span>
 							{/each}
 						</div>
@@ -526,9 +543,7 @@
 								{@const yQty = yearStats.byClient.find((c) => c.id === row.id)?.qty ?? 0}
 								{@const yPct = yearStats.qty > 0 ? (yQty / yearStats.qty) * 100 : 0}
 								<tr class="hover:bg-base-200/40">
-									<td>
-										<span class="h-2.5 w-2.5 rounded-full block" style="background:{CC[i % CC.length]}"></span>
-									</td>
+									<td><span class="h-2.5 w-2.5 rounded-full block" style="background:{CC[i % CC.length]}"></span></td>
 									<td class="text-xs font-semibold">{row.name}</td>
 									<td class="text-right text-[11px] text-base-content/60 tabular-nums">{row.count}</td>
 									<td class="text-right text-xs font-bold tabular-nums">{fmtQty(row.qty)}</td>
