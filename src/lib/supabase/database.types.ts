@@ -263,44 +263,7 @@ export type Database = {
           },
         ]
       }
-      invoice_attachments: {
-        Row: {
-          created_at: string
-          file_name: string | null
-          file_url: string
-          id: string
-          invoice_id: string
-          mime_type: string | null
-          storage_path: string | null
-        }
-        Insert: {
-          created_at?: string
-          file_name?: string | null
-          file_url: string
-          id?: string
-          invoice_id: string
-          mime_type?: string | null
-          storage_path?: string | null
-        }
-        Update: {
-          created_at?: string
-          file_name?: string | null
-          file_url?: string
-          id?: string
-          invoice_id?: string
-          mime_type?: string | null
-          storage_path?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "invoice_attachments_invoice_id_fkey"
-            columns: ["invoice_id"]
-            isOneToOne: false
-            referencedRelation: "invoices"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
+
       invoice_items: {
         Row: {
           amount: number

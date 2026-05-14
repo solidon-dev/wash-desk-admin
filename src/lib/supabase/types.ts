@@ -28,7 +28,7 @@ export type Client           = Tables<'clients'>;
 export type Factory          = Tables<'factories'>;
 export type Inventory        = Tables<'inventory'>;
 export type InventoryLog     = Tables<'inventory_logs'>;
-export type InvoiceAttachment = Tables<'invoice_attachments'>;
+
 export type InvoiceItem      = Tables<'invoice_items'>;
 
 export type Invoice          = Tables<'invoices'>;
@@ -46,7 +46,7 @@ export type ClientInsert            = TablesInsert<'clients'>;
 export type FactoryInsert           = TablesInsert<'factories'>;
 export type InventoryInsert         = TablesInsert<'inventory'>;
 export type InventoryLogInsert      = TablesInsert<'inventory_logs'>;
-export type InvoiceAttachmentInsert = TablesInsert<'invoice_attachments'>;
+
 export type InvoiceItemInsert       = TablesInsert<'invoice_items'>;
 
 export type InvoiceInsert           = TablesInsert<'invoices'>;
@@ -64,7 +64,7 @@ export type ClientUpdate            = TablesUpdate<'clients'>;
 export type FactoryUpdate           = TablesUpdate<'factories'>;
 export type InventoryUpdate         = TablesUpdate<'inventory'>;
 export type InventoryLogUpdate      = TablesUpdate<'inventory_logs'>;
-export type InvoiceAttachmentUpdate = TablesUpdate<'invoice_attachments'>;
+
 export type InvoiceItemUpdate       = TablesUpdate<'invoice_items'>;
 
 export type InvoiceUpdate           = TablesUpdate<'invoices'>;
