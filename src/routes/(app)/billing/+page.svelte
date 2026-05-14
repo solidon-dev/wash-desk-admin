@@ -38,8 +38,8 @@
 
 	let { data }: { data: PageData & BillingPageData } = $props();
 
-	type InvoiceLine    = { category: string; catSortOrder: number; itemName: string; itemSortOrder: number; quantity: number; unitPrice: number; amount: number; dateMin: string; dateMax: string; };
-	type ShipmentItem   = { itemName: string; category: string; itemSortOrder: number; quantity: number; unitPrice: number };
+	type InvoiceLine    = { category: string; catSortOrder: number; itemName: string; itemSortOrder: number; quantity: number; unitPrice: number; amount: number; priceFrom: string | null; priceTo: string | null; };
+	type ShipmentItem   = { itemName: string; category: string; itemSortOrder: number; quantity: number; unitPrice: number; priceFrom: string | null; priceTo: string | null; };
 	type Shipment       = { id: string; clientId: string; shippedAt: string; items: ShipmentItem[] };
 
 	// 카테고리 동적 색상 팔레트
@@ -80,6 +80,8 @@
 					itemSortOrder: log.item_sort_order,
 					quantity:      log.quantity,
 					unitPrice:     log.unit_price,
+					priceFrom:     log.price_from ?? null,
+					priceTo:       log.price_to ?? null,
 				});
 		}
 		return Array.from(map.values());
@@ -109,13 +111,11 @@
 					quantity:  0,
 					unitPrice: item.unitPrice,
 					amount:    0,
-					dateMin:   s.shippedAt.slice(0, 10),
-					dateMax:   s.shippedAt.slice(0, 10),
+					priceFrom: item.priceFrom,
+					priceTo:   item.priceTo,
 				};
 				map[key].quantity += item.quantity;
 				map[key].amount += item.quantity * map[key].unitPrice;
-				if (s.shippedAt < map[key].dateMin) map[key].dateMin = s.shippedAt.slice(0, 10);
-				if (s.shippedAt > map[key].dateMax) map[key].dateMax = s.shippedAt.slice(0, 10);
 			}
 		}
 		return Object.values(map).sort((a, b) => {
@@ -127,6 +127,14 @@
 	// ── 포맷 함수 ──
 	function formatDate(d: string) { return d.replace(/-/g, '.').slice(0, 10); }
 	function formatMoney(n: number) { return n.toLocaleString('ko-KR') + '원'; }
+	function formatPriceRange(from: string | null, to: string | null): string {
+		const f = from ? from.slice(5).replace('-', '.') : null;
+		const t = to   ? to.slice(5).replace('-', '.')   : null;
+		if (f && t)  return `${f}~${t}`;
+		if (f && !t) return `${f}~`;
+		if (!f && t) return `~${t}`;
+		return '';
+	}
 
 	// ── 탭 ──
 	type BillingTab = 'invoice' | 'statement' | 'history';
@@ -687,13 +695,10 @@
 			head: [['품목명', '구분', '수량', '단가', '금액']],
 			body: lines.map(l => {
 				const hasDup = lines.filter(x => x.itemName === l.itemName).length > 1;
-				const dateLabel = hasDup
-					? (l.dateMin === l.dateMax
-						? ` (${l.dateMin.slice(5).replace('-', '.')})`
-						: ` (${l.dateMin.slice(5).replace('-', '.')}~${l.dateMax.slice(5).replace('-', '.')})`)
-					: '';
+				const rangeLabel = formatPriceRange(l.priceFrom, l.priceTo);
+				const nameCell = hasDup && rangeLabel ? `${l.itemName} (${rangeLabel})` : l.itemName;
 				return [
-					l.itemName + dateLabel,
+					nameCell,
 					catLabelMap[l.category] ?? l.category,
 					l.quantity.toLocaleString(),
 					l.unitPrice > 0 ? `${l.unitPrice.toLocaleString()} 원` : '-',
@@ -1197,13 +1202,12 @@
 											</tr>
 											{#each catLines as line (line.category + line.itemName + line.unitPrice)}
 												{@const hasDup = catLines.filter(l => l.itemName === line.itemName).length > 1}
+												{@const rangeLabel = formatPriceRange(line.priceFrom, line.priceTo)}
 												<tr class="hover">
 													<td class="pl-8 font-medium">
 														{line.itemName}
-														{#if hasDup}
-															<span class="ml-1.5 text-[11px] font-normal text-base-content/40">
-																({line.dateMin === line.dateMax ? formatDate(line.dateMin) : `${formatDate(line.dateMin)}~${formatDate(line.dateMax)}`})
-															</span>
+														{#if hasDup && rangeLabel}
+															<span class="ml-1.5 text-[11px] font-normal text-base-content/40">({rangeLabel})</span>
 														{/if}
 													</td>
 													<td class="w-20 text-right">{line.quantity.toLocaleString()}</td>
@@ -1587,8 +1591,8 @@
 																quantity:      it.quantity,
 																unitPrice:     it.unit_price,
 																amount:        it.amount,
-																dateMin:       inv.period_start,
-																dateMax:       inv.period_end,
+																priceFrom:     null,
+																priceTo:       null,
 															}));
 														historyPdfLoading = true;
 														historyPdfModal = true;

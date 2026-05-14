@@ -618,6 +618,10 @@ export type Database = {
         Args: { p_date: string; p_item_id: string }
         Returns: number
       }
+      get_unit_price_with_range: {
+        Args: { p_date: string; p_item_id: string }
+        Returns: { unit_price: number; price_from: string | null; price_to: string | null }[]
+      }
       my_factory_id: { Args: never; Returns: string }
       my_role: {
         Args: never

@@ -12,6 +12,8 @@ export interface ShipoutLog {
 	item_sort_order: number;
 	quantity: number;
 	unit_price: number;
+	price_from: string | null;
+	price_to: string | null;
 }
 
 // ── 권한 헬퍼 ─────────────────────────────────────────────────────────────
@@ -123,21 +125,24 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	// 로그가 최대 200건 이하라 가정하고, get_unit_price RPC를 Promise.all로 병렬 호출
 	type LogWithItem = typeof filteredLogs[number];
 
+
+
 	const unitPriceResults = await Promise.all(
 		filteredLogs.map(async (log: LogWithItem) => {
 			const processedDate = log.processed_at
-				? log.processed_at.slice(0, 10) // 'YYYY-MM-DD'
+				? log.processed_at.slice(0, 10)
 				: new Date().toISOString().slice(0, 10);
 
 			try {
-				const { data, error } = await locals.supabase.rpc('get_unit_price', {
+				const { data, error } = await locals.supabase.rpc('get_unit_price_with_range', {
 					p_item_id: log.item_id,
 					p_date:    processedDate,
 				});
-				if (error || data === null || data === undefined) return 0;
-				return data as number;
+				if (error || !data || (data as unknown[]).length === 0) return { unit_price: 0, price_from: null, price_to: null };
+				const row = (data as { unit_price: number; price_from: string | null; price_to: string | null }[])[0];
+				return { unit_price: row.unit_price ?? 0, price_from: row.price_from ?? null, price_to: row.price_to ?? null };
 			} catch {
-				return 0;
+				return { unit_price: 0, price_from: null, price_to: null };
 			}
 		})
 	);
@@ -158,7 +163,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			category_name:   categoryMap.get(categoryId) ?? '',
 			item_sort_order: itemSortOrder,
 			quantity:        log.quantity ?? 0,
-			unit_price:      unitPriceResults[idx] ?? 0,
+			unit_price:      unitPriceResults[idx].unit_price,
+			price_from:      unitPriceResults[idx].price_from,
+			price_to:        unitPriceResults[idx].price_to,
 		};
 	});
 
