@@ -21,8 +21,8 @@
 
 	let { data }: { data: PageData & BillingPageData } = $props();
 
-	type InvoiceLine    = { category: string; itemName: string; quantity: number; unitPrice: number; amount: number };
-	type ShipmentItem   = { itemName: string; category: string; quantity: number; unitPrice: number };
+	type InvoiceLine    = { category: string; catSortOrder: number; itemName: string; itemSortOrder: number; quantity: number; unitPrice: number; amount: number };
+	type ShipmentItem   = { itemName: string; category: string; itemSortOrder: number; quantity: number; unitPrice: number };
 	type Shipment       = { id: string; clientId: string; shippedAt: string; items: ShipmentItem[] };
 
 	// 카테고리 동적 색상 팔레트
@@ -58,11 +58,12 @@
 				});
 			}
 			map.get(log.shipout_id)!.items.push({
-				itemName:  log.item_name_ko,
-				category:  log.category_name,
-				quantity:  log.quantity,
-				unitPrice: log.unit_price,
-			});
+					itemName:      log.item_name_ko,
+					category:      log.category_name,
+					itemSortOrder: log.item_sort_order,
+					quantity:      log.quantity,
+					unitPrice:     log.unit_price,
+				});
 		}
 		return Array.from(map.values());
 	});
@@ -77,16 +78,28 @@
 			const ts = new Date(s.shippedAt).getTime();
 			return ts >= fromTs && ts <= toTs;
 		});
+		const catSortMap = new Map(data.categories.map((c, i) => [c.name, i]));
 		const map: Record<string, InvoiceLine> = {};
 		for (const s of inRange) {
 			for (const item of s.items) {
 				const key = item.category + '__' + item.itemName;
-				if (!map[key]) map[key] = { category: item.category, itemName: item.itemName, quantity: 0, unitPrice: item.unitPrice, amount: 0 };
+				if (!map[key]) map[key] = {
+					category:      item.category,
+					catSortOrder:  catSortMap.get(item.category) ?? 99,
+					itemName:      item.itemName,
+					itemSortOrder: item.itemSortOrder,
+					quantity:  0,
+					unitPrice: item.unitPrice,
+					amount:    0,
+				};
 				map[key].quantity += item.quantity;
 				map[key].amount += item.quantity * map[key].unitPrice;
 			}
 		}
-		return Object.values(map);
+		return Object.values(map).sort((a, b) => {
+			const co = a.catSortOrder - b.catSortOrder;
+			return co !== 0 ? co : a.itemSortOrder - b.itemSortOrder;
+		});
 	}
 
 	// ── 포맷 함수 ──
@@ -238,21 +251,21 @@
 		);
 
 		// 고유 품목 수집
-		const itemSet: Record<string, { category: string; itemName: string }> = {};
+		const itemSet: Record<string, { category: string; itemName: string; itemSortOrder: number }> = {};
 		for (const s of ships) {
 			for (const item of s.items) {
 				const key = `${item.category}__${item.itemName}`;
-				if (!itemSet[key]) itemSet[key] = { category: item.category, itemName: item.itemName };
+				if (!itemSet[key]) itemSet[key] = { category: item.category, itemName: item.itemName, itemSortOrder: item.itemSortOrder };
 			}
 		}
 
-		// 카테고리 → 품목명 정렬 (data.categories sort_order 기준)
+		// 카테고리 sort_order → 품목 sort_order 순으로 정렬
 		const catSortMap = new Map(data.categories.map((c, i) => [c.name, i]));
 		const itemList = Object.entries(itemSet)
 			.map(([key, v]) => ({ key, ...v }))
 			.sort((a, b) => {
 				const co = (catSortMap.get(a.category) ?? 99) - (catSortMap.get(b.category) ?? 99);
-				return co !== 0 ? co : a.itemName.localeCompare(b.itemName);
+				return co !== 0 ? co : a.itemSortOrder - b.itemSortOrder;
 			});
 
 		// 카테고리 그룹 계산 (행 방향)

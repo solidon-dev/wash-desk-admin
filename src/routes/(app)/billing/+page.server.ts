@@ -8,6 +8,7 @@ export interface ShipoutLog {
 	item_name_ko: string;
 	category_id: string;
 	category_name: string;
+	item_sort_order: number;
 	quantity: number;
 	unit_price: number;
 }
@@ -85,7 +86,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			processed_at,
 			item_id,
 			quantity,
-			items!inner ( name_ko, category_id )
+			items!inner ( name_ko, category_id, sort_order )
 		`)
 		.eq('client_id', selectedClientId)
 		.eq('log_type', 'out')
@@ -143,18 +144,20 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	// ── 6. shipoutLogs 조립 ───────────────────────────────────────────────
 	const shipoutLogs: ShipoutLog[] = filteredLogs.map((log: LogWithItem, idx: number) => {
 		const itemData = Array.isArray(log.items) ? log.items[0] : log.items;
-		const categoryId   = (itemData as { name_ko: string; category_id: string } | null)?.category_id ?? '';
-		const itemNameKo   = (itemData as { name_ko: string; category_id: string } | null)?.name_ko    ?? '';
+		const categoryId   = (itemData as { name_ko: string; category_id: string; sort_order: number } | null)?.category_id ?? '';
+		const itemNameKo   = (itemData as { name_ko: string; category_id: string; sort_order: number } | null)?.name_ko    ?? '';
+		const itemSortOrder = (itemData as { name_ko: string; category_id: string; sort_order: number } | null)?.sort_order ?? 0;
 
 		return {
-			shipout_id:    log.shipout_id ?? '',
-			processed_at:  log.processed_at ?? '',
-			item_id:       log.item_id,
-			item_name_ko:  itemNameKo,
-			category_id:   categoryId,
-			category_name: categoryMap.get(categoryId) ?? '',
-			quantity:      log.quantity ?? 0,
-			unit_price:    unitPriceResults[idx] ?? 0,
+			shipout_id:      log.shipout_id ?? '',
+			processed_at:    log.processed_at ?? '',
+			item_id:         log.item_id,
+			item_name_ko:    itemNameKo,
+			category_id:     categoryId,
+			category_name:   categoryMap.get(categoryId) ?? '',
+			item_sort_order: itemSortOrder,
+			quantity:        log.quantity ?? 0,
+			unit_price:      unitPriceResults[idx] ?? 0,
 		};
 	});
 
