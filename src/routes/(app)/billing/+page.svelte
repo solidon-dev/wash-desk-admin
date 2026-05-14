@@ -706,6 +706,7 @@
 				];
 			}),
 			foot: [['품목합계', '', totalQty.toLocaleString(), '', `${supplyAmount.toLocaleString()} 원`]],
+			showFoot: 'lastPage',
 			styles:            { font: 'NanumGothic', fontSize: 8, valign: 'middle' },
 			headStyles:        { fillColor: [225, 232, 245], textColor: [60, 80, 130], fontStyle: 'bold', fontSize: 8 },
 			bodyStyles:        { textColor: [40, 55, 80], fontStyle: 'normal' },
