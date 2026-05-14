@@ -38,7 +38,7 @@
 
 	let { data }: { data: PageData & BillingPageData } = $props();
 
-	type InvoiceLine    = { category: string; catSortOrder: number; itemName: string; itemSortOrder: number; quantity: number; unitPrice: number; amount: number };
+	type InvoiceLine    = { category: string; catSortOrder: number; itemName: string; itemSortOrder: number; quantity: number; unitPrice: number; amount: number; dateMin: string; dateMax: string; };
 	type ShipmentItem   = { itemName: string; category: string; itemSortOrder: number; quantity: number; unitPrice: number };
 	type Shipment       = { id: string; clientId: string; shippedAt: string; items: ShipmentItem[] };
 
@@ -109,9 +109,13 @@
 					quantity:  0,
 					unitPrice: item.unitPrice,
 					amount:    0,
+					dateMin:   s.shippedAt.slice(0, 10),
+					dateMax:   s.shippedAt.slice(0, 10),
 				};
 				map[key].quantity += item.quantity;
 				map[key].amount += item.quantity * map[key].unitPrice;
+				if (s.shippedAt < map[key].dateMin) map[key].dateMin = s.shippedAt.slice(0, 10);
+				if (s.shippedAt > map[key].dateMax) map[key].dateMax = s.shippedAt.slice(0, 10);
 			}
 		}
 		return Object.values(map).sort((a, b) => {
@@ -1184,8 +1188,16 @@
 												</td>
 											</tr>
 											{#each catLines as line (line.category + line.itemName + line.unitPrice)}
+												{@const hasDup = catLines.filter(l => l.itemName === line.itemName).length > 1}
 												<tr class="hover">
-													<td class="pl-8 font-medium">{line.itemName}</td>
+													<td class="pl-8 font-medium">
+														{line.itemName}
+														{#if hasDup}
+															<span class="ml-1.5 text-[11px] font-normal text-base-content/40">
+																({line.dateMin === line.dateMax ? formatDate(line.dateMin) : `${formatDate(line.dateMin)}~${formatDate(line.dateMax)}`})
+															</span>
+														{/if}
+													</td>
 													<td class="w-20 text-right">{line.quantity.toLocaleString()}</td>
 													<td class="w-28 whitespace-nowrap text-right {line.unitPrice === 0 ? 'font-semibold text-warning' : 'text-base-content/70'}">{line.unitPrice === 0 ? '미설정' : formatMoney(line.unitPrice)}</td>
 													<td class="w-28 whitespace-nowrap text-right font-bold {line.amount === 0 ? 'text-base-content/30' : ''}">{formatMoney(line.amount)}</td>
@@ -1567,6 +1579,8 @@
 																quantity:      it.quantity,
 																unitPrice:     it.unit_price,
 																amount:        it.amount,
+																dateMin:       inv.period_start,
+																dateMax:       inv.period_end,
 															}));
 														historyPdfLoading = true;
 														historyPdfModal = true;
