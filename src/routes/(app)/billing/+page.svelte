@@ -10,7 +10,7 @@
 	const CATEGORY_LABELS: Record<string, string> = { towel: '타월', sheet: '시트', uniform: '유니폼', all: '전체' };
 
 	type InvoiceLine    = { category: string; itemName: string; quantity: number; unitPrice: number; amount: number };
-	type ClientContract = { id: string; clientId: string; startDate: string; endDate: string; createdAt: string };
+
 
 	const clients: { id: string; name: string; businessNo?: string; ownerName?: string; managerName?: string; phone?: string; address?: string; type?: string }[] = [
 		{ id: 'client-001', name: '그랜드호텔' },
@@ -175,7 +175,7 @@
 		{ id: 'ship-506', clientId: 'client-006', items: [{ laundryItemId: 'item-006', itemName: '바스타올', category: 'towel', quantity: 230 }, { laundryItemId: 'item-008', itemName: '킹시트', category: 'sheet', quantity: 58 }, { laundryItemId: 'item-009', itemName: '조리복', category: 'uniform', quantity: 18 }], driverId: 'driver-001', shippedAt: '2026-05-13T11:00:00', createdAt: '2026-05-13T11:00:00' },
 	]);
 
-	let clientContractsData = $state<ClientContract[]>([]);
+
 	let clientItemPrices  = $state<{ clientId: string; category: string; itemName: string; unitPrice: number }[]>([
 		{ clientId: 'client-001', category: 'towel',   itemName: '대형타올',     unitPrice: 800  },
 		{ clientId: 'client-001', category: 'towel',   itemName: '중형타올',     unitPrice: 650  },
@@ -237,7 +237,7 @@
 	function formatMoney(n: number) { return n.toLocaleString('ko-KR') + '원'; }
 
 	// ── 탭 ──
-	type BillingTab = 'invoice' | 'statement' | 'contract';
+	type BillingTab = 'invoice' | 'statement';
 	const tabState = $state({ active: 'invoice' as BillingTab });
 	function switchTab(t: BillingTab) { tabState.active = t; }
 
@@ -279,54 +279,6 @@
 		if (pickerTarget === 'from') periodFrom = ymd;
 		else periodTo = ymd;
 		pickerShow = false;
-	}
-
-	// 계약 모달 인라인 달력
-	let contractCalTarget = $state<'from' | 'to'>('from'); // 현재 편집 중인 날짜
-	let contractCalYear   = $state(new Date().getFullYear());
-	let contractCalMonth  = $state(new Date().getMonth());
-
-	const CONTRACT_MONTH_NAMES = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
-	const CONTRACT_DAY_NAMES   = ['일','월','화','수','목','금','토'];
-
-	function contractCalDays(): (number | null)[] {
-		const first = new Date(contractCalYear, contractCalMonth, 1).getDay();
-		const last  = new Date(contractCalYear, contractCalMonth + 1, 0).getDate();
-		const cells: (number | null)[] = Array(first).fill(null);
-		for (let d = 1; d <= last; d++) cells.push(d);
-		// 항상 42칸(6행×7열) 고정 — 달마다 높이가 바뀌지 않도록
-		while (cells.length < 42) cells.push(null);
-		return cells;
-	}
-	function contractCalPrev() {
-		if (contractCalMonth === 0) { contractCalMonth = 11; contractCalYear -= 1; }
-		else contractCalMonth -= 1;
-	}
-	function contractCalNext() {
-		if (contractCalMonth === 11) { contractCalMonth = 0; contractCalYear += 1; }
-		else contractCalMonth += 1;
-	}
-	function contractCalSelectDay(day: number) {
-		function pad(n: number) { return String(n).padStart(2, '0'); }
-		const ymd = `${contractCalYear}-${pad(contractCalMonth + 1)}-${pad(day)}`;
-		if (contractCalTarget === 'from') {
-			contractFrom = ymd;
-			// 시작일이 종료일보다 뒤면 종료일 초기화
-			if (contractTo && ymd >= contractTo) contractTo = '';
-		} else {
-			// 종료일은 시작일보다 앞이면 선택 불가
-			if (contractFrom && ymd < contractFrom) return;
-			contractTo = ymd;
-		}
-	}
-	function openContractCal(t: 'from' | 'to') {
-		contractCalTarget = t;
-		const base = t === 'from' ? contractFrom : contractTo;
-		if (base) {
-			const d = new Date(base);
-			contractCalYear  = d.getFullYear();
-			contractCalMonth = d.getMonth();
-		}
 	}
 
 	// ── 청구서 미리보기 데이터 ──
@@ -1181,79 +1133,7 @@
 		uniform: 'bg-warning'
 	};
 
-	// ── 계약기간 관리 ──
-	const contracts = $derived(
-		selectedClientId ? clientContractsData.filter((c) => c.clientId === selectedClientId) : []
-	);
 
-	let showContractModal       = $state(false);
-	let editingContractId       = $state<string | null>(null);
-	let contractClientId        = $state('');
-	let contractFrom            = $state('');
-	let contractTo              = $state('');
-	let contractDeleteTargetId  = $state<string | null>(null);
-
-	function openAddContract() {
-		editingContractId = null;
-		contractClientId  = selectedClientId ?? clients[0]?.id ?? '';
-		const d   = new Date();
-		const pad = (n: number) => String(n).padStart(2, '0');
-		const y   = d.getFullYear();
-		const m   = d.getMonth() + 1;
-		const last = new Date(y, m, 0).getDate();
-		contractFrom     = `${y}-${pad(m)}-01`;
-		contractTo       = `${y}-${pad(m)}-${pad(last)}`;
-		contractCalTarget = 'from';
-		contractCalYear  = y;
-		contractCalMonth = d.getMonth();
-		showContractModal = true;
-	}
-
-	function openEditContract(c: ClientContract) {
-		editingContractId = c.id;
-		contractClientId  = c.clientId;
-		contractFrom = c.startDate;
-		contractTo   = c.endDate;
-		showContractModal = true;
-	}
-
-	function saveContract() {
-		if (!contractClientId || !contractFrom || !contractTo) return;
-		if (editingContractId) {
-			const idx = clientContractsData.findIndex(ct => ct.id === editingContractId);
-			if (idx >= 0) { clientContractsData[idx].clientId = contractClientId; clientContractsData[idx].startDate = contractFrom; clientContractsData[idx].endDate = contractTo; }
-		} else {
-			clientContractsData.push({ id: crypto.randomUUID(), clientId: contractClientId, startDate: contractFrom, endDate: contractTo, createdAt: new Date().toISOString() });
-		}
-		showContractModal = false;
-	}
-
-	function getContractStatus(startDate: string, endDate: string): 'active' | 'expired' | 'upcoming' {
-		const now   = Date.now();
-		const start = new Date(startDate + 'T00:00:00').getTime();
-		const end   = new Date(endDate   + 'T23:59:59').getTime();
-		if (now < start) return 'upcoming';
-		if (now > end)   return 'expired';
-		return 'active';
-	}
-
-	function getContractProgress(startDate: string, endDate: string): number {
-		const now   = Date.now();
-		const start = new Date(startDate + 'T00:00:00').getTime();
-		const end   = new Date(endDate   + 'T23:59:59').getTime();
-		if (now <= start) return 0;
-		if (now >= end)   return 100;
-		return Math.round(((now - start) / (end - start)) * 100);
-	}
-
-	function getDday(endDate: string): string {
-		const diff = Math.ceil(
-			(new Date(endDate + 'T23:59:59').getTime() - Date.now()) / 86400000
-		);
-		if (diff < 0)   return `D+${Math.abs(diff)}`;
-		if (diff === 0) return 'D-DAY';
-		return `D-${diff}`;
-	}
 </script>
 
 <svelte:head>
@@ -1300,29 +1180,12 @@
 				{/if}
 			</div>
 
-			<!-- 계약 빠른 선택 -->
-			{#if contracts.length > 0}
-				<div class="flex items-center gap-2 px-6 border-r border-base-200">
-					<span class="text-xs font-bold text-base-content/40 shrink-0">계약</span>
-					<div class="flex items-center gap-1">
-						{#each contracts.slice(0, 3) as c (c.id)}
-							{@const status = getContractStatus(c.startDate, c.endDate)}
-							<button type="button"
-								class="btn btn-xs {status === 'active' ? 'btn-primary' : status === 'upcoming' ? 'btn-info' : 'btn-ghost opacity-60'}"
-								onclick={() => { periodFrom = c.startDate; periodTo = c.endDate; }}>
-								{c.startDate.slice(2)} ~ {c.endDate.slice(2)}
-							</button>
-						{/each}
-					</div>
-				</div>
-			{/if}
-
 			<!-- 탭 (오른쪽 끝) -->
 			<div class="ml-auto flex items-center pl-6">
 				<div role="tablist" class="tabs tabs-boxed bg-base-200">
 					<button type="button" class="tab {tabState.active === 'invoice' ? 'tab-active' : ''}" onclick={() => switchTab('invoice')}>청구서</button>
 					<button type="button" class="tab {tabState.active === 'statement' ? 'tab-active' : ''}" onclick={() => switchTab('statement')}>거래내역서</button>
-					<button type="button" class="tab {tabState.active === 'contract' ? 'tab-active' : ''}" onclick={() => switchTab('contract')}>계약기간</button>
+
 				</div>
 			</div>
 		</div>
@@ -1745,111 +1608,6 @@
 					{/if}
 			{/if}
 		</div>
-	{:else if tabState.active === 'contract'}
-		<div class="space-y-5">
-			<!-- 헤더 -->
-			<div class="flex items-center gap-3">
-				<h3 class="text-xl font-extrabold text-base-content">계약기간</h3>
-				{#if true}
-					{@const totalActive   = clientContractsData.filter(c => getContractStatus(c.startDate, c.endDate) === 'active').length}
-					{@const totalUpcoming = clientContractsData.filter(c => getContractStatus(c.startDate, c.endDate) === 'upcoming').length}
-					{@const totalExpired  = clientContractsData.filter(c => getContractStatus(c.startDate, c.endDate) === 'expired').length}
-					<div class="flex items-center gap-1.5">
-						{#if totalActive > 0}
-							<span class="badge badge-success badge-sm font-bold">진행중 {totalActive}</span>
-						{/if}
-						{#if totalUpcoming > 0}
-							<span class="badge badge-info badge-sm font-bold">시작 전 {totalUpcoming}</span>
-						{/if}
-						{#if totalExpired > 0}
-							<span class="badge badge-ghost badge-sm font-bold">종료 {totalExpired}</span>
-						{/if}
-					</div>
-				{/if}
-				<button type="button" class="btn btn-primary btn-sm ml-auto gap-1.5" onclick={openAddContract}>
-					<Icon icon="lucide:plus" class="h-4 w-4" />계약 추가
-				</button>
-			</div>
-
-			<!-- 테이블 -->
-			<div class="bg-base-100 rounded-2xl shadow-sm border border-base-300 overflow-hidden">
-				<table class="table table-sm w-full" style="table-layout: fixed;">
-					<thead class="bg-base-200 text-base-content/60">
-						<tr>
-							<th class="text-xs font-bold w-[22%] lg:w-[18%]">거래처명</th>
-							<th class="text-xs font-bold w-[18%] lg:w-[14%]">시작일</th>
-							<th class="text-xs font-bold w-[18%] lg:w-[14%]">종료일</th>
-							<th class="text-xs font-bold hidden sm:table-cell w-[10%]">상태</th>
-							<th class="text-xs font-bold hidden md:table-cell w-[28%]">진행률</th>
-							<th class="text-xs font-bold hidden sm:table-cell whitespace-nowrap w-[10%]">D-day</th>
-							<th class="text-xs font-bold text-center whitespace-nowrap w-[12%] sm:w-[8%]">액션</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#if clientContractsData.length === 0}
-							<tr>
-								<td colspan="7" class="py-16 text-center text-base-content/40 text-sm">
-									등록된 계약기간이 없습니다.
-								</td>
-							</tr>
-						{:else}
-							{#each clientContractsData as c (c.id)}
-								{@const status   = getContractStatus(c.startDate, c.endDate)}
-								{@const progress = getContractProgress(c.startDate, c.endDate)}
-								{@const dday     = getDday(c.endDate)}
-								{@const clientName = clients.find(cl => cl.id === c.clientId)?.name ?? '알 수 없음'}
-								<tr class="hover:bg-base-200 transition-colors {status === 'expired' ? 'opacity-50' : ''}">
-									<!-- 거래처명 -->
-									<td class="font-semibold text-base-content">
-										{clientName}
-										<div class="sm:hidden mt-0.5 flex gap-2 text-xs text-base-content/40">
-											<span>{c.startDate.replace(/-/g, '.')} ~ {c.endDate.replace(/-/g, '.')}</span>
-										</div>
-									</td>
-									<!-- 시작일 -->
-									<td class="text-sm text-base-content/70 tabular-nums whitespace-nowrap">{c.startDate.replace(/-/g, '.')}</td>
-									<!-- 종료일 -->
-									<td class="text-sm text-base-content/70 tabular-nums whitespace-nowrap">{c.endDate.replace(/-/g, '.')}</td>
-									<!-- 상태 -->
-									<td class="hidden sm:table-cell">
-										<span class="badge badge-sm font-bold
-											{status === 'active' ? 'badge-success' : status === 'upcoming' ? 'badge-info' : 'badge-ghost'}">
-											{status === 'active' ? '진행중' : status === 'upcoming' ? '시작 전' : '종료'}
-										</span>
-									</td>
-									<!-- 진행률 -->
-									<td class="hidden md:table-cell">
-										<div class="flex items-center gap-2">
-											<progress
-												class="progress flex-1 h-1.5 {status === 'active' ? 'progress-success' : status === 'upcoming' ? 'progress-info' : 'progress-ghost'}"
-												value={progress} max="100">
-											</progress>
-											<span class="text-xs text-base-content/40 tabular-nums shrink-0">{progress}%</span>
-										</div>
-									</td>
-									<!-- D-day -->
-									<td class="hidden sm:table-cell text-xs font-bold tabular-nums whitespace-nowrap
-										{status === 'active' ? 'text-success' : status === 'upcoming' ? 'text-info' : 'text-base-content/30'}">
-										{dday}
-									</td>
-									<!-- 액션 -->
-									<td>
-										<div class="flex items-center justify-center gap-1">
-											<button type="button" class="btn btn-ghost btn-xs text-primary font-semibold"
-												onclick={() => openEditContract(c)}>수정</button>
-											<button type="button" class="btn btn-ghost btn-xs text-error"
-												onclick={() => (contractDeleteTargetId = c.id)}>
-												<Icon icon="lucide:trash-2" class="h-3.5 w-3.5" />
-											</button>
-										</div>
-									</td>
-								</tr>
-							{/each}
-						{/if}
-					</tbody>
-				</table>
-			</div>
-		</div>
 	{/if}
 	</div><!-- /flex-1 overflow-auto -->
 </div>
@@ -1983,166 +1741,6 @@
 	</dialog>
 {/if}
 
-<!-- ═══════════════ 계약기간 모달 ═══════════════ -->
-{#if showContractModal}
-	<div
-		class="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4"
-		role="button" tabindex="-1" aria-label="닫기"
-		onclick={() => (showContractModal = false)}
-		onkeydown={(e) => e.key === 'Escape' && (showContractModal = false)}
-	>
-		<div
-			class="bg-base-100 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
-			role="dialog" aria-modal="true"
-			onclick={(e) => e.stopPropagation()}
-			onkeydown={(e) => e.stopPropagation()}
-			tabindex="-1"
-		>
-			<!-- 헤더 -->
-			<div class="flex items-center justify-between px-5 py-4 border-b border-base-200">
-				<h3 class="text-base font-extrabold">{editingContractId ? '계약기간 수정' : '계약기간 추가'}</h3>
-				<button type="button" class="btn btn-ghost btn-sm btn-square" onclick={() => (showContractModal = false)} aria-label="닫기">
-					<Icon icon="lucide:x" class="h-4 w-4" />
-				</button>
-			</div>
 
-			<!-- 거래처 선택 -->
-			<div class="px-5 py-3 border-b border-base-200">
-				<label for="contract-client" class="text-[10px] font-semibold text-base-content/40 block mb-1">거래처</label>
-				<select
-					id="contract-client"
-					bind:value={contractClientId}
-					class="select select-bordered select-sm w-full font-semibold"
-				>
-					{#each clients as c (c.id)}
-						<option value={c.id}>{c.name}</option>
-					{/each}
-				</select>
-			</div>
-
-			<!-- 날짜 선택 탭 -->
-			<div class="grid grid-cols-2 border-b border-base-200">
-				<button
-					type="button"
-					class="flex flex-col items-center py-3 px-4 transition-colors
-						{contractCalTarget === 'from' ? 'bg-primary/5 border-b-2 border-primary' : 'hover:bg-base-200'}"
-					onclick={() => openContractCal('from')}
-				>
-					<span class="text-[10px] font-semibold text-base-content/40 mb-0.5">시작일</span>
-					<span class="text-sm font-black tabular-nums {contractFrom ? (contractCalTarget === 'from' ? 'text-primary' : 'text-base-content') : 'text-base-content/25'}">
-						{contractFrom || '미선택'}
-					</span>
-				</button>
-				<button
-					type="button"
-					class="flex flex-col items-center py-3 px-4 transition-colors border-l border-base-200
-						{contractCalTarget === 'to' ? 'bg-primary/5 border-b-2 border-primary' : 'hover:bg-base-200'}"
-					onclick={() => openContractCal('to')}
-				>
-					<span class="text-[10px] font-semibold text-base-content/40 mb-0.5">종료일</span>
-					<span class="text-sm font-black tabular-nums {contractTo ? (contractCalTarget === 'to' ? 'text-primary' : 'text-base-content') : 'text-base-content/25'}">
-						{contractTo || '미선택'}
-					</span>
-				</button>
-			</div>
-
-			<!-- 달력 네비게이션 -->
-			<div class="flex items-center justify-between px-4 pt-4 pb-2">
-				<div class="flex items-center gap-0.5">
-					<button type="button" class="btn btn-ghost btn-xs btn-square" onclick={() => contractCalYear -= 1}>
-						<Icon icon="heroicons:chevron-double-left" class="h-3.5 w-3.5" />
-					</button>
-					<button type="button" class="btn btn-ghost btn-xs btn-square" onclick={contractCalPrev}>
-						<Icon icon="heroicons:chevron-left" class="h-3.5 w-3.5" />
-					</button>
-				</div>
-				<span class="text-sm font-black">{contractCalYear}년 {CONTRACT_MONTH_NAMES[contractCalMonth]}</span>
-				<div class="flex items-center gap-0.5">
-					<button type="button" class="btn btn-ghost btn-xs btn-square" onclick={contractCalNext}>
-						<Icon icon="heroicons:chevron-right" class="h-3.5 w-3.5" />
-					</button>
-					<button type="button" class="btn btn-ghost btn-xs btn-square" onclick={() => contractCalYear += 1}>
-						<Icon icon="heroicons:chevron-double-right" class="h-3.5 w-3.5" />
-					</button>
-				</div>
-			</div>
-
-			<!-- 요일 헤더 -->
-			<div class="grid grid-cols-7 px-3 pb-1">
-				{#each CONTRACT_DAY_NAMES as dn, i (dn)}
-					<div class="py-1 text-center text-xs font-bold {i === 0 ? 'text-error' : i === 6 ? 'text-info' : 'text-base-content/30'}">{dn}</div>
-				{/each}
-			</div>
-
-			<!-- 달력 그리드 — 항상 42칸(6행×7열) 고정 높이 -->
-			<div class="grid grid-cols-7 px-3 pb-3 gap-y-0.5">
-				{#each contractCalDays() as cell, i (i)}
-					{#if cell === null}
-						<div class="h-9"></div>
-					{:else}
-						{@const pad2 = (n: number) => String(n).padStart(2, '0')}
-						{@const ymd = `${contractCalYear}-${pad2(contractCalMonth + 1)}-${pad2(cell)}`}
-						{@const isFrom = contractFrom === ymd}
-						{@const isTo = contractTo === ymd}
-						{@const inRange = contractFrom && contractTo && ymd > contractFrom && ymd < contractTo}
-						{@const dow = new Date(contractCalYear, contractCalMonth, cell).getDay()}
-						<button
-							type="button"
-							class="h-9 w-full rounded-lg text-sm font-bold transition-colors
-								{isFrom || isTo
-									? 'bg-primary text-primary-content'
-									: inRange
-										? 'bg-primary/20 text-primary'
-										: dow === 0
-											? 'text-error hover:bg-base-200'
-											: dow === 6
-												? 'text-info hover:bg-base-200'
-												: 'text-base-content hover:bg-base-200'}"
-							onclick={() => contractCalSelectDay(cell)}
-						>{cell}</button>
-					{/if}
-				{/each}
-			</div>
-
-			<!-- 하단 버튼 -->
-			<div class="flex gap-2 border-t border-base-200 px-5 py-4">
-				<button type="button" class="btn btn-ghost flex-1" onclick={() => (showContractModal = false)}>취소</button>
-				<button type="button" class="btn btn-primary flex-1"
-					disabled={!contractFrom || !contractTo}
-					onclick={saveContract}>저장</button>
-			</div>
-		</div>
-	</div>
-{/if}
-
-<!-- ═══════════════ 계약 삭제 확인 모달 ═══════════════ -->
-{#if contractDeleteTargetId}
-	{@const target = clientContractsData.find(c => c.id === contractDeleteTargetId)}
-	<dialog
-		open
-		aria-modal="true"
-		class="modal modal-open"
-		onkeydown={(e) => e.key === 'Escape' && (contractDeleteTargetId = null)}
-	>
-		<div class="modal-box w-full max-w-sm rounded-2xl p-6">
-			<h3 class="text-base font-extrabold text-base-content mb-2">계약기간 삭제</h3>
-			<p class="text-sm text-base-content/70 mb-6">
-				<span class="font-bold text-error">{target?.startDate?.replace(/-/g, '.')} ~ {target?.endDate?.replace(/-/g, '.')}</span> 계약을 삭제하시겠습니까?<br />
-				<span class="text-xs text-base-content/40">이 작업은 되돌릴 수 없습니다.</span>
-			</p>
-			<div class="modal-action">
-				<button onclick={() => (contractDeleteTargetId = null)} class="btn btn-ghost font-bold">취소</button>
-				<button onclick={() => { clientContractsData = clientContractsData.filter(c => c.id !== contractDeleteTargetId); contractDeleteTargetId = null; }} class="btn btn-error font-bold">삭제</button>
-			</div>
-		</div>
-		<div
-			class="modal-backdrop"
-			role="button"
-			tabindex="-1"
-			onclick={() => (contractDeleteTargetId = null)}
-			onkeydown={(e) => e.key === 'Escape' && (contractDeleteTargetId = null)}
-		></div>
-	</dialog>
-{/if}
 
 
