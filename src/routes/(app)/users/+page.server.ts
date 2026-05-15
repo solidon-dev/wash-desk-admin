@@ -27,7 +27,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		.from('profiles')
 		.select('id, full_name, phone, role, factory_id, created_at, deleted_at, factories(id, name)', { count: 'exact' })
 		.neq('role', 'super_admin')
-		.order('created_at', { ascending: true })
+		.order('created_at', { ascending: false })
 		.range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
 
 	if (!showDeleted) query = query.is('deleted_at', null);

@@ -11,7 +11,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	let query = locals.supabase
 		.from('factories')
 		.select('id, name, address, phone, created_at, deleted_at', { count: 'exact' })
-		.order('created_at', { ascending: true })
+		.order('created_at', { ascending: false })
 		.range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
 
 	if (!showHidden) query = query.is('deleted_at', null);
