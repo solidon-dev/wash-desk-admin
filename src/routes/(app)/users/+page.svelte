@@ -285,7 +285,7 @@
             <div>
               <label for="cPw" class="label pb-1"><span class="label-text text-xs font-bold text-base-content/60">비밀번호 *</span></label>
               <div class="relative">
-                <input id="cPw" name="password" type={showPassword ? 'text' : 'password'} bind:value={formPassword} placeholder="비밀번호 입력" class="input input-bordered w-full text-sm pr-9" required />
+                <input id="cPw" name="password" type={showPassword ? 'text' : 'password'} bind:value={formPassword} placeholder="비밀번호 입력" autocomplete="new-password" class="input input-bordered w-full text-sm pr-9" required />
                 <button type="button" onclick={() => (showPassword = !showPassword)} class="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/40 hover:text-base-content/70">
                   <Icon icon={showPassword ? 'lucide:eye-off' : 'lucide:eye'} class="w-4 h-4" />
                 </button>
@@ -296,7 +296,7 @@
                 <span class="label-text text-xs font-bold text-base-content/60">비밀번호 확인 *{#if passwordMismatch}<span class="text-error ml-1">불일치</span>{/if}</span>
               </label>
               <div class="relative">
-                <input id="cPwConf" type={showPasswordConf ? 'text' : 'password'} bind:value={formPasswordConf} placeholder="다시 입력" class="input input-bordered w-full text-sm pr-9 {passwordMismatch ? 'input-error' : ''}" required />
+                <input id="cPwConf" type={showPasswordConf ? 'text' : 'password'} bind:value={formPasswordConf} placeholder="다시 입력" autocomplete="new-password" class="input input-bordered w-full text-sm pr-9 {passwordMismatch ? 'input-error' : ''}" required />
                 <button type="button" onclick={() => (showPasswordConf = !showPasswordConf)} class="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/40 hover:text-base-content/70">
                   <Icon icon={showPasswordConf ? 'lucide:eye-off' : 'lucide:eye'} class="w-4 h-4" />
                 </button>
@@ -435,7 +435,7 @@
               <div>
                 <label for="pw-new" class="label pb-1"><span class="label-text text-xs font-bold text-base-content/60">새 비밀번호</span></label>
                 <div class="relative">
-                  <input id="pw-new" type={showPassword ? 'text' : 'password'} bind:value={formPassword} placeholder="비밀번호 입력" class="input input-bordered w-full text-sm pr-9" />
+                  <input id="pw-new" type={showPassword ? 'text' : 'password'} bind:value={formPassword} placeholder="비밀번호 입력" autocomplete="new-password" class="input input-bordered w-full text-sm pr-9" />
                   <button type="button" onclick={() => (showPassword = !showPassword)} class="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/40 hover:text-base-content/70">
                     <Icon icon={showPassword ? 'lucide:eye-off' : 'lucide:eye'} class="w-4 h-4" />
                   </button>
@@ -446,7 +446,7 @@
                   <span class="label-text text-xs font-bold text-base-content/60">비밀번호 확인{#if passwordMismatch}<span class="text-error ml-1">불일치</span>{/if}</span>
                 </label>
                 <div class="relative">
-                  <input id="pw-conf" type={showPasswordConf ? 'text' : 'password'} bind:value={formPasswordConf} placeholder="다시 입력" class="input input-bordered w-full text-sm pr-9 {passwordMismatch ? 'input-error' : ''}" />
+                  <input id="pw-conf" type={showPasswordConf ? 'text' : 'password'} bind:value={formPasswordConf} placeholder="다시 입력" autocomplete="new-password" class="input input-bordered w-full text-sm pr-9 {passwordMismatch ? 'input-error' : ''}" />
                   <button type="button" onclick={() => (showPasswordConf = !showPasswordConf)} class="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/40 hover:text-base-content/70">
                     <Icon icon={showPasswordConf ? 'lucide:eye-off' : 'lucide:eye'} class="w-4 h-4" />
                   </button>
