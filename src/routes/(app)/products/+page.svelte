@@ -71,9 +71,12 @@
       : (localCategories[0]?.id ?? null)
   );
 
-  // 거래처/카테고리 변경 시 초기화
+  // 거래처 변경 시에만 초기화 (카테고리 추가/삭제 시에는 실행 안 되도록 격리)
+  let _lastClientId = selectedClientId;
   $effect(() => {
-    void selectedClientId;
+    const cid = selectedClientId;
+    if (cid === _lastClientId) return;
+    _lastClientId = cid;
     selectedCategoryId = null;
     resetGrid();
   });
@@ -739,9 +742,9 @@
       const realId = (result.data as Record<string, unknown>)?.id as string | undefined;
       if (realId) {
         localCategories = localCategories.map(c => c.id === tmpId ? { ...c, id: realId } : c);
+        await tick();
         selectedCategoryId = realId;
       } else {
-        // id가 없으면 전체 리로드로 폴백
         await invalidateAll();
       }
     } catch {

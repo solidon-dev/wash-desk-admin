@@ -89,12 +89,8 @@
 	const clients = $derived(data.clients);
 
 	let selectedClientId = $state<string>(data.selectedClientId ?? data.clients[0]?.id ?? '');
-
-	// data.selectedClientId가 바뀌면(goto로 페이지 재로드) 동기화
-	$effect.pre(() => {
-		const next = data.selectedClientId ?? data.clients[0]?.id ?? '';
-		selectedClientId = next;
-	});
+	// $effect.pre 제거 — selectedClientId는 selectClient()가 유일한 주인
+	// 서버 data는 shipoutLogs/categories 등 컨텐츠만 담당
 
 	// shipoutLogs → Shipment[] 변환
 	const shipments = $derived.by((): Shipment[] => {
@@ -179,9 +175,11 @@
 	const selectedClient = $derived(data.clients.find((c) => c.id === selectedClientId) ?? null);
 
 	function selectClient(id: string) {
+		selectedClientId = id;  // 즉시 UI 반영
 		const url = new URL(window.location.href);
 		url.searchParams.set('clientId', id);
-		goto(url.toString(), { replaceState: true, invalidateAll: true });
+		history.replaceState({}, '', url.toString());
+		invalidateAll();  // 서버에서 해당 거래처 데이터 다시 로드
 	}
 
 	// ── 기간 설정 (공통): 오늘 기준 전달 동일+1일 ~ 오늘
