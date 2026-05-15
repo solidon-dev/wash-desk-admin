@@ -89,27 +89,22 @@ export const actions: Actions = {
 		}
 
 		const admin = getAdminClient();
-		const { data: created, error: authErr } = await admin.auth.admin.createUser({
+		const { error: authErr } = await admin.auth.admin.createUser({
 			email: `${username}@mail.com`,
 			password,
 			email_confirm: true,
-			user_metadata: { full_name },
+			user_metadata: {
+				full_name,
+				role: role ?? 'worker',
+				factory_id,
+				phone,
+			},
 		});
 		if (authErr) {
 			const msg = authErr.message.includes('already been registered')
 				? '이미 사용 중인 아이디입니다.'
 				: authErr.message;
 			return fail(400, { error: msg });
-		}
-
-		const { error: profileErr } = await admin
-			.from('profiles')
-			.update({ role: (role ?? 'worker') as 'factory_admin' | 'worker', factory_id, phone })
-			.eq('id', created.user.id);
-
-		if (profileErr) {
-			await admin.auth.admin.deleteUser(created.user.id);
-			return fail(500, { error: '프로필 저장 실패: ' + profileErr.message });
 		}
 
 		return { success: true };
