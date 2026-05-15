@@ -40,7 +40,7 @@
 	import type { Cell, Sheet, MergeRegion, ColumnDef } from './excel.js';
 	import DatePicker from '../stats/_components/DatePicker.svelte';
 	import { SvelteMap } from 'svelte/reactivity';
-	import { invalidateAll } from '$app/navigation';
+	import { invalidateAll, goto } from '$app/navigation';
 	import type { PageData } from './$types';
 	import type { ShipoutLog } from './+page.server';
 
@@ -90,14 +90,10 @@
 
 	let selectedClientId = $state<string>(data.selectedClientId ?? data.clients[0]?.id ?? '');
 
-	// selectClient() 호출 후 서버 data가 새 clientId로 바뀐 경우만 동기화
-	let _lastDataClientId = data.selectedClientId ?? data.clients[0]?.id ?? '';
+	// data.selectedClientId가 바뀌면(goto로 페이지 재로드) 동기화
 	$effect.pre(() => {
 		const next = data.selectedClientId ?? data.clients[0]?.id ?? '';
-		if (next !== _lastDataClientId) {
-			_lastDataClientId = next;
-			selectedClientId = next;
-		}
+		selectedClientId = next;
 	});
 
 	// shipoutLogs → Shipment[] 변환
@@ -183,11 +179,9 @@
 	const selectedClient = $derived(data.clients.find((c) => c.id === selectedClientId) ?? null);
 
 	function selectClient(id: string) {
-		selectedClientId = id;
 		const url = new URL(window.location.href);
 		url.searchParams.set('clientId', id);
-		history.replaceState({}, '', url.toString());
-		invalidateAll();
+		goto(url.toString(), { replaceState: true, invalidateAll: true });
 	}
 
 	// ── 기간 설정 (공통): 오늘 기준 전달 동일+1일 ~ 오늘
