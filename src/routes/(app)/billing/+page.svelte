@@ -88,9 +88,16 @@
 
 	const clients = $derived(data.clients);
 
-	let selectedClientId = $state<string>('');
+	let selectedClientId = $state<string>(data.selectedClientId ?? data.clients[0]?.id ?? '');
+
+	// selectClient() 호출 후 서버 data가 새 clientId로 바뀐 경우만 동기화
+	let _lastDataClientId = data.selectedClientId ?? data.clients[0]?.id ?? '';
 	$effect.pre(() => {
-		selectedClientId = data.selectedClientId ?? data.clients[0]?.id ?? '';
+		const next = data.selectedClientId ?? data.clients[0]?.id ?? '';
+		if (next !== _lastDataClientId) {
+			_lastDataClientId = next;
+			selectedClientId = next;
+		}
 	});
 
 	// shipoutLogs → Shipment[] 변환
