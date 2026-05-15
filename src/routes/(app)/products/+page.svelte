@@ -66,9 +66,9 @@
   let selectedCategoryId = $state<string | null>(null);
 
   const effectiveCategoryId = $derived(
-    selectedCategoryId && data.categories.find(c => c.id === selectedCategoryId)
+    selectedCategoryId && localCategories.find(c => c.id === selectedCategoryId)
       ? selectedCategoryId
-      : (data.categories[0]?.id ?? null)
+      : (localCategories[0]?.id ?? null)
   );
 
   // 거래처/카테고리 변경 시 초기화
