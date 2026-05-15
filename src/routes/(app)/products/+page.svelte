@@ -24,8 +24,12 @@
   let localPrices     = $state<Price[]>((data.itemPrices as Price[]).map(p => ({ ...p })));
   let localCategories = $state<typeof data.categories>([...data.categories]);
 
-  $effect(() => { localItems      = [...serverItems]; });
-  $effect(() => { localPrices     = serverPrices.map(p => ({ ...p })); });
+  // 낙관적 업데이트 중(tmpId 존재) $effect가 덮어쓰지 않도록 플래그로 보호
+  let _suppressItemSync  = false;
+  let _suppressPriceSync = false;
+
+  $effect(() => { if (!_suppressItemSync)  localItems      = [...serverItems]; });
+  $effect(() => { if (!_suppressPriceSync) localPrices     = serverPrices.map(p => ({ ...p })); });
   $effect(() => { localCategories = [...serverCategories]; });
 
   // ── 토스트 ────────────────────────────────────────────────────
@@ -497,7 +501,8 @@
     moveFocus(currentItems.length - 1, 0); // 방금 추가된 행으로
 
     // 백그라운드로 서버에 저장 (RPC가 item + price 한 트랜잭션으로 처리)
-    const savedFocusId = `cell-${currentItems.length - 1}-0`;
+    const savedFocusRow = currentItems.length - 1; // 방금 추가된 행 index (tmpItem 포함 후)
+    const savedFocusId = `cell-${savedFocusRow}-0`;
     const form = new FormData();
     form.append('category_id', catId);
     form.append('name_ko', name);
@@ -510,6 +515,10 @@
     form.append('effective_from', priceDate);
 
     try {
+      // $effect 동기화 억제 — tmpId가 살아있는 동안 serverItems 변경이 localItems를 덮어쓰지 않게
+      _suppressItemSync  = true;
+      _suppressPriceSync = true;
+
       const res = await fetch('/products?/upsertItem', { method: 'POST', body: form });
       const text = await res.text();
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -522,7 +531,6 @@
       const realId = (result.data as Record<string, unknown>)?.id as string | undefined;
       if (!realId) throw new Error('no id in response');
 
-      // RPC가 price도 이미 저장했으므로 별도 upsertPrice 불필요
       // localPrices 먼저 교체 → localItems key 변경 시 getPriceDate(realId) 보장
       localPrices = localPrices.map(p =>
         p.item_id === tmpId ? { ...p, item_id: realId } : p
@@ -531,11 +539,17 @@
       localItems = localItems.map(i =>
         i.id === tmpId ? { ...i, id: realId } : i
       );
+
+      _suppressItemSync  = false;
+      _suppressPriceSync = false;
+
       // key 변경으로 해당 tr이 재생성될 수 있으니 tick 후 포커스 복원
       await tick();
       const el = document.getElementById(savedFocusId) as HTMLInputElement | null;
       if (el) { el.focus(); el.select?.(); }
     } catch (err) {
+      _suppressItemSync  = false;
+      _suppressPriceSync = false;
       // 실패 → 로컬 롤백
       localItems = localItems.filter(i => i.id !== tmpId);
       localPrices = localPrices.filter(p => p.item_id !== tmpId);
@@ -701,10 +715,40 @@
     const cat = newCatInput.trim();
     if (!cat || !selectedClient) return;
     newCatInput = '';
-    await submitAndReload('upsertCategory', {
-      name: cat,
-      client_id: selectedClientId!,
-    });
+
+    // 낙관적: 임시 ID로 로컨에 먼저 추가
+    const tmpId = `tmp-cat-${Date.now()}`;
+    const maxSort = localCategories.reduce((m, c) => Math.max(m, c.sort_order ?? -1), -1) + 1;
+    const tmpCat = { id: tmpId, name: cat, client_id: selectedClientId!, sort_order: maxSort };
+    localCategories = [...localCategories, tmpCat];
+    selectedCategoryId = tmpId;
+
+    const form = new FormData();
+    form.append('name', cat);
+    form.append('client_id', selectedClientId!);
+    try {
+      const res = await fetch('/products?/upsertCategory', { method: 'POST', body: form });
+      const text = await res.text();
+      const result = deserialize(text);
+      if (result.type !== 'success') {
+        localCategories = localCategories.filter(c => c.id !== tmpId);
+        selectedCategoryId = null;
+        showToast('카테고리 추가 실패');
+        return;
+      }
+      const realId = (result.data as Record<string, unknown>)?.id as string | undefined;
+      if (realId) {
+        localCategories = localCategories.map(c => c.id === tmpId ? { ...c, id: realId } : c);
+        selectedCategoryId = realId;
+      } else {
+        // id가 없으면 전체 리로드로 폴백
+        await invalidateAll();
+      }
+    } catch {
+      localCategories = localCategories.filter(c => c.id !== tmpId);
+      selectedCategoryId = null;
+      showToast('네트워크 오류');
+    }
   }
 
   // 카테고리 삭제 확인

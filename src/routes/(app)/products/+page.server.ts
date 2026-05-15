@@ -115,9 +115,10 @@ export const actions: Actions = {
 				.order('sort_order', { ascending: false }).limit(1).single();
 			const sort_order = (maxRow?.sort_order ?? -1) + 1;
 
-			const { error } = await locals.supabase
-				.from('categories').insert({ name, client_id, sort_order });
+			const { data: inserted, error } = await locals.supabase
+				.from('categories').insert({ name, client_id, sort_order }).select('id').single();
 			if (error) return fail(500, { error: error.message });
+			return { success: true, id: inserted.id, sort_order };
 		}
 		return { success: true };
 	},
