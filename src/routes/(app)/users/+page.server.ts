@@ -81,6 +81,7 @@ export const actions: Actions = {
 
 		if (!full_name || !username || !password) return fail(400, { error: '필수 항목을 모두 입력해주세요.' });
 		if (!factory_id) return fail(400, { error: '공장을 선택해주세요.' });
+		if (phone && !/^01[016789][0-9]{7,8}$/.test(phone)) return fail(400, { error: '연락처 형식이 올바르지 않습니다. (예: 01012345678)' });
 
 		// factory_admin은 자기 공장 worker만
 		if (myRole === 'factory_admin') {
@@ -89,6 +90,7 @@ export const actions: Actions = {
 		}
 
 		const admin = getAdminClient();
+		console.log('[CREATE USER] 시작', { full_name, username, role, factory_id, phone });
 		const { error: authErr } = await admin.auth.admin.createUser({
 			email: `${username}@mail.com`,
 			password,
@@ -101,12 +103,18 @@ export const actions: Actions = {
 			},
 		});
 		if (authErr) {
+			console.error('[CREATE USER] auth.admin.createUser 에러', {
+				message: authErr.message,
+				status: authErr.status,
+				name: authErr.name,
+			});
 			const msg = authErr.message.includes('already been registered')
 				? '이미 사용 중인 아이디입니다.'
 				: authErr.message;
 			return fail(400, { error: msg });
 		}
 
+		console.log('[CREATE USER] 성공');
 		return { success: true };
 	},
 

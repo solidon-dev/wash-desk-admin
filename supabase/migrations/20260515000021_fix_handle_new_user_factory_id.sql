@@ -27,6 +27,11 @@ BEGIN
     v_role := 'worker';
   END IF;
 
+  -- phone 포맷 체크: 형식이 맞지 않으면 NULL 처리 (트리거 에러 방지)
+  IF v_phone IS NOT NULL AND v_phone !~ '^01[016789][0-9]{7,8}$' THEN
+    v_phone := NULL;
+  END IF;
+
   INSERT INTO public.profiles (id, full_name, role, factory_id, phone)
   VALUES (
     NEW.id,
