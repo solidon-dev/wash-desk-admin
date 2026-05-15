@@ -175,11 +175,8 @@
 	const selectedClient = $derived(data.clients.find((c) => c.id === selectedClientId) ?? null);
 
 	function selectClient(id: string) {
-		selectedClientId = id;  // 즉시 UI 반영
-		const url = new URL(window.location.href);
-		url.searchParams.set('clientId', id);
-		history.replaceState({}, '', url.toString());
-		invalidateAll();  // 서버에서 해당 거래처 데이터 다시 로드
+		selectedClientId = id; // 즉시 UI 반영
+		goto(`?clientId=${id}`, { replaceState: true, invalidateAll: true });
 	}
 
 	// ── 기간 설정 (공통): 오늘 기준 전달 동일+1일 ~ 오늘
