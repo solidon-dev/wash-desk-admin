@@ -546,10 +546,12 @@
       _suppressItemSync  = false;
       _suppressPriceSync = false;
 
-      // key 변경으로 해당 tr이 재생성될 수 있으니 tick 후 포커스 복원
+      // key 변경으로 tr이 재생성될 수 있으나, 유저가 이미 다른 셀로 이동했으면 포커스 복원 안 함
       await tick();
-      const el = document.getElementById(savedFocusId) as HTMLInputElement | null;
-      if (el) { el.focus(); el.select?.(); }
+      if (activeRow === savedFocusRow) {
+        const el = document.getElementById(savedFocusId) as HTMLInputElement | null;
+        if (el) { el.focus(); el.select?.(); }
+      }
     } catch (err) {
       _suppressItemSync  = false;
       _suppressPriceSync = false;
