@@ -6,6 +6,7 @@
   import { browser } from '$app/environment';
   import { deserialize } from '$app/forms';
   import SearchBar from '$lib/components/SearchBar.svelte';
+  import { createListStore } from '$lib';
   import type { PageProps, PageData } from './$types';
 
   // ── 서버 데이터 ───────────────────────────────────────────────
@@ -14,24 +15,10 @@
   type Item = PageData['items'][number];
   type Price = { id: string; item_id: string; unit_price: number; effective_from: string };
 
-  // ── 낙관적 로컈 상태 ──────────────────────────────────────────
-  // $derived로 맨저 래핑해서 $effect가 정확히 추적하게 함 (state_referenced_locally 경고 해결)
-  const serverItems      = $derived(data.items);
-  const serverPrices     = $derived(data.itemPrices as Price[]);
-  const serverCategories = $derived(data.categories);
-
-  // 서버 data가 바뀌면 로켈 상태도 동기화 — $effect가 초기화도 담당
-  let localItems      = $state<Item[]>([]);
-  let localPrices     = $state<Price[]>([]);
-  let localCategories = $state<typeof data.categories>([]);
-
-  // 낙관적 업데이트 중(tmpId 존재) $effect가 덮어쓰지 않도록 플래그로 보호
-  let _suppressItemSync  = false;
-  let _suppressPriceSync = false;
-
-  $effect(() => { if (!_suppressItemSync)  localItems      = [...serverItems]; });
-  $effect(() => { if (!_suppressPriceSync) localPrices     = serverPrices.map(p => ({ ...p })); });
-  $effect(() => { localCategories = [...serverCategories]; });
+  // ── 낙관적 로컬 상태 (CONVENTIONS 섹션 3 — createListStore 패턴)
+  const itemStore     = createListStore(() => data.items);
+  const priceStore    = createListStore(() => data.itemPrices as Price[]);
+  const categoryStore = createListStore(() => data.categories);
 
   // ── 토스트 ────────────────────────────────────────────────────
   type Toast = { id: number; msg: string; type: 'error' | 'success' };
@@ -91,9 +78,9 @@
   let selectedCategoryId = $state<string | null>(null);
 
   const effectiveCategoryId = $derived(
-    selectedCategoryId && localCategories.find(c => c.id === selectedCategoryId)
+    selectedCategoryId && categoryStore.items.find(c => c.id === selectedCategoryId)
       ? selectedCategoryId
-      : (localCategories[0]?.id ?? null)
+      : (categoryStore.items[0]?.id ?? null)
   );
 
   // 거래처 변경 시에만 초기화 (카테고리 추가/삭제 시에는 실행 안 되도록 격리)
@@ -140,7 +127,7 @@
   // ── 품목 그리드 ────────────────────────────────────────────────
   const currentItems = $derived(
     effectiveCategoryId
-      ? localItems.filter(i => i.category_id === effectiveCategoryId)
+      ? itemStore.items.filter(i => i.category_id === effectiveCategoryId)
       : []
   );
 
@@ -191,12 +178,11 @@
     const price = getPrice(item.id);
     priceResetLoading = true;
 
-    // 낙관적 업데이트: 로컬에서 이전 날짜 하 이력 제거 + 새 날짜로 업데이트
-    const prevPrices = localPrices.slice();
-    localPrices = [
-      ...localPrices.filter(p => p.item_id !== item.id),
-      { id: `tmp-${item.id}`, item_id: item.id, unit_price: price, effective_from: newDate },
-    ];
+    // 낙관적 업데이트: 기존 단가 row들 제거 + 새 row pending 추가
+    const prevPrices = priceStore.items.filter(p => p.item_id === item.id).slice();
+    prevPrices.forEach(p => priceStore.remove(p.id));
+    const tmpResetId = `tmp-reset-${item.id}`;
+    priceStore.addPending({ id: tmpResetId, item_id: item.id, unit_price: price, effective_from: newDate });
 
     const form = new FormData();
     form.append('item_id', item.id);
@@ -208,14 +194,17 @@
       const { deserialize } = await import('$app/forms');
       const result = deserialize(await res.text());
       if (result.type === 'failure' || result.type === 'error') {
-        localPrices = prevPrices; // 롤백
+        // 롤백
+        priceStore.removePending(tmpResetId);
+        prevPrices.forEach(p => priceStore.restoreRemoved(p.id));
         const msg = (result as { data?: { error?: string } }).data?.error ?? '단가 변경에 실패했습니다.';
         showToast(msg);
       } else {
         await invalidateAll();
       }
     } catch {
-      localPrices = prevPrices;
+      priceStore.removePending(tmpResetId);
+      prevPrices.forEach(p => priceStore.restoreRemoved(p.id));
       showToast('네트워크 오류 — 변경사항이 취소되었습니다.');
     }
 
@@ -266,10 +255,10 @@
 
   // 단가/날짜 디스플레이 헬퍼
   function getPrice(itemId: string): number {
-    return localPrices.find(p => p.item_id === itemId)?.unit_price ?? 0;
+    return priceStore.items.find(p => p.item_id === itemId)?.unit_price ?? 0;
   }
   function getPriceDate(itemId: string): string {
-    return localPrices.find(p => p.item_id === itemId)?.effective_from ?? '';
+    return priceStore.items.find(p => p.item_id === itemId)?.effective_from ?? '';
   }
 
   function getDisplayName(item: Item)  { return nameDrafts[item.id]  ?? item.name_ko; }
@@ -352,21 +341,28 @@
 
   // ── 품목 셀 commit (낙관적 업데이트) ────────────────────────
   function patchLocalItem(id: string, patch: Partial<Item>) {
-    localItems = localItems.map(it => it.id === id ? { ...it, ...patch } : it);
+    const cur = itemStore.items.find(i => i.id === id);
+    if (cur) itemStore.override(id, { ...cur, ...patch });
   }
+  function rollbackLocalItem(id: string) { itemStore.clear(id); }
+
   function patchLocalPrice(itemId: string, patch: Partial<Price>) {
-    const existing = localPrices.find(p => p.item_id === itemId);
-    if (existing) {
-      localPrices = localPrices.map(p => p.item_id === itemId ? { ...p, ...patch } : p);
+    const cur = priceStore.items.find(p => p.item_id === itemId);
+    if (cur) {
+      priceStore.override(cur.id, { ...cur, ...patch });
     } else {
-      localPrices = [...localPrices, {
-        id: `tmp-${itemId}`,
+      priceStore.addPending({
+        id: `tmp-price-${itemId}`,
         item_id: itemId,
         unit_price: 0,
         effective_from: todayYMD(),
         ...patch,
-      }];
+      });
     }
+  }
+  function rollbackLocalPrice(itemId: string) {
+    const cur = priceStore.items.find(p => p.item_id === itemId);
+    if (cur) priceStore.clear(cur.id);
   }
 
   function commitName(item: Item) {
@@ -375,13 +371,12 @@
     const newN = draft.trim();
     delete nameDrafts[item.id];
     if (!newN || newN === item.name_ko) return;
-    const prev = item.name_ko;
     patchLocalItem(item.id, { name_ko: newN });
     submitBg('upsertItem', {
-      id: item.id, category_id: item.category_id,
+      id: item.id, category_id: item.category_id, client_id: item.client_id,
       name_ko: newN, name_en: item.name_en ?? '',
       name_zh: item.name_zh ?? '', nickname: item.nickname ?? '',
-    }, () => patchLocalItem(item.id, { name_ko: prev }));
+    }, () => rollbackLocalItem(item.id));
   }
 
   function commitAlias(item: Item) {
@@ -390,13 +385,12 @@
     delete aliasDrafts[item.id];
     const val = draft.trim();
     if (val === (item.nickname ?? '')) return;
-    const prev = item.nickname;
     patchLocalItem(item.id, { nickname: val || null });
     submitBg('upsertItem', {
-      id: item.id, category_id: item.category_id,
+      id: item.id, category_id: item.category_id, client_id: item.client_id,
       name_ko: item.name_ko, name_en: item.name_en ?? '',
       name_zh: item.name_zh ?? '', nickname: val,
-    }, () => patchLocalItem(item.id, { nickname: prev }));
+    }, () => rollbackLocalItem(item.id));
   }
 
   function commitCn(item: Item) {
@@ -405,13 +399,12 @@
     delete cnDrafts[item.id];
     const val = draft.trim();
     if (val === (item.name_zh ?? '')) return;
-    const prev = item.name_zh;
     patchLocalItem(item.id, { name_zh: val || null });
     submitBg('upsertItem', {
-      id: item.id, category_id: item.category_id,
+      id: item.id, category_id: item.category_id, client_id: item.client_id,
       name_ko: item.name_ko, name_en: item.name_en ?? '',
       name_zh: val, nickname: item.nickname ?? '',
-    }, () => patchLocalItem(item.id, { name_zh: prev }));
+    }, () => rollbackLocalItem(item.id));
   }
 
   function commitEn(item: Item) {
@@ -420,13 +413,12 @@
     delete enDrafts[item.id];
     const val = draft.trim();
     if (val === (item.name_en ?? '')) return;
-    const prev = item.name_en;
     patchLocalItem(item.id, { name_en: val || null });
     submitBg('upsertItem', {
-      id: item.id, category_id: item.category_id,
+      id: item.id, category_id: item.category_id, client_id: item.client_id,
       name_ko: item.name_ko, name_en: val,
       name_zh: item.name_zh ?? '', nickname: item.nickname ?? '',
-    }, () => patchLocalItem(item.id, { name_en: prev }));
+    }, () => rollbackLocalItem(item.id));
   }
 
   function commitPrice(item: Item) {
@@ -442,7 +434,7 @@
     submitBg('upsertPrice', {
       item_id: item.id,
       unit_price: String(price), effective_from: date,
-    }, () => patchLocalPrice(item.id, { unit_price: prevPrice }));
+    }, () => rollbackLocalPrice(item.id));
   }
 
   function commitDate(item: Item) {
@@ -458,7 +450,7 @@
 
     // 이전 날짜로 변경하는 경우 → 기존 이력 전체 삭제 후 교체 확인 모달
     if (prevDate && val < prevDate) {
-      const existingPrices = localPrices
+      const existingPrices = priceStore.items
         .filter(p => p.item_id === item.id)
         .map(p => ({ effective_from: p.effective_from, unit_price: p.unit_price }))
         .sort((a, b) => a.effective_from.localeCompare(b.effective_from));
@@ -472,7 +464,7 @@
     submitBg('upsertPrice', {
       item_id: item.id,
       unit_price: String(price), effective_from: val,
-    }, () => patchLocalPrice(item.id, { effective_from: prevDate }));
+    }, () => rollbackLocalPrice(item.id));
   }
 
   // commit은 이제 동기적 (낙관적 업데이트, bg fetch는 fire-and-forget)
@@ -561,9 +553,9 @@
     newPrice = ''; newPriceDate = todayYMD();
     newRowSubmitTried = false;
 
-    // 임시 ID로 로컈에 리스트 먼저 추가
+    // 임시 ID로 낙관적 추가
     const tmpId = `tmp-${Date.now()}`;
-    const maxSort = localItems.filter(i => i.category_id === catId)
+    const maxSort = itemStore.items.filter(i => i.category_id === catId)
       .reduce((m, i) => Math.max(m, i.sort_order), -1) + 1;
     const tmpItem: Item = {
       id: tmpId,
@@ -575,8 +567,8 @@
       nickname: alias || null,
       sort_order: maxSort,
     };
-    localItems = [...localItems, tmpItem];
-    if (price > 0) patchLocalPrice(tmpId, { unit_price: price, effective_from: priceDate });
+    itemStore.addPending(tmpItem);
+    if (price > 0) priceStore.addPending({ id: `tmp-price-${tmpId}`, item_id: tmpId, unit_price: price, effective_from: priceDate });
 
     await tick();
     moveFocus(currentItems.length - 1, 0); // 방금 추가된 행으로
@@ -596,10 +588,6 @@
     form.append('effective_from', priceDate);
 
     try {
-      // $effect 동기화 억제 — tmpId가 살아있는 동안 serverItems 변경이 localItems를 덮어쓰지 않게
-      _suppressItemSync  = true;
-      _suppressPriceSync = true;
-
       const res = await fetch('/products?/upsertItem', { method: 'POST', body: form });
       const text = await res.text();
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -612,30 +600,21 @@
       const realId = (result.data as Record<string, unknown>)?.id as string | undefined;
       if (!realId) throw new Error('no id in response');
 
-      // localPrices 먼저 교체 → localItems key 변경 시 getPriceDate(realId) 보장
-      localPrices = localPrices.map(p =>
-        p.item_id === tmpId ? { ...p, item_id: realId } : p
-      );
-      // localItems key 교체 (tr 재생성)
-      localItems = localItems.map(i =>
-        i.id === tmpId ? { ...i, id: realId } : i
-      );
+      // priceStore 먼저 교체 → itemStore key 변경 시 getPriceDate(realId) 보장
+      priceStore.replacePending(`tmp-price-${tmpId}`, { id: `tmp-price-${tmpId}`, item_id: realId, unit_price: price, effective_from: priceDate });
+      // itemStore key 교체 (tr 재생성)
+      itemStore.replacePending(tmpId, { ...tmpItem, id: realId });
+      // invalidateAll 호출 안 함
 
-      _suppressItemSync  = false;
-      _suppressPriceSync = false;
-
-      // key 변경으로 tr이 재생성될 수 있으나, 유저가 이미 다른 셀로 이동했으면 포커스 복원 안 함
       await tick();
       if (activeRow === savedFocusRow) {
         const el = document.getElementById(savedFocusId) as HTMLInputElement | null;
         if (el) { el.focus(); el.select?.(); }
       }
     } catch (err) {
-      _suppressItemSync  = false;
-      _suppressPriceSync = false;
-      // 실패 → 로컬 롤백
-      localItems = localItems.filter(i => i.id !== tmpId);
-      localPrices = localPrices.filter(p => p.item_id !== tmpId);
+      // 실패 → 롤백
+      itemStore.removePending(tmpId);
+      priceStore.removePending(`tmp-price-${tmpId}`);
       const msg = err instanceof Error ? err.message : String(err);
       showToast(`품목 추가 실패 — ${msg}`);
     }
@@ -650,12 +629,11 @@
     const date = dateModalValue.trim();
     if (!date || !isValidDate(date)) return;
     const price = getPrice(item.id);
-    const prevDate = getPriceDate(item.id);
     patchLocalPrice(item.id, { effective_from: date });
     submitBg('upsertPrice', {
       item_id: item.id,
       unit_price: String(price), effective_from: date,
-    }, () => patchLocalPrice(item.id, { effective_from: prevDate }));
+    }, () => rollbackLocalPrice(item.id));
     showDateModal = false; dateModalRow = null; dateModalValue = '';
   }
 
@@ -665,11 +643,8 @@
 
   // 품목 삭제
   async function removeItem(id: string) {
-    const removed = localItems.find(i => i.id === id);
-    localItems = localItems.filter(i => i.id !== id);
-    const ok = await submitBg('deleteItem', { id }, () => {
-      if (removed) localItems = [...localItems, removed].sort((a, b) => a.sort_order - b.sort_order);
-    });
+    itemStore.remove(id);
+    const ok = await submitBg('deleteItem', { id }, () => itemStore.restoreRemoved(id));
     void ok;
   }
 
@@ -693,14 +668,10 @@
         const reordered = [...currentItems];
         const [moved] = reordered.splice(i, 1);
         reordered.splice(to, 0, moved);
-        const prevOrder = [...localItems];
-        localItems = [
-          ...localItems.filter(x => !reordered.find(r => r.id === x.id)),
-          ...reordered.map((r, idx) => ({ ...r, sort_order: idx })),
-        ].sort((a, b) => a.sort_order - b.sort_order);
+        reordered.forEach((r, idx) => itemStore.override(r.id, { ...r, sort_order: idx }));
         const ok = await submitBg('reorderItems', { ids: JSON.stringify(reordered.map(x => x.id)) },
-          () => { localItems = prevOrder; });
-        if (ok) await invalidateAll();
+          () => { reordered.forEach(r => itemStore.clear(r.id)); });
+        void ok;
       }
     }
     editingOrderRow = null;
@@ -729,14 +700,10 @@
       const reordered = [...currentItems];
       const [moved] = reordered.splice(dragSrcIdx, 1);
       reordered.splice(i, 0, moved);
-      const prevOrder = [...localItems];
-      localItems = [
-        ...localItems.filter(x => !reordered.find(r => r.id === x.id)),
-        ...reordered.map((r, idx) => ({ ...r, sort_order: idx })),
-      ].sort((a, b) => a.sort_order - b.sort_order);
+      reordered.forEach((r, idx) => itemStore.override(r.id, { ...r, sort_order: idx }));
       const ok = await submitBg('reorderItems', { ids: JSON.stringify(reordered.map(x => x.id)) },
-        () => { localItems = prevOrder; });
-      if (ok) await invalidateAll();
+        () => { reordered.forEach(r => itemStore.clear(r.id)); });
+      void ok;
     }
     dragSrcIdx = null; dragOverIdx = null;
   }
@@ -760,33 +727,31 @@
   async function onCatDrop(e: DragEvent, i: number) {
     e.preventDefault();
     if (catDragSrcIdx !== null && catDragSrcIdx !== i) {
-      const reordered = [...localCategories];
+      const reordered = [...categoryStore.items];
       const [moved] = reordered.splice(catDragSrcIdx, 1);
       reordered.splice(i, 0, moved);
-      const prev = [...localCategories];
-      localCategories = reordered.map((c, idx) => ({ ...c, sort_order: idx }));
+      reordered.forEach((c, idx) => categoryStore.override(c.id, { ...c, sort_order: idx }));
       const ok = await submitBg('reorderCategories', { ids: JSON.stringify(reordered.map(x => x.id)) },
-        () => { localCategories = prev; });
-      if (ok) await invalidateAll();
+        () => { reordered.forEach(c => categoryStore.clear(c.id)); });
+      void ok;
     }
     catDragSrcIdx = null; catDragOverIdx = null;
   }
   function onCatDragEnd() { catDragSrcIdx = null; catDragOverIdx = null; }
 
   async function commitCatOrderEdit(i: number) {
-    const max = localCategories.length;
+    const max = categoryStore.items.length;
     const raw = parseInt(catOrderInputValue, 10);
     if (!isNaN(raw)) {
       const to = Math.max(1, Math.min(raw, max)) - 1;
       if (to !== i) {
-        const reordered = [...localCategories];
+        const reordered = [...categoryStore.items];
         const [moved] = reordered.splice(i, 1);
         reordered.splice(to, 0, moved);
-        const prev = [...localCategories];
-        localCategories = reordered.map((c, idx) => ({ ...c, sort_order: idx }));
+        reordered.forEach((c, idx) => categoryStore.override(c.id, { ...c, sort_order: idx }));
         const ok = await submitBg('reorderCategories', { ids: JSON.stringify(reordered.map(x => x.id)) },
-          () => { localCategories = prev; });
-        if (ok) await invalidateAll();
+          () => { reordered.forEach(c => categoryStore.clear(c.id)); });
+        void ok;
       }
     }
     editingCatOrderIdx = null;
@@ -798,11 +763,11 @@
     if (!cat || !selectedClient) return;
     newCatInput = '';
 
-    // 낙관적: 임시 ID로 로컨에 먼저 추가
+    // 낙관적: 임시 ID로 먼저 추가
     const tmpId = `tmp-cat-${Date.now()}`;
-    const maxSort = localCategories.reduce((m, c) => Math.max(m, c.sort_order ?? -1), -1) + 1;
+    const maxSort = categoryStore.items.reduce((m, c) => Math.max(m, c.sort_order ?? -1), -1) + 1;
     const tmpCat = { id: tmpId, name: cat, client_id: selectedClientId!, sort_order: maxSort };
-    localCategories = [...localCategories, tmpCat];
+    categoryStore.addPending(tmpCat);
     selectedCategoryId = tmpId;
 
     const form = new FormData();
@@ -813,21 +778,21 @@
       const text = await res.text();
       const result = deserialize(text);
       if (result.type !== 'success') {
-        localCategories = localCategories.filter(c => c.id !== tmpId);
+        categoryStore.removePending(tmpId);
         selectedCategoryId = null;
         showToast('카테고리 추가 실패');
         return;
       }
       const realId = (result.data as Record<string, unknown>)?.id as string | undefined;
       if (realId) {
-        localCategories = localCategories.map(c => c.id === tmpId ? { ...c, id: realId } : c);
+        categoryStore.replacePending(tmpId, { ...tmpCat, id: realId });
         await tick();
         selectedCategoryId = realId;
       } else {
         await invalidateAll();
       }
     } catch {
-      localCategories = localCategories.filter(c => c.id !== tmpId);
+      categoryStore.removePending(tmpId);
       selectedCategoryId = null;
       showToast('네트워크 오류');
     }
@@ -891,8 +856,8 @@
 
 <!-- ── 카테고리 삭제 확인 모달 ──────────────────────────────────── -->
 {#if deleteCatTarget}
-  {@const targetCat = localCategories.find(c => c.id === deleteCatTarget)}
-  {@const catItemCount = localItems.filter(i => i.category_id === deleteCatTarget).length}
+  {@const targetCat = categoryStore.items.find(c => c.id === deleteCatTarget)}
+  {@const catItemCount = itemStore.items.filter(i => i.category_id === deleteCatTarget).length}
   <dialog open aria-modal="true" class="modal modal-open"
     onkeydown={(e) => e.key === 'Escape' && cancelRemoveCategory()}
   >
@@ -976,12 +941,12 @@
           <li class="px-4 py-8 text-center text-xs opacity-40 pointer-events-none">
             <span>거래처를<br/>선택해주세요</span>
           </li>
-        {:else if localCategories.length === 0}
+        {:else if categoryStore.items.length === 0}
           <li class="px-4 py-8 text-center text-xs opacity-40 pointer-events-none">
             <span>카테고리 없음</span>
           </li>
         {:else}
-          {#each localCategories as cat, ci (cat.id)}
+          {#each categoryStore.items as cat, ci (cat.id)}
             {@const isActive   = effectiveCategoryId === cat.id}
             {@const isDragOver = catDragOverIdx === ci}
             {@const isDragSrc  = catDragSrcIdx  === ci}
