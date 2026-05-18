@@ -1,3 +1,5 @@
+import { SvelteMap } from 'svelte/reactivity';
+
 /**
  * createListStore
  *
@@ -19,7 +21,7 @@
  *   if (saved) list.override(id, saved);
  */
 export function createListStore<T extends { id: string }>(getItems: () => T[]) {
-  let overrides = $state(new Map<string, T>());
+  const overrides = new SvelteMap<string, T>();
 
   const items = $derived(
     getItems().map(item => overrides.get(item.id) ?? item)
@@ -27,12 +29,10 @@ export function createListStore<T extends { id: string }>(getItems: () => T[]) {
 
   function override(id: string, patch: T) {
     overrides.set(id, patch);
-    overrides = overrides; // Map 변이 트리거
   }
 
   function clear(id: string) {
     overrides.delete(id);
-    overrides = overrides;
   }
 
   return {
