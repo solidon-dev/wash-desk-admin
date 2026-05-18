@@ -59,12 +59,14 @@ export const actions: Actions = {
 		const fd = await request.formData();
 		const id = fd.get('id') as string;
 		if (!id) return fail(400, { error: 'id 없음' });
-		const { error } = await locals.supabase
+		const { data: updated, error } = await locals.supabase
 			.from('shipout_memos')
 			.update({ is_read: true })
-			.eq('id', id);
+			.eq('id', id)
+			.select('*')
+			.single();
 		if (error) return fail(500, { error: error.message });
-		return { success: true };
+		return { success: true, memo: updated };
 	},
 
 	markAllRead: async ({ locals }) => {
