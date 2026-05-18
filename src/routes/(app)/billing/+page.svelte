@@ -119,14 +119,7 @@
 
 	const clients = $derived(data.clients);
 
-	let selectedClientId = $state<string>('');
-	$effect.pre(() => {
-		// URL이 바뀌면(거래처 목록 재로드) 업데이트 — selectClient()가 직접 매기지 않은 경우만
-		const fromUrl = data.selectedClientId ?? data.clients[0]?.id ?? '';
-		if (selectedClientId === '') selectedClientId = fromUrl;
-	});
-	// selectedClientId는 selectClient()가 유일한 주인
-	// 서버 data는 shipoutLogs/categories 등 컨텐츠만 담당
+	const selectedClientId = $derived(data.selectedClientId ?? data.clients[0]?.id ?? '');
 
 	// shipoutLogs → Shipment[] 변환
 	const shipments = $derived.by((): Shipment[] => {
@@ -216,7 +209,6 @@
 	const selectedClient = $derived(data.clients.find((c) => c.id === selectedClientId) ?? null);
 
 	function selectClient(id: string) {
-		selectedClientId = id; // 즉시 UI 반영
 		goto(`?clientId=${id}`, { replaceState: true, invalidateAll: true });
 	}
 

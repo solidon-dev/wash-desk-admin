@@ -1,4 +1,4 @@
-import { fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
 // ── 타입 ──────────────────────────────────────────────────────────────────
@@ -22,7 +22,7 @@ function getFactoryId(locals: App.Locals): string | null {
 }
 
 // ── load ──────────────────────────────────────────────────────────────────
-export const load: PageServerLoad = async ({ locals, url }) => {
+export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 	const myRole = locals.session?.role;
 	const myFactoryId = getFactoryId(locals);
 
@@ -52,6 +52,29 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 	// ── 2. selectedClientId 결정 ──────────────────────────────────────────
 	const paramClientId = url.searchParams.get('clientId');
+	if (paramClientId) {
+		if (clientList.some((c) => c.id === paramClientId)) {
+			// 유효한 id → 쿠키 저장
+			cookies.set('billing:lastClientId', paramClientId, {
+				path: '/billing',
+				maxAge: 60 * 60 * 24 * 365,
+				httpOnly: false,
+				sameSite: 'lax'
+			});
+		} else {
+			// 무효 id → 쿠키 삭제
+			cookies.delete('billing:lastClientId', { path: '/billing' });
+		}
+	} else {
+		// URL 파라미터 없으면 쿠키에서 읽어 redirect
+		const cookieClientId = cookies.get('billing:lastClientId');
+		if (cookieClientId && clientList.some((c) => c.id === cookieClientId)) {
+			const redirectUrl = new URL(url);
+			redirectUrl.searchParams.set('clientId', cookieClientId);
+			throw redirect(302, redirectUrl.pathname + redirectUrl.search);
+		}
+	}
+
 	const selectedClientId =
 		paramClientId && clientList.some((c) => c.id === paramClientId)
 			? paramClientId
