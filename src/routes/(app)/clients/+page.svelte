@@ -175,6 +175,10 @@
   // ── 액션 핸들러
   async function handleSave() {
     if (!formName.trim()) { showErrorModal('거래처명을 입력해주세요.'); return; }
+    if (formContractStart && formContractEnd && formContractStart > formContractEnd) {
+      showErrorModal('거래 시작일이 종료일보다 늦을 수 없습니다.');
+      return;
+    }
 
     const payload: Record<string, string> = {
       name:               formName.trim(),
@@ -301,6 +305,19 @@
     <div class="flex flex-col gap-0 overflow-hidden flex-1">
       <div class="flex flex-col gap-4 overflow-y-auto flex-1 pr-1">
 
+        {#if myRole === 'super_admin'}
+          <div>
+            <label for="cFactory" class="label pb-1">
+              <span class="label-text text-xs font-bold text-base-content/60">소속 공장 <span class="text-error">*</span></span>
+            </label>
+            <select id="cFactory" bind:value={formFactoryId} class="select select-bordered w-full text-sm">
+              {#each factories as f (f.id)}
+                <option value={f.id}>{f.name}</option>
+              {/each}
+            </select>
+          </div>
+        {/if}
+
         <div>
           <label for="cName" class="label pb-1">
             <span class="label-text text-xs font-bold text-base-content/60">거래처명 <span class="text-error">*</span></span>
@@ -349,6 +366,7 @@
               <span class="label-text text-xs font-bold text-base-content/60">거래 시작일</span>
             </label>
             <input id="cStartDate" type="date" bind:value={formContractStart}
+              max={formContractEnd || undefined}
               class="input input-bordered w-full text-sm" />
           </div>
           <div>
@@ -356,22 +374,10 @@
               <span class="label-text text-xs font-bold text-base-content/60">거래 종료일</span>
             </label>
             <input id="cEndDate" type="date" bind:value={formContractEnd}
+              min={formContractStart || undefined}
               class="input input-bordered w-full text-sm" />
           </div>
         </div>
-
-        {#if myRole === 'super_admin'}
-          <div>
-            <label for="cFactory" class="label pb-1">
-              <span class="label-text text-xs font-bold text-base-content/60">소속 공장 <span class="text-error">*</span></span>
-            </label>
-            <select id="cFactory" bind:value={formFactoryId} class="select select-bordered w-full text-sm">
-              {#each factories as f (f.id)}
-                <option value={f.id}>{f.name}</option>
-              {/each}
-            </select>
-          </div>
-        {/if}
 
       </div>
 
