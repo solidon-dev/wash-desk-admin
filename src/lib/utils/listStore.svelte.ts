@@ -1,4 +1,4 @@
-import { SvelteMap } from 'svelte/reactivity';
+import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
 /**
  * createListStore
@@ -15,14 +15,21 @@ import { SvelteMap } from 'svelte/reactivity';
  *   removePending(tmpId)      — tmp row 제거 (실패 롤백)
  *   remove(id)                — 서버 row 낙관적 삭제
  *   restoreRemoved(id)        — 낙관적 삭제 롤백
+ *   reset()                   — 모든 로컬 상태 초기화 (거래처 전환 시)
  */
 export function createListStore<T extends { id: string }>(getItems: () => T[]) {
 	const overrides = new SvelteMap<string, T>();
 	const pending = $state<T[]>([]);
-	const removed = new SvelteMap<string, true>();
+	const removed = new SvelteSet<string>();
 
-	// items = pending + (서버 row에 override 적용)
-	const items = $derived([...pending, ...getItems().map((item) => overrides.get(item.id) ?? item)]);
+	// items = (서버 row에 override 적용) + pending
+	// 서버에 이미 있는 id(replacePending 완료된 것)는 pending에서 제외
+	const items = $derived.by(() => {
+		const serverItems = getItems().map((item) => overrides.get(item.id) ?? item);
+		const serverIds = serverItems.map((i) => i.id);
+		const activePending = pending.filter((p) => !serverIds.includes(p.id));
+		return [...serverItems, ...activePending];
+	});
 
 	const itemsWithRemove = $derived(items.filter((i) => !removed.has(i.id)));
 
@@ -50,10 +57,16 @@ export function createListStore<T extends { id: string }>(getItems: () => T[]) {
 	}
 
 	function remove(id: string) {
-		removed.set(id, true);
+		removed.add(id);
 	}
 	function restoreRemoved(id: string) {
 		removed.delete(id);
+	}
+
+	function reset() {
+		overrides.clear();
+		pending.splice(0, pending.length);
+		removed.clear();
 	}
 
 	return {
@@ -66,6 +79,7 @@ export function createListStore<T extends { id: string }>(getItems: () => T[]) {
 		replacePending,
 		removePending,
 		remove,
-		restoreRemoved
+		restoreRemoved,
+		reset
 	};
 }
