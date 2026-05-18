@@ -3,7 +3,6 @@
 	import { tick } from 'svelte';
 	import { flip } from 'svelte/animate';
 	import { goto, invalidateAll } from '$app/navigation';
-	import { browser } from '$app/environment';
 	import { deserialize } from '$app/forms';
 	import SearchBar from '$lib/components/SearchBar.svelte';
 	import { createListStore } from '$lib';
@@ -19,6 +18,9 @@
 	const itemStore = createListStore(() => data.items);
 	const priceStore = createListStore(() => data.itemPrices as Price[]);
 	const categoryStore = createListStore(() => data.categories);
+	const sortedCategories = $derived(
+		[...categoryStore.items].sort((a, b) => a.sort_order - b.sort_order)
+	);
 
 	// ── 토스트 ────────────────────────────────────────────────────
 	type Toast = { id: number; msg: string; type: 'error' | 'success' };
@@ -33,26 +35,11 @@
 	}
 
 	// ── 거래처 선택 ────────────────────────────────────────────────
-	const LS_KEY = 'products:lastClientId';
-
-	// 무효 id가 내려온 경우 localStorage 제거 후 첫 번째 거래처로 재진입
+	// 무효 id가 내려온 경우 첫 번째 거래처로 재진입 (쿠키는 서버에서 이미 삭제)
 	$effect(() => {
-		if (!browser) return;
 		if (data.invalidClientId) {
-			localStorage.removeItem(LS_KEY);
 			const fallback = data.clients[0]?.id;
 			if (fallback) goto(`?clientId=${fallback}`, { replaceState: true });
-		}
-	});
-
-	// URL에 clientId 없이 진입 + localStorage에 저장된 id가 있으면 해당 id로 redirect
-	$effect(() => {
-		if (!browser) return;
-		if (data.selectedClientId !== null) return; // 이미 선택됨
-		if (data.invalidClientId) return; // 무효 처리 중
-		const saved = localStorage.getItem(LS_KEY);
-		if (saved && data.clients.find((c) => c.id === saved)) {
-			goto(`?clientId=${saved}`, { replaceState: true });
 		}
 	});
 
@@ -61,7 +48,6 @@
 	const selectedClient = $derived(data.clients.find((c) => c.id === selectedClientId) ?? null);
 
 	function selectClient(id: string) {
-		if (browser) localStorage.setItem(LS_KEY, id);
 		const url = new URL(window.location.href);
 		url.searchParams.set('clientId', id);
 		showClientModal = false;
@@ -78,28 +64,35 @@
 	let selectedCategoryId = $state<string | null>(null);
 
 	const effectiveCategoryId = $derived.by(() => {
-		const cats = categoryStore.items;
+		const cats = sortedCategories;
 		if (selectedCategoryId && cats.find((c) => c.id === selectedCategoryId))
 			return selectedCategoryId;
 		return cats[0]?.id ?? null;
 	});
 
 	// 거래처 변경 시에만 초기화 (카테고리 추가/삭제 시에는 실행 안 되도록 격리)
-	let _lastClientId = $state<string | null>(null);
+	let _lastClientId: string | null = null;
 	$effect(() => {
 		const cid = selectedClientId;
 		if (_lastClientId === null) {
 			_lastClientId = cid;
 			return;
-		} // 초기화
+		}
 		if (cid === _lastClientId) return;
 		_lastClientId = cid;
 		selectedCategoryId = null;
+		itemStore.reset();
+		priceStore.reset();
+		categoryStore.reset();
 		resetGrid();
 	});
 
+	// 카테고리가 실제로 바뀔 때(클릭/거래처변경)만 그리드 초기화
+	let _lastEffectiveCategoryId: string | null = null;
 	$effect(() => {
-		void effectiveCategoryId;
+		const cur = effectiveCategoryId;
+		if (cur === _lastEffectiveCategoryId) return;
+		_lastEffectiveCategoryId = cur;
 		resetGrid();
 	});
 
@@ -135,7 +128,11 @@
 
 	// ── 품목 그리드 ────────────────────────────────────────────────
 	const currentItems = $derived(
-		effectiveCategoryId ? itemStore.items.filter((i) => i.category_id === effectiveCategoryId) : []
+		effectiveCategoryId
+			? itemStore.items
+					.filter((i) => i.category_id === effectiveCategoryId)
+					.sort((a, b) => a.sort_order - b.sort_order)
+			: []
 	);
 
 	type GridCol = 0 | 1 | 2 | 3 | 4 | 5;
@@ -213,6 +210,7 @@
 					(result as { data?: { error?: string } }).data?.error ?? '단가 변경에 실패했습니다.';
 				showToast(msg);
 			} else {
+				priceStore.removePending(tmpResetId);
 				await invalidateAll();
 			}
 		} catch {
@@ -261,6 +259,10 @@
 		showDateModal = false;
 		dateModalRow = null;
 		dateModalValue = '';
+		editingCatOrderIdx = null;
+		catOrderInputValue = '';
+		catDragSrcIdx = null;
+		catDragOverIdx = null;
 	}
 
 	function isValidDate(str: string) {
@@ -368,14 +370,17 @@
 		for (const [k, v] of Object.entries(payload)) form.append(k, v);
 		try {
 			const res = await fetch(`/products?/${action}`, { method: 'POST', body: form });
-			if (!res.ok) {
-				showToast('저장 실패');
+			const text = await res.text();
+			const result = deserialize(text);
+			if (result.type === 'failure' || result.type === 'error') {
+				const msg = (result as { data?: { error?: string } }).data?.error ?? '저장 실패';
+				showToast(`저장 실패 — ${msg}`);
 				return false;
 			}
 			await invalidateAll();
 			return true;
 		} catch {
-			showToast('네트워크 오류');
+			showToast('네트워크 오류 — 변경사항이 취소되었습니다.');
 			return false;
 		}
 	}
@@ -636,112 +641,116 @@
 		}
 	}
 
+	let isSubmitting = $state(false);
+
 	// 새 행 추가
 	async function addItemAndContinue() {
-		newRowSubmitTried = true;
-		const name = newName.trim();
-		if (!name || !selectedClientId || !effectiveCategoryId) return;
-		if (!newRowPriceOk || !newRowDateOk) return;
-
-		const price = parseInt(newPrice.trim(), 10);
-		const priceDate = newPriceDate.trim() || todayYMD(); // 빈칸이면 오늘 날짜
-		const catId = effectiveCategoryId;
-		const cliId = selectedClientId;
-		const alias = newAlias.trim();
-		const cn = newCn.trim();
-		const en = newEn.trim();
-
-		// 입력칬 즉시 쒈기
-		newName = '';
-		newAlias = '';
-		newCn = '';
-		newEn = '';
-		newPrice = '';
-		newPriceDate = todayYMD();
-		newRowSubmitTried = false;
-
-		// 임시 ID로 낙관적 추가
-		const tmpId = `tmp-${Date.now()}`;
-		const maxSort =
-			itemStore.items
-				.filter((i) => i.category_id === catId)
-				.reduce((m, i) => Math.max(m, i.sort_order), -1) + 1;
-		const tmpItem: Item = {
-			id: tmpId,
-			category_id: catId,
-			client_id: cliId,
-			name_ko: name,
-			name_en: en || null,
-			name_zh: cn || null,
-			nickname: alias || null,
-			sort_order: maxSort
-		};
-		itemStore.addPending(tmpItem);
-		if (price > 0)
-			priceStore.addPending({
-				id: `tmp-price-${tmpId}`,
-				item_id: tmpId,
-				unit_price: price,
-				effective_from: priceDate
-			});
-
-		await tick();
-		moveFocus(currentItems.length - 1, 0); // 방금 추가된 행으로
-
-		// 백그라운드로 서버에 저장 (RPC가 item + price 한 트랜잭션으로 처리)
-		const savedFocusRow = currentItems.length - 1; // 방금 추가된 행 index (tmpItem 포함 후)
-		const savedFocusId = `cell-${savedFocusRow}-0`;
-		const form = new FormData();
-		form.append('category_id', catId);
-		form.append('name_ko', name);
-		form.append('name_en', en);
-		form.append('name_zh', cn);
-		form.append('nickname', alias);
-		// RPC에 price 정보도 같이 전달
-		form.append('client_id', cliId);
-		form.append('unit_price', String(price));
-		form.append('effective_from', priceDate);
-		// 클라이언트에서 계산한 sort_order를 그대로 전달 (연속 추가 시 DB 재조회 경합 방지)
-		form.append('sort_order', String(maxSort));
-
+		if (isSubmitting) return;
+		isSubmitting = true;
 		try {
-			const res = await fetch('/products?/upsertItem', { method: 'POST', body: form });
-			const text = await res.text();
-			if (!res.ok) throw new Error(`HTTP ${res.status}`);
+			newRowSubmitTried = true;
+			const name = newName.trim();
+			if (!name || !selectedClientId || !effectiveCategoryId) return;
+			if (!newRowPriceOk || !newRowDateOk) return;
 
-			const result = deserialize(text);
-			if (result.type !== 'success') {
-				const errMsg = (result as { data?: { error?: string } }).data?.error ?? '서버 오류';
-				throw new Error(errMsg);
-			}
-			const realId = (result.data as Record<string, unknown>)?.id as string | undefined;
-			if (!realId) throw new Error('no id in response');
+			const price = parseInt(newPrice.trim(), 10);
+			const priceDate = newPriceDate.trim() || todayYMD();
+			const catId = effectiveCategoryId;
+			const cliId = selectedClientId;
+			const alias = newAlias.trim();
+			const cn = newCn.trim();
+			const en = newEn.trim();
 
-			// priceStore 먼저 교체 → itemStore key 변경 시 getPriceDate(realId) 보장
-			priceStore.replacePending(`tmp-price-${tmpId}`, {
-				id: `tmp-price-${tmpId}`,
-				item_id: realId,
-				unit_price: price,
-				effective_from: priceDate
-			});
-			// itemStore key 교체 (tr 재생성)
-			itemStore.replacePending(tmpId, { ...tmpItem, id: realId });
-			// invalidateAll 호출 안 함
+			// 입력칸 즉시 비우기
+			newName = '';
+			newAlias = '';
+			newCn = '';
+			newEn = '';
+			newPrice = '';
+			newPriceDate = todayYMD();
+			newRowSubmitTried = false;
+
+			// 임시 ID로 낙관적 추가
+			const tmpId = `tmp-${Date.now()}`;
+			const maxSort =
+				itemStore.items
+					.filter((i) => i.category_id === catId)
+					.reduce((m, i) => Math.max(m, i.sort_order), -1) + 1;
+			const tmpItem: Item = {
+				id: tmpId,
+				category_id: catId,
+				client_id: cliId,
+				name_ko: name,
+				name_en: en || null,
+				name_zh: cn || null,
+				nickname: alias || null,
+				sort_order: maxSort
+			};
+			itemStore.addPending(tmpItem);
+			if (price > 0)
+				priceStore.addPending({
+					id: `tmp-price-${tmpId}`,
+					item_id: tmpId,
+					unit_price: price,
+					effective_from: priceDate
+				});
 
 			await tick();
-			if (activeRow === savedFocusRow) {
-				const el = document.getElementById(savedFocusId) as HTMLInputElement | null;
-				if (el) {
-					el.focus();
-					el.select?.();
+			moveFocus(currentItems.length - 1, 0);
+
+			// 백그라운드로 서버에 저장
+			const savedFocusRow = currentItems.length - 1;
+			const savedFocusId = `cell-${savedFocusRow}-0`;
+			const form = new FormData();
+			form.append('category_id', catId);
+			form.append('name_ko', name);
+			form.append('name_en', en);
+			form.append('name_zh', cn);
+			form.append('nickname', alias);
+			form.append('client_id', cliId);
+			form.append('unit_price', String(price));
+			form.append('effective_from', priceDate);
+			form.append('sort_order', String(maxSort));
+
+			try {
+				const res = await fetch('/products?/upsertItem', { method: 'POST', body: form });
+				const text = await res.text();
+				if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+				const result = deserialize(text);
+				if (result.type !== 'success') {
+					const errMsg = (result as { data?: { error?: string } }).data?.error ?? '서버 오류';
+					throw new Error(errMsg);
 				}
+				const realId = (result.data as Record<string, unknown>)?.id as string | undefined;
+				if (!realId) throw new Error('no id in response');
+
+				// item key 교체 + price의 item_id도 realId로 교체 (가격/날짜 유지)
+				itemStore.replacePending(tmpId, { ...tmpItem, id: realId });
+				priceStore.replacePending(`tmp-price-${tmpId}`, {
+					id: `tmp-price-${realId}`,
+					item_id: realId,
+					unit_price: price,
+					effective_from: priceDate
+				});
+
+				await tick();
+				if (activeRow === savedFocusRow) {
+					const el = document.getElementById(savedFocusId) as HTMLInputElement | null;
+					if (el) {
+						el.focus();
+						el.select?.();
+					}
+				}
+			} catch (err) {
+				// 실패 → 롤백
+				itemStore.removePending(tmpId);
+				priceStore.removePending(`tmp-price-${tmpId}`);
+				const msg = err instanceof Error ? err.message : String(err);
+				showToast(`품목 추가 실패 — ${msg}`);
 			}
-		} catch (err) {
-			// 실패 → 롤백
-			itemStore.removePending(tmpId);
-			priceStore.removePending(`tmp-price-${tmpId}`);
-			const msg = err instanceof Error ? err.message : String(err);
-			showToast(`품목 추가 실패 — ${msg}`);
+		} finally {
+			isSubmitting = false;
 		}
 	}
 
@@ -779,7 +788,7 @@
 	async function removeItem(id: string) {
 		itemStore.remove(id);
 		const ok = await submitBg('deleteItem', { id }, () => itemStore.restoreRemoved(id));
-		void ok;
+		if (ok) await invalidateAll();
 	}
 
 	// 순서 편집
@@ -889,7 +898,7 @@
 	async function onCatDrop(e: DragEvent, i: number) {
 		e.preventDefault();
 		if (catDragSrcIdx !== null && catDragSrcIdx !== i) {
-			const reordered = [...categoryStore.items];
+			const reordered = [...sortedCategories];
 			const [moved] = reordered.splice(catDragSrcIdx, 1);
 			reordered.splice(i, 0, moved);
 			reordered.forEach((c, idx) => categoryStore.override(c.id, { ...c, sort_order: idx }));
@@ -911,12 +920,12 @@
 	}
 
 	async function commitCatOrderEdit(i: number) {
-		const max = categoryStore.items.length;
+		const max = sortedCategories.length;
 		const raw = parseInt(catOrderInputValue, 10);
 		if (!isNaN(raw)) {
 			const to = Math.max(1, Math.min(raw, max)) - 1;
 			if (to !== i) {
-				const reordered = [...categoryStore.items];
+				const reordered = [...sortedCategories];
 				const [moved] = reordered.splice(i, 1);
 				reordered.splice(to, 0, moved);
 				reordered.forEach((c, idx) => categoryStore.override(c.id, { ...c, sort_order: idx }));
@@ -941,7 +950,7 @@
 
 		// 낙관적: 임시 ID로 먼저 추가
 		const tmpId = `tmp-cat-${Date.now()}`;
-		const maxSort = categoryStore.items.reduce((m, c) => Math.max(m, c.sort_order ?? -1), -1) + 1;
+		const maxSort = sortedCategories.reduce((m, c) => Math.max(m, c.sort_order ?? -1), -1) + 1;
 		const tmpCat = { id: tmpId, name: cat, client_id: selectedClientId!, sort_order: maxSort };
 		categoryStore.addPending(tmpCat);
 		selectedCategoryId = tmpId;
@@ -989,6 +998,16 @@
 <svelte:window
 	onkeydown={(e) => {
 		if (e.key === 'Escape' && showDateModal) cancelDateModal();
+	}}
+	onpointerup={() => {
+		if (dragSrcIdx !== null) {
+			dragSrcIdx = null;
+			dragOverIdx = null;
+		}
+		if (catDragSrcIdx !== null) {
+			catDragSrcIdx = null;
+			catDragOverIdx = null;
+		}
 	}}
 />
 
@@ -1150,7 +1169,7 @@
 						<span>카테고리 없음</span>
 					</li>
 				{:else}
-					{#each categoryStore.items as cat, ci (cat.id)}
+					{#each sortedCategories as cat, ci (cat.id)}
 						{@const isActive = effectiveCategoryId === cat.id}
 						{@const isDragOver = catDragOverIdx === ci}
 						{@const isDragSrc = catDragSrcIdx === ci}

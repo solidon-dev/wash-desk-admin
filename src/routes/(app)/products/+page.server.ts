@@ -1,4 +1,4 @@
-import { fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 
 // ── 권한 헬퍼 ─────────────────────────────────────────────────────────────
@@ -26,7 +26,7 @@ async function guardClientFactory(
 }
 
 // ── load ──────────────────────────────────────────────────────────────────
-export const load: PageServerLoad = async ({ locals, url }) => {
+export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 	const myRole = locals.session?.role;
 	const myFactoryId = getFactoryId(locals);
 
@@ -43,8 +43,26 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	if (clientsError)
 		return { clients: [], categories: [], items: [], itemPrices: [], selectedClientId: null };
 
-	// clientId 없으면 URL 없이 진입한 것 — localStorage fallback은 클라이언트가 처리
+	// clientId: URL 파라미터 우선, 없으면 쿠키에서 읽어 redirect
 	const rawClientId = url.searchParams.get('clientId');
+	if (rawClientId) {
+		// URL 파라미터가 있으면 쿠키에도 저장
+		cookies.set('lastClientId', rawClientId, {
+			path: '/',
+			maxAge: 60 * 60 * 24 * 365,
+			httpOnly: false,
+			sameSite: 'lax'
+		});
+	} else {
+		// URL 파라미터 없으면 쿠키에서 읽어 redirect
+		const cookieClientId = cookies.get('lastClientId');
+		if (cookieClientId && (clients ?? []).find((c) => c.id === cookieClientId)) {
+			const redirectUrl = new URL(url);
+			redirectUrl.searchParams.set('clientId', cookieClientId);
+			throw redirect(302, redirectUrl.pathname + redirectUrl.search);
+		}
+	}
+
 	const selectedClientId = rawClientId || (clients?.[0]?.id ?? null);
 	if (!selectedClientId)
 		return {
@@ -57,8 +75,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		};
 
 	const targetClient = (clients ?? []).find((c) => c.id === selectedClientId);
-	if (!targetClient)
-		// rawClientId가 있는데 찾을 수 없으면 무효 id → 클라이언트가 localStorage 제거
+	if (!targetClient) {
+		// 무효 id → 쿠키도 삭제
+		if (rawClientId) cookies.delete('lastClientId', { path: '/' });
 		return {
 			clients: clients ?? [],
 			categories: [],
@@ -67,6 +86,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			selectedClientId: null,
 			invalidClientId: !!rawClientId
 		};
+	}
 
 	// categories + items 병렬 조회
 	const [{ data: categories }, { data: items }] = await Promise.all([
