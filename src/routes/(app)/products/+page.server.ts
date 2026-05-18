@@ -280,6 +280,39 @@ export const actions: Actions = {
 		return { success: true };
 	},
 
+	// ── 단가 리셋 (이전 날짜로 변경 시: 기존 이력 전부 삭제 후 단일 레코드로 교체)
+	resetPrice: async ({ request, locals }) => {
+		const myRole      = locals.session?.role;
+		const myFactoryId = getFactoryId(locals);
+		const g = guardWorker(myRole); if (g) return g;
+
+		const form           = await request.formData();
+		const item_id        = form.get('item_id')        as string;
+		const unit_price_raw = form.get('unit_price')     as string;
+		const effective_from = form.get('effective_from') as string;
+
+		if (!item_id)        return fail(400, { error: 'item_id 누락' });
+		if (!effective_from) return fail(400, { error: '적용일 누락' });
+		const unit_price = parseInt(unit_price_raw?.replace(/[^0-9]/g, '') || '0', 10);
+		if (unit_price <= 0) return fail(400, { error: '단가는 0보다 커야 합니다.' });
+
+		if (myRole === 'factory_admin') {
+			const { data: item } = await locals.supabase
+				.from('items').select('client_id').eq('id', item_id).single();
+			if (!item) return fail(404, { error: '품목을 찾을 수 없습니다.' });
+			const fg = await guardClientFactory(locals, item.client_id, myFactoryId); if (fg) return fg;
+		}
+
+		const { data, error } = await (locals.supabase.rpc as unknown as (
+			fn: string, args: Record<string, unknown>
+		) => Promise<{ data: { deleted_count: number } | null; error: { message: string } | null }>)(
+			'reset_item_price',
+			{ p_item_id: item_id, p_unit_price: unit_price, p_effective_from: effective_from }
+		);
+		if (error) return fail(500, { error: error.message });
+		return { success: true, deleted_count: data?.deleted_count ?? 0 };
+	},
+
 	// ── 단가 upsert
 	upsertPrice: async ({ request, locals }) => {
 		const myRole      = locals.session?.role;

@@ -148,16 +148,60 @@
   // 날짜 빈칸이면 오늘 날짜로 대체하니 유효성 체크 제외
   const newRowDateOk  = $derived(!newPriceDate.trim() || isValidDate(newPriceDate));
 
-  // 특정 품목의 현재 저장된 최신 적용일 반환 (새 날짜는 이보다 커야 함)
-  function getMinDate(itemId: string): string {
-    return getPriceDate(itemId); // 현재 저장된 effective_from
+  // ── 단가 리셋 확인 모달 ───────────────────────────────────────────────
+  // 이전 날짜로 변경 시: 삭제될 이력 목록을 보여주고 확인 시 resetPrice 호출
+  type PriceResetPending = {
+    item: Item;
+    newDate: string;
+    prevDate: string;
+    existingPrices: Array<{ effective_from: string; unit_price: number }>;
+  };
+  let priceResetPending = $state<PriceResetPending | null>(null);
+  let priceResetLoading = $state(false);
+
+  async function confirmPriceReset() {
+    if (!priceResetPending) return;
+    const { item, newDate } = priceResetPending;
+    const price = getPrice(item.id);
+    priceResetLoading = true;
+
+    // 낙관적 업데이트: 로컬에서 이전 날짜 하 이력 제거 + 새 날짜로 업데이트
+    const prevPrices = localPrices.slice();
+    localPrices = [
+      ...localPrices.filter(p => p.item_id !== item.id),
+      { id: `tmp-${item.id}`, item_id: item.id, unit_price: price, effective_from: newDate },
+    ];
+
+    const form = new FormData();
+    form.append('item_id', item.id);
+    form.append('unit_price', String(price));
+    form.append('effective_from', newDate);
+
+    try {
+      const res = await fetch(`/products?/resetPrice`, { method: 'POST', body: form });
+      const { deserialize } = await import('$app/forms');
+      const result = deserialize(await res.text());
+      if (result.type === 'failure' || result.type === 'error') {
+        localPrices = prevPrices; // 롤백
+        const msg = (result as { data?: { error?: string } }).data?.error ?? '단가 변경에 실패했습니다.';
+        showToast(msg);
+      } else {
+        await invalidateAll();
+      }
+    } catch {
+      localPrices = prevPrices;
+      showToast('네트워크 오류 — 변경사항이 취소되었습니다.');
+    }
+
+    priceResetLoading = false;
+    priceResetPending = null;
   }
 
-  // 날짜가 기존 최신 적용일보다 큰지 검사
-  // minDate가 없으면(최초 등록) 제한 없음
-  function isDateAfterMin(date: string, minDate: string): boolean {
-    if (!minDate) return true;
-    return date > minDate;
+  function cancelPriceReset() {
+    if (!priceResetPending) return;
+    // draft를 이전 날짜로 되돌리기
+    dateDrafts[priceResetPending.item.id] = priceResetPending.prevDate;
+    priceResetPending = null;
   }
 
   let editingOrderRow  = $state<number | null>(null);
@@ -385,10 +429,18 @@
     const val = raw || todayYMD();
     const prevDate = getPriceDate(item.id);
     if (val === prevDate) return; // 변화 없으면 서버 요청 안 함
-    if (!isDateAfterMin(val, prevDate)) {
-      showToast(`적용일은 현재 날짜(${prevDate})보다 이후여야 합니다.`);
+
+    // 이전 날짜로 변경하는 경우 → 기존 이력 전체 삭제 후 교체 확인 모달
+    if (prevDate && val < prevDate) {
+      const existingPrices = localPrices
+        .filter(p => p.item_id === item.id)
+        .map(p => ({ effective_from: p.effective_from, unit_price: p.unit_price }))
+        .sort((a, b) => a.effective_from.localeCompare(b.effective_from));
+      priceResetPending = { item, newDate: val, prevDate, existingPrices };
       return;
     }
+
+    // 이후 날짜로 변경 → 기존대로 upsert
     const price = getPrice(item.id);
     patchLocalPrice(item.id, { effective_from: val });
     submitBg('upsertPrice', {
@@ -1343,3 +1395,46 @@
     {t.msg}
   </div>
 {/each}
+
+<!-- ── 단가 리셋 확인 모달 ───────────────────────────────────────── -->
+{#if priceResetPending}
+  <dialog class="modal modal-open">
+    <div class="modal-box max-w-sm">
+      <div class="flex items-start gap-3">
+        <Icon icon="lucide:alert-triangle" class="text-warning mt-0.5 h-5 w-5 shrink-0" />
+        <div class="flex-1 min-w-0">
+          <h3 class="font-semibold text-base-content">단가 이력이 전체 삭제됩니다</h3>
+          <p class="mt-1 text-sm text-base-content/70">
+            <span class="font-medium text-base-content">{priceResetPending.item.name_ko}</span>의
+            적용일을 <span class="font-medium text-warning">{priceResetPending.newDate}</span>로 변경하면
+            아래 단가 이력 {priceResetPending.existingPrices.length}개가 모두 삭제됩니다.
+          </p>
+          <!-- 삭제될 이력 목록 -->
+          <ul class="mt-2 space-y-0.5 text-xs text-base-content/60 bg-base-200 rounded-lg px-3 py-2">
+            {#each priceResetPending.existingPrices as p (p.effective_from)}
+              <li class="flex justify-between">
+                <span>{p.effective_from}</span>
+                <span>{p.unit_price.toLocaleString()}원</span>
+              </li>
+            {/each}
+          </ul>
+          <p class="mt-2 text-xs text-base-content/50">이 작업은 되돌릴 수 없습니다.</p>
+        </div>
+      </div>
+      <div class="modal-action mt-4 gap-2">
+        <button class="btn btn-sm btn-ghost" onclick={cancelPriceReset} disabled={priceResetLoading}>
+          취소
+        </button>
+        <button
+          class="btn btn-sm btn-warning {priceResetLoading ? 'loading' : ''}"
+          onclick={confirmPriceReset}
+          disabled={priceResetLoading}
+        >
+          {#if !priceResetLoading}이력 삭제 후 변경{/if}
+        </button>
+      </div>
+    </div>
+    <div class="modal-backdrop" role="button" tabindex="-1"
+         onclick={cancelPriceReset} onkeydown={() => {}}></div>
+  </dialog>
+{/if}
