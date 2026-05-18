@@ -7,6 +7,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const page       = Math.max(1, Number(url.searchParams.get('page') ?? '1'));
 	const showHidden = url.searchParams.get('hidden') === '1';
 	const q          = url.searchParams.get('q')?.trim() ?? '';
+	const role       = locals.session?.role ?? '';
 
 	let query = locals.supabase
 		.from('factories')
@@ -18,9 +19,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	if (q)           query = query.ilike('name', `%${q}%`);
 
 	const { data: factories, count, error } = await query;
-	if (error) return { factories: [], total: 0, page, PAGE_SIZE, showHidden, q };
+	if (error) return { factories: [], total: 0, page, PAGE_SIZE, showHidden, q, role };
 
-	return { factories: factories ?? [], total: count ?? 0, page, PAGE_SIZE, showHidden, q };
+	return { factories: factories ?? [], total: count ?? 0, page, PAGE_SIZE, showHidden, q, role };
 };
 
 export const actions: Actions = {
@@ -44,9 +45,14 @@ export const actions: Actions = {
 		const address = (fd.get('address') as string)?.trim() || null;
 		const phone   = (fd.get('phone')   as string)?.trim() || null;
 		if (!id || !name) return fail(400, { error: '필수 항목 누락' });
-		const { error } = await locals.supabase.from('factories').update({ name, address, phone }).eq('id', id);
+		const { data: updated, error } = await locals.supabase
+			.from('factories')
+			.update({ name, address, phone })
+			.eq('id', id)
+			.select('*')
+			.single();
 		if (error) return fail(500, { error: error.message });
-		return { success: true };
+		return { success: true, factory: updated };
 	},
 
 	hide: async ({ request, locals }) => {
@@ -54,9 +60,14 @@ export const actions: Actions = {
 		const fd = await request.formData();
 		const id = fd.get('id') as string;
 		if (!id) return fail(400, { error: 'id 누락' });
-		const { error } = await locals.supabase.from('factories').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+		const { data: updated, error } = await locals.supabase
+			.from('factories')
+			.update({ deleted_at: new Date().toISOString() })
+			.eq('id', id)
+			.select('*')
+			.single();
 		if (error) return fail(500, { error: error.message });
-		return { success: true };
+		return { success: true, factory: updated };
 	},
 
 	restore: async ({ request, locals }) => {
@@ -64,8 +75,13 @@ export const actions: Actions = {
 		const fd = await request.formData();
 		const id = fd.get('id') as string;
 		if (!id) return fail(400, { error: 'id 누락' });
-		const { error } = await locals.supabase.from('factories').update({ deleted_at: null }).eq('id', id);
+		const { data: updated, error } = await locals.supabase
+			.from('factories')
+			.update({ deleted_at: null })
+			.eq('id', id)
+			.select('*')
+			.single();
 		if (error) return fail(500, { error: error.message });
-		return { success: true };
+		return { success: true, factory: updated };
 	},
 };
