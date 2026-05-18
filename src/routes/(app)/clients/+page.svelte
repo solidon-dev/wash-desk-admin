@@ -49,8 +49,15 @@
   const myFactoryId   = $derived(data.factory_id);
   const factories     = $derived(data.factories);
   const totalPages    = $derived(Math.max(1, Math.ceil(data.total / data.PAGE_SIZE)));
-  // ── 로컬 상태 (낙관적 업데이트 — invalidateAll 없이 서버 응답으로 직접 갱신)
+  // ── 로컬 상태 (낙관적 업데이트 — 액션 중 아닐 때는 서버 데이터와 동기화)
   let localClients = $state<ClientRow[]>([...data.clients]);
+  let _acting = false; // 액션 진행 중엔 $effect가 덮어쓰지 않도록
+
+  const serverClients = $derived(data.clients);
+  $effect(() => {
+    const next = serverClients;
+    if (!_acting) localClients = [...next];
+  });
 
   // ── 에러 모달 상태
   let errorMessage = $state('');
@@ -205,9 +212,11 @@
       localClients = localClients.map(c => c.id === id ? optimistic : c);
       modal.close();
 
+      _acting = true;
       const saved = await submitAction('update', payload, () => {
         localClients = localClients.map(c => c.id === id ? (prev ?? c) : c);
       });
+      _acting = false;
       if (saved) localClients = localClients.map(c => c.id === id ? saved : c);
     } else {
       // 등록 — 모달 닫고 tmpId로 즉시 추가, 서버 응답으로 tmpId 교체
@@ -228,9 +237,11 @@
       localClients = [tmpRow, ...localClients].slice(0, data.PAGE_SIZE);
       modal.close();
 
+      _acting = true;
       const created = await submitAction('create', payload, () => {
         localClients = localClients.filter(c => c.id !== tmpId);
       });
+      _acting = false;
       if (created) localClients = localClients.map(c => c.id === tmpId ? created : c);
     }
   }
@@ -244,9 +255,11 @@
     );
     modal.close();
 
+    _acting = true;
     const saved = await submitAction('hide', { id }, () => {
       localClients = localClients.map(c => c.id === id ? (prev ?? c) : c);
     });
+    _acting = false;
     if (saved) localClients = localClients.map(c => c.id === id ? saved : c);
   }
 
@@ -259,9 +272,11 @@
     );
     modal.close();
 
+    _acting = true;
     const saved = await submitAction('restore', { id }, () => {
       localClients = localClients.map(c => c.id === id ? (prev ?? c) : c);
     });
+    _acting = false;
     if (saved) localClients = localClients.map(c => c.id === id ? saved : c);
   }
 
