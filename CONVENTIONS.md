@@ -251,21 +251,49 @@ async function handleCreate() {
 }
 ```
 
-### 페이지네이션 없는 목록 — 인라인 직접 작성
+### 페이지네이션 없는 목록 / 낙관적 추가가 필요한 목록
 
+`createListStore`는 update/hide/restore 외에 낙관적 추가(addPending), 삭제(remove), 재정렬(override 루프)도 지원한다.
+
+**낙관적 추가 패턴**
 ```ts
-// update
-const prev = items.find(i => i.id === id);
-items = items.map(i => i.id === id ? { ...i, ...patch } : i);
-const saved = await submitAction('update', payload, () => {
-  items = items.map(i => i.id === id ? (prev ?? i) : i);
-});
-if (saved) items = items.map(i => i.id === id ? saved : i);
+const list = createListStore(() => data.items);
 
-// delete
-const prev = items.slice();
-items = items.filter(i => i.id !== id);
-const ok = await submitAction('delete', { id }, () => { items = prev; });
+async function handleCreate(payload) {
+  const tmpId = `tmp-${Date.now()}`;
+  list.addPending({ id: tmpId, ...optimisticFields });
+
+  const saved = await submitAction<ItemRow>('create', payload, {
+    responseKey: 'item',
+    onRollback: () => list.removePending(tmpId),
+    onError: showErrorModal,
+  });
+  if (saved) list.replacePending(tmpId, saved);
+  else list.removePending(tmpId);
+}
+```
+
+**낙관적 삭제 패턴**
+```ts
+async function handleDelete(id: string) {
+  list.remove(id);
+  await submitAction('delete', { id }, {
+    onRollback: () => list.restoreRemoved(id),
+    onError: showErrorModal,
+  });
+}
+```
+
+**재정렬 패턴**
+```ts
+async function handleReorder(newOrder: ItemRow[]) {
+  newOrder.forEach((item, idx) => list.override(item.id, { ...item, sort_order: idx }));
+  const ok = await submitAction('reorder', { ids: JSON.stringify(newOrder.map(i => i.id)) }, {
+    onRollback: () => newOrder.forEach(item => list.clear(item.id)),
+    onError: showErrorModal,
+  });
+  if (!ok) newOrder.forEach(item => list.clear(item.id));
+}
 ```
 
 ---
