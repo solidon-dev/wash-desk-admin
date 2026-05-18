@@ -19,10 +19,10 @@
   const serverPrices     = $derived(data.itemPrices as Price[]);
   const serverCategories = $derived(data.categories);
 
-  // 서버 data가 바뀌면 로컈 상태도 동기화 — 초기값을 서버 데이터로 바로 설정
-  let localItems      = $state<Item[]>([...data.items]);
-  let localPrices     = $state<Price[]>((data.itemPrices as Price[]).map(p => ({ ...p })));
-  let localCategories = $state<typeof data.categories>([...data.categories]);
+  // 서버 data가 바뀌면 로켈 상태도 동기화 — $effect가 초기화도 담당
+  let localItems      = $state<Item[]>([]);
+  let localPrices     = $state<Price[]>([]);
+  let localCategories = $state<typeof data.categories>([]);
 
   // 낙관적 업데이트 중(tmpId 존재) $effect가 덮어쓰지 않도록 플래그로 보호
   let _suppressItemSync  = false;
@@ -72,9 +72,10 @@
   );
 
   // 거래처 변경 시에만 초기화 (카테고리 추가/삭제 시에는 실행 안 되도록 격리)
-  let _lastClientId = selectedClientId;
+  let _lastClientId = $state<string | null>(null);
   $effect(() => {
     const cid = selectedClientId;
+    if (_lastClientId === null) { _lastClientId = cid; return; } // 초기화
     if (cid === _lastClientId) return;
     _lastClientId = cid;
     selectedCategoryId = null;
