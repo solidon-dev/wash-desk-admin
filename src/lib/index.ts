@@ -1,6 +1,4 @@
 // components
-export { default as ErrorModal } from './components/ErrorModal.svelte';
-export { default as ConfirmModal } from './components/ConfirmModal.svelte';
 export { default as ModalShell } from './components/ModalShell.svelte';
 export { default as Pagination } from './components/Pagination.svelte';
 export { default as SearchBar } from './components/SearchBar.svelte';

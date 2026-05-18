@@ -14,8 +14,6 @@
 
 | 파일 | import | 용도 |
 |------|--------|------|
-| `ErrorModal.svelte` | `import { ErrorModal } from '$lib'` | 액션 실패 시 에러 표시 모달. `open`, `message`, `onclose` props |
-| `ConfirmModal.svelte` | `import { ConfirmModal } from '$lib'` | 삭제/확인용 모달. `variant: 'danger'\|'warning'\|'info'`, `loading` 지원 |
 | `ModalShell.svelte` | layout에 이미 마운트됨 — 직접 import 불필요 | 전역 모달 렌더러. `modal.open(snippet)`으로 제어 |
 | `Pagination.svelte` | `import { Pagination } from '$lib'` | 페이지네이션 UI |
 | `SearchBar.svelte` | `import { SearchBar } from '$lib'` | 자동완성 검색바 |
@@ -48,9 +46,11 @@ modal.close();
 ```svelte
 <script lang="ts">
   import { modal } from '$lib';
+
+  let errorMessage = $state('');
 </script>
 
-<!-- 1. snippet 선언 -->
+<!-- 확인 모달 -->
 {#snippet confirmDelete()}
   <div class="modal-box max-w-sm">
     <h3 class="font-semibold">삭제하시겠습니까?</h3>
@@ -61,7 +61,25 @@ modal.close();
   </div>
 {/snippet}
 
-<!-- 2. 버튼에서 열기 -->
+<!-- 에러 모달 -->
+{#snippet errorContent()}
+  <div class="modal-box max-w-sm">
+    <div class="flex items-start gap-3">
+      <Icon icon="lucide:alert-circle" class="text-error mt-0.5 h-5 w-5 shrink-0" />
+      <div>
+        <h3 class="font-semibold">오류가 발생했습니다</h3>
+        <p class="mt-1 text-sm text-base-content/70">{errorMessage}</p>
+      </div>
+    </div>
+    <div class="modal-action mt-4">
+      <button class="btn btn-sm" onclick={modal.close}>확인</button>
+    </div>
+  </div>
+{/snippet}
+
+<!-- 에러 시: -->
+<!-- errorMessage = '...'; modal.open(errorContent); -->
+
 <button onclick={() => modal.open(confirmDelete)}>삭제</button>
 ```
 
