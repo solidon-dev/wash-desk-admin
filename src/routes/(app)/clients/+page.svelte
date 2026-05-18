@@ -50,20 +50,13 @@
   const factories   = $derived(data.factories);
   const totalPages  = $derived(Math.max(1, Math.ceil(data.total / data.PAGE_SIZE)));
 
-  // ── 낙관적 업데이트: overrides(수정/삭제) + pendingNew(등록 후 data.clients에 나타날 때까지 유지)
+  // ── 낙관적 업데이트: overrides(수정/비활성화만) — create는 저장 후 1페이지 이동
   //    displayClients = 서버 데이터 기반 $derived — 페이지 이동/검색 자동 반영
-  let overrides  = $state(new Map<string, ClientRow>());
-  let pendingNew = $state<ClientRow[]>([]);
+  let overrides = $state(new Map<string, ClientRow>());
 
-  const displayClients = $derived.by(() => {
-    const serverIds = new Set(data.clients.map(c => c.id));
-    // data.clients에 이미 나타난 id는 pendingNew에서 제거
-    const stillPending = pendingNew.filter(c => !serverIds.has(c.id));
-    return [
-      ...stillPending,
-      ...data.clients.map(c => overrides.get(c.id) ?? c),
-    ].slice(0, data.PAGE_SIZE);
-  });
+  const displayClients = $derived(
+    data.clients.map(c => overrides.get(c.id) ?? c)
+  );
 
   // ── 에러 모달 상태
   let errorMessage = $state('');
@@ -226,29 +219,10 @@
       if (saved) { overrides.set(id, saved); }
       overrides = overrides;
     } else {
-      // 등록 — pendingNew에 tmpRow 추가, 서버 응답 오면 제거 (실제 row는 다음 페이지 이동 시 SSR로 표시)
-      const tmpId = `tmp-${Date.now()}`;
-      const tmpRow: ClientRow = {
-        id:                  tmpId,
-        factory_id:          formFactoryId,
-        name:                formName.trim(),
-        business_number:     formBusinessNo.trim() || null,
-        email:               formEmail.trim() || null,
-        manager_name:        formManagerName.trim() || null,
-        manager_phone:       formManagerPhone || null,
-        contract_start_date: formContractStart || null,
-        contract_end_date:   formContractEnd   || null,
-        created_at:          new Date().toISOString(),
-        deleted_at:          null,
-      };
-      pendingNew = [tmpRow];
+      // 등록 — 모달 닫고 저장, 성공 시 1페이지로 이동 (SSR이 새 row 가져옴)
       modal.close();
-
-      const created = await submitAction('create', payload, () => {
-        pendingNew = [];
-      });
-      // 서버 응답의 실제 row로 교체 — data.clients에 나타난 순간 $derived가 자동으로 제거
-      pendingNew = created ? [created] : [];
+      const ok = await submitAction('create', payload);
+      if (ok) await navTo({ page: 1 });
     }
   }
 
