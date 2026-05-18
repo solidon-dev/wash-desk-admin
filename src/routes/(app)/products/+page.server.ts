@@ -265,14 +265,21 @@ export const actions: Actions = {
 			const unit_price = parseInt(unit_price_raw?.replace(/[^0-9]/g, '') || '0', 10);
 			if (unit_price <= 0) return fail(400, { error: '단가는 0보다 커야 합니다.' });
 
-			const { data: maxRow } = await locals.supabase
-				.from('items')
-				.select('sort_order')
-				.eq('category_id', category_id)
-				.order('sort_order', { ascending: false })
-				.limit(1)
-				.single();
-			const sort_order = (maxRow?.sort_order ?? -1) + 1;
+			const sort_order_raw = form.get('sort_order') as string | null;
+			let sort_order: number;
+			if (sort_order_raw !== null && !isNaN(Number(sort_order_raw))) {
+				// 클라이언트가 계산한 값 우선 사용 (연속 추가 시 DB 재조회 경합 방지)
+				sort_order = Number(sort_order_raw);
+			} else {
+				const { data: maxRow } = await locals.supabase
+					.from('items')
+					.select('sort_order')
+					.eq('category_id', category_id)
+					.order('sort_order', { ascending: false })
+					.limit(1)
+					.single();
+				sort_order = (maxRow?.sort_order ?? -1) + 1;
+			}
 
 			const { data: result, error } = await locals.supabase.rpc('create_item_with_price', {
 				p_client_id: client_id,

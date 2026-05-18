@@ -77,11 +77,12 @@
 	// ── 카테고리 ───────────────────────────────────────────────────
 	let selectedCategoryId = $state<string | null>(null);
 
-	const effectiveCategoryId = $derived(
-		selectedCategoryId && categoryStore.items.find((c) => c.id === selectedCategoryId)
-			? selectedCategoryId
-			: (categoryStore.items[0]?.id ?? null)
-	);
+	const effectiveCategoryId = $derived.by(() => {
+		const cats = categoryStore.items;
+		if (selectedCategoryId && cats.find((c) => c.id === selectedCategoryId))
+			return selectedCategoryId;
+		return cats[0]?.id ?? null;
+	});
 
 	// 거래처 변경 시에만 초기화 (카테고리 추가/삭제 시에는 실행 안 되도록 격리)
 	let _lastClientId = $state<string | null>(null);
@@ -700,6 +701,8 @@
 		form.append('client_id', cliId);
 		form.append('unit_price', String(price));
 		form.append('effective_from', priceDate);
+		// 클라이언트에서 계산한 sort_order를 그대로 전달 (연속 추가 시 DB 재조회 경합 방지)
+		form.append('sort_order', String(maxSort));
 
 		try {
 			const res = await fetch('/products?/upsertItem', { method: 'POST', body: form });

@@ -5,6 +5,31 @@
 
 ---
 
+## 패키지 매니저 — 절대 규칙
+
+**이 프로젝트는 `pnpm`만 사용한다. `npm` / `yarn`은 절대 사용하지 않는다.**
+
+```
+# ✅ 올바른 사용
+pnpm install
+pnpm dev
+pnpm build
+pnpm check          ← svelte-check (타입 검사)
+pnpm lint           ← eslint + prettier 검사
+pnpm add <package>
+pnpm remove <package>
+
+# ❌ 절대 금지
+npm install
+npm run dev
+npm run build
+yarn
+```
+
+> AI가 커맨드를 실행하거나 안내할 때 `npm` 또는 `yarn`을 쓰면 절대 안 된다.
+
+---
+
 ## 0. 공통 모듈 맵 — 새 코드 작성 전 반드시 확인
 
 > 아래 목록에 있는 것을 직접 재구현하거나 다른 경로에 새로 만들지 않는다.
