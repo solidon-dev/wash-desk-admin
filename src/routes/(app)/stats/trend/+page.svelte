@@ -5,8 +5,8 @@
 	import type { StatsShipout } from '$lib/api/stats';
 	import {
 		calcStats,
-		calcDaily,
-		calcRangeMonthly,
+		calcTrend,
+		autoGranularity,
 		prevPeriod,
 		diff,
 		fmtQty,
@@ -74,14 +74,14 @@
 
 	const toDate = $derived((preset as string) === 'custom' ? customTo || today : today);
 
-	// ── 기간 일수 & 모드 ───────────────────────────────────────────────────────
+	// ── 기간 일수 & granularity ───────────────────────────────────────────
 	const periodDays = $derived(daysBetween(fromDate, toDate));
-	const trendMode = $derived(periodDays <= 60 ? 'daily' : 'monthly');
+	const granularity = $derived(autoGranularity(periodDays));
 
-	// ── metric ────────────────────────────────────────────────────────────────
+	// ── metric ───────────────────────────────────────────────────────────────
 	let metric: 'qty' | 'amount' = $state('amount');
 
-	// ── 현재/직전 통계 ─────────────────────────────────────────────────────────
+	// ── 현재/직전 통계 ────────────────────────────────────────────────────
 	const periodStats = $derived(calcStats(allShipouts, fromDate, toDate, cid));
 	const prev = $derived(prevPeriod(fromDate, toDate));
 	const prevStats = $derived(calcStats(allShipouts, prev.from, prev.to, cid));
@@ -89,29 +89,12 @@
 	const dAmt = $derived(diff(periodStats.amount, prevStats.amount));
 	const dQty = $derived(diff(periodStats.qty, prevStats.qty));
 
-	// ── 라인차트 원본 rows (한 번만 계산) ─────────────────────────────────────
-	const trendRowsCurr = $derived(
-		trendMode === 'daily'
-			? calcDaily(allShipouts, fromDate, toDate, cid)
-			: calcRangeMonthly(allShipouts, fromDate, toDate, cid)
-	);
-	const trendRowsPrev = $derived(
-		trendMode === 'daily'
-			? calcDaily(allShipouts, prev.from, prev.to, cid)
-			: calcRangeMonthly(allShipouts, prev.from, prev.to, cid)
-	);
+	// ── 라인차트 rows (granularity 자동 선택, 한 번만 계산) ─────────────────────
+	const trendRowsCurr = $derived(calcTrend(allShipouts, fromDate, toDate, cid, granularity));
+	const trendRowsPrev = $derived(calcTrend(allShipouts, prev.from, prev.to, cid, granularity));
 
-	// ── 라인차트 데이터 ────────────────────────────────────────────────────────
-	const trendLabels = $derived.by((): string[] => {
-		if (trendMode === 'daily') {
-			const n = trendRowsCurr.length;
-			const step = Math.max(1, Math.floor(n / 8));
-			return (trendRowsCurr as ReturnType<typeof calcDaily>).map((r, i) =>
-				i % step === 0 ? r.date.slice(5) : ''
-			);
-		}
-		return (trendRowsCurr as ReturnType<typeof calcRangeMonthly>).map((r) => r.label);
-	});
+	// ── 라인차트 데이터 ───────────────────────────────────────────────────────
+	const trendLabels = $derived(trendRowsCurr.map((r) => r.label));
 
 	const trendSeriesCurr = $derived(
 		trendRowsCurr.map((r) => (metric === 'amount' ? r.amount : r.qty))
@@ -125,11 +108,11 @@
 		{ label: '직전 기간', color: '#9CA3AF', dash: true, data: trendSeriesPrev }
 	]);
 
-	// ── 스택바 (trendRowsCurr 재사용) ─────────────────────────────────────────
+	// ── 스택바는 항상 monthly 처리 ──────────────────────────────────────────
 	const stackMonths = $derived(
-		trendMode === 'monthly'
-			? (trendRowsCurr as ReturnType<typeof calcRangeMonthly>)
-			: calcRangeMonthly(allShipouts, fromDate, toDate, cid)
+		granularity === 'monthly'
+			? trendRowsCurr
+			: calcTrend(allShipouts, fromDate, toDate, cid, 'monthly')
 	);
 
 	// 카테고리별 월별 스택 데이터 (범위 기준)
@@ -142,7 +125,7 @@
 		for (const s of allShipouts) {
 			if (cid && s.client_id !== cid) continue;
 			const ym = s.created_at.slice(0, 7);
-			const idx = stackMonths.findIndex((m) => m.ym === ym);
+			const idx = stackMonths.findIndex((m) => m.key === ym);
 			if (idx === -1) continue;
 			for (const item of s.items) {
 				const cat = item.category_name;
@@ -287,7 +270,7 @@
 				<div class="text-base-content/50 mb-1 text-xs font-semibold">집계 기간</div>
 				<div class="text-base-content text-sm font-bold">{fromDate} ~ {toDate}</div>
 				<div class="text-base-content/40 mt-0.5 text-xs">
-					{trendMode === 'daily' ? '일별' : '월별'} ({periodDays}일)
+					{granularity === 'daily' ? '일별' : granularity === 'weekly' ? '주별' : '월별'} ({periodDays}일)
 				</div>
 			</div>
 		</div>
@@ -346,7 +329,7 @@
 		<!-- X축 실제 레이블 (StackBarChart 내부 레이블 대신 별도 표기) -->
 		{#if stackMonths.length > 0 && stackMonths.length <= 24}
 			<div class="text-base-content/40 flex text-[10px] font-semibold">
-				{#each stackMonths as m (m.ym)}
+				{#each stackMonths as m (m.key)}
 					<div class="flex-1 truncate text-center">{m.label}</div>
 				{/each}
 			</div>

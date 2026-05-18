@@ -5,8 +5,11 @@
 	import type { StatsShipout } from '$lib/api/stats';
 	import {
 		calcStats,
+		calcTrend,
+		autoGranularity,
 		calcDaily,
 		calcMonthlyCategoryStack,
+		daysBetween,
 		prevPeriod,
 		diff,
 		fmtQty,
@@ -66,9 +69,16 @@
 
 	// ── 올해 통계 ─────────────────────────────────────────────────────────────
 	const thisYear = $derived(new Date(today + 'T00:00:00').getFullYear());
-	// ── 일별 집계 (스파크라인 + 라인차트) ─────────────────────────────────────
+	// ── 기간 일수 & granularity ────────────────────────────────────────────────
+	const periodDays = $derived(daysBetween(fromDate, toDate));
+	const granularity = $derived(autoGranularity(periodDays));
+
+	// ── 트렌드 집계 (자동 스케일) ──────────────────────────────────────────────
+	const trendRowsCurr = $derived(calcTrend(allShipouts, fromDate, toDate, cid, granularity));
+	const trendRowsPrev = $derived(calcTrend(allShipouts, prev.from, prev.to, cid, granularity));
+
+	// 스파크라인은 항상 daily (KPI 카드용 작은 차트)
 	const dailyCurr = $derived(calcDaily(allShipouts, fromDate, toDate, cid));
-	const dailyPrev = $derived(calcDaily(allShipouts, prev.from, prev.to, cid));
 
 	const sparkQty = $derived(dailyCurr.map((d) => d.qty));
 	const sparkAmt = $derived(dailyCurr.map((d) => d.amount));
@@ -83,28 +93,22 @@
 		return dailyCurr.map((r) => map[r.date] ?? 0);
 	});
 
-	// ── 라인차트 metric ────────────────────────────────────────────────────────
+	// ── 라인차트 metric ────────────────────────────────────────────────────────────
 	let metric: 'qty' | 'amount' = $state('amount');
 
-	const lineLabels = $derived.by(() => {
-		const n = dailyCurr.length;
-		if (n === 0) return [];
-		// 최대 8개 레이블만 표시
-		const step = Math.max(1, Math.floor(n / 7));
-		return dailyCurr.map((d, i) => (i % step === 0 ? d.date.slice(5) : ''));
-	});
+	const lineLabels = $derived(trendRowsCurr.map((r) => r.label));
 
 	const lineSeries = $derived([
 		{
 			label: '현재 기간',
 			color: '#3B82F6',
-			data: metric === 'amount' ? sparkAmt : sparkQty
+			data: trendRowsCurr.map((r) => (metric === 'amount' ? r.amount : r.qty))
 		},
 		{
 			label: '직전 기간',
 			color: '#9CA3AF',
 			dash: true,
-			data: metric === 'amount' ? dailyPrev.map((d) => d.amount) : dailyPrev.map((d) => d.qty)
+			data: trendRowsPrev.map((r) => (metric === 'amount' ? r.amount : r.qty))
 		}
 	]);
 

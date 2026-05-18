@@ -255,9 +255,123 @@ export function calcDaily(
 	return rows;
 }
 
+export interface WeeklyRow {
+	weekStart: string; // 'YYYY-MM-DD' (월요일)
+	label: string;
+	qty: number;
+	amount: number;
+}
+
+export type TrendGranularity = 'daily' | 'weekly' | 'monthly';
+
+export interface TrendRow {
+	key: string; // YYYY-MM-DD | YYYY-Www | YYYY-MM
+	label: string;
+	qty: number;
+	amount: number;
+}
+
 /**
- * 범위 월별 집계
+ * 기간 일수 → 자동 granularity 선택
+ * ~60일 → daily   (최대 60포인트)
+ * ~180일 → weekly  (최대 ~26포인트)
+ * 180일+ → monthly (최대 ~24포인트)
  */
+export function autoGranularity(days: number): TrendGranularity {
+	if (days <= 60) return 'daily';
+	if (days <= 180) return 'weekly';
+	return 'monthly';
+}
+
+/**
+ * 주별 집계 (ISO 월요일 기준)
+ */
+export function calcWeekly(
+	shipouts: StatsShipout[],
+	from: string,
+	to: string,
+	clientId?: string
+): WeeklyRow[] {
+	// from이 속한 주의 월요일 구하기
+	function getMonday(d: Date): Date {
+		const day = d.getDay();
+		const diff = day === 0 ? -6 : 1 - day;
+		const m = new Date(d);
+		m.setDate(d.getDate() + diff);
+		return m;
+	}
+
+	const fromD = new Date(from + 'T00:00:00');
+	const toD = new Date(to + 'T00:00:00');
+	const rows: WeeklyRow[] = [];
+	let cur = getMonday(fromD);
+
+	while (cur <= toD) {
+		const ws = `${cur.getFullYear()}-${pad2(cur.getMonth() + 1)}-${pad2(cur.getDate())}`;
+		const m = cur.getMonth() + 1;
+		const d = cur.getDate();
+		rows.push({ weekStart: ws, label: `${m}/${d}`, qty: 0, amount: 0 });
+		cur = new Date(cur.getTime() + 7 * 86_400_000);
+	}
+
+	const idx: Record<string, WeeklyRow> = {};
+	for (const r of rows) idx[r.weekStart] = r;
+
+	for (const s of shipouts) {
+		if (clientId != null && s.client_id !== clientId) continue;
+		const d = s.created_at.slice(0, 10);
+		if (d < from || d > to) continue;
+		const sd = new Date(d + 'T00:00:00');
+		const mon = getMonday(sd);
+		const key = `${mon.getFullYear()}-${pad2(mon.getMonth() + 1)}-${pad2(mon.getDate())}`;
+		const row = idx[key];
+		if (!row) continue;
+		for (const item of s.items) {
+			row.qty += item.quantity;
+			row.amount += item.quantity * item.unit_price;
+		}
+	}
+	return rows;
+}
+
+/**
+ * granularity에 따라 자동으로 daily/weekly/monthly 집계 반환
+ */
+export function calcTrend(
+	shipouts: StatsShipout[],
+	from: string,
+	to: string,
+	clientId?: string,
+	granularity?: TrendGranularity
+): TrendRow[] {
+	const days = daysBetween(from, to);
+	const g = granularity ?? autoGranularity(days);
+
+	if (g === 'daily') {
+		return calcDaily(shipouts, from, to, clientId).map((r) => ({
+			key: r.date,
+			label: r.date.slice(5),
+			qty: r.qty,
+			amount: r.amount
+		}));
+	}
+	if (g === 'weekly') {
+		return calcWeekly(shipouts, from, to, clientId).map((r) => ({
+			key: r.weekStart,
+			label: r.label,
+			qty: r.qty,
+			amount: r.amount
+		}));
+	}
+	// monthly
+	return calcRangeMonthly(shipouts, from, to, clientId).map((r) => ({
+		key: r.ym,
+		label: r.label,
+		qty: r.qty,
+		amount: r.amount
+	}));
+}
+
 export function calcRangeMonthly(
 	shipouts: StatsShipout[],
 	from: string,
