@@ -1,12 +1,20 @@
 @import 'tailwindcss';
 @import 'daisyui/daisyui.css';
 
-@keyframes nav-progress {
-	0%   { transform: translateX(-100%); }
-	80%  { transform: translateX(-5%); }
-	100% { transform: translateX(-3%); }
+@keyframes nav-progress-complete {
+	0%   { opacity: 1; }
+	100% { opacity: 0; }
 }
 
-.animate-nav-progress {
-	animation: nav-progress 10s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+.nav-progress-bar {
+	position: fixed;
+	top: 0; left: 0; right: 0;
+	z-index: 9999;
+	height: 3px;
+	pointer-events: none;
+}
+
+.nav-progress-bar .bar {
+	height: 100%;
+	transition: width 0.2s ease, opacity 0.3s ease;
 }

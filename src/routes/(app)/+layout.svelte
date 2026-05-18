@@ -3,8 +3,81 @@
 	import { afterNavigate, goto } from '$app/navigation';
 	import { navigating } from '$app/stores';
 	import { onMount } from 'svelte';
+
+	// ── 페이지 전환 진행바 (NProgress 스타일) ──────────────────────────────────
+	let navProgress = $state(0);          // 0~100
+	let navVisible  = $state(false);
+	let navOpacity  = $state(1);
+
+	let _rafId   = 0;
+	let _timerId: ReturnType<typeof setTimeout> | number = 0;
+
+	function startProgress() {
+		cancelAnimationFrame(_rafId);
+		clearTimeout(_timerId);
+		navProgress = 0;
+		navOpacity  = 1;
+		navVisible  = true;
+
+		// 1단계: 0 → 80% 빠르게 (400ms)
+		const start = performance.now();
+		const phase1Duration = 400;
+
+		function phase1(now: number) {
+			const elapsed = now - start;
+			const t = Math.min(elapsed / phase1Duration, 1);
+			// easeOut 커브로 80%까지
+			navProgress = 80 * (1 - Math.pow(1 - t, 3));
+			if (t < 1) {
+				_rafId = requestAnimationFrame(phase1);
+			} else {
+				// 2단계: 80% → 90% 아주 천천히 (크롤링)
+				startCrawl();
+			}
+		}
+		_rafId = requestAnimationFrame(phase1);
+	}
+
+	function startCrawl() {
+		let crawlTarget = 90;
+		function crawl() {
+			if (navProgress < crawlTarget) {
+				navProgress += (crawlTarget - navProgress) * 0.03;
+			}
+			_rafId = requestAnimationFrame(crawl);
+		}
+		_rafId = requestAnimationFrame(crawl);
+	}
+
+	function completeProgress() {
+		cancelAnimationFrame(_rafId);
+		clearTimeout(_timerId);
+		// 100%로 즉시 확 채움
+		navProgress = 100;
+		// 잠깐 보여주다가 페이드아웃
+		_timerId = setTimeout(() => {
+			navOpacity = 0;
+			_timerId = setTimeout(() => {
+				navVisible  = false;
+				navProgress = 0;
+				navOpacity  = 1;
+			}, 300);
+		}, 100);
+	}
+
+	$effect(() => {
+		if ($navigating) {
+			startProgress();
+		}
+	});
+
+	afterNavigate(() => {
+		completeProgress();
+	});
+
 	import Icon from '@iconify/svelte';
 	import SearchBar from '$lib/components/SearchBar.svelte';
+	import ModalShell from '$lib/components/ModalShell.svelte';
 	import { logout } from '$lib/api/auth';
 	import type { LayoutData } from './$types';
 
@@ -282,10 +355,13 @@
 		</div>
 	{/if}
 
-	<!-- ── 페이지 전환 로딩 바 ── -->
-	{#if $navigating}
-		<div class="fixed top-0 left-0 right-0 z-[9999] h-[3px] overflow-hidden">
-			<div class="h-full bg-primary animate-nav-progress"></div>
+	<!-- ── 페이지 전환 로딩 바 (NProgress 스타일) ── -->
+	{#if navVisible}
+		<div class="nav-progress-bar">
+			<div
+				class="bar bg-primary"
+				style="width: {navProgress}%; opacity: {navOpacity};"
+			></div>
 		</div>
 	{/if}
 
@@ -333,3 +409,6 @@
 		</main>
 	</div>
 </div>
+
+<!-- 전역 모달 렌더러 (항상 하나만 렌더링) -->
+<ModalShell />
