@@ -9,4 +9,5 @@ export { modal } from './modal.svelte';
 
 // utils
 export * from './utils/action';
+export * from './utils/listStore.svelte';
 export * from './utils/phone';

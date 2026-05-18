@@ -2,7 +2,7 @@
   import { deserialize } from '$app/forms';
   import { goto } from '$app/navigation';
   import Icon from '@iconify/svelte';
-  import { modal, SearchBar, Pagination, TableCard } from '$lib';
+  import { modal, SearchBar, Pagination, TableCard, createListStore } from '$lib';
   import type { PageData } from './$types';
   import { formatPhone, displayPhone } from '$lib/utils/phone';
 
@@ -50,13 +50,8 @@
   const factories   = $derived(data.factories);
   const totalPages  = $derived(Math.max(1, Math.ceil(data.total / data.PAGE_SIZE)));
 
-  // ── 낙관적 업데이트: overrides(수정/비활성화만) — create는 저장 후 1페이지 이동
-  //    displayClients = 서버 데이터 기반 $derived — 페이지 이동/검색 자동 반영
-  let overrides = $state(new Map<string, ClientRow>());
-
-  const displayClients = $derived(
-    data.clients.map(c => overrides.get(c.id) ?? c)
-  );
+  // ── 낙관적 업데이트 (update/hide/restore) — create는 저장 후 1페이지 이동
+  const list = createListStore(() => data.clients);
 
   // ── 에러 모달 상태
   let errorMessage = $state('');
@@ -208,16 +203,12 @@
         contract_end_date:   formContractEnd   || null,
         factory_id:          myRole === 'super_admin' ? formFactoryId : (prev?.factory_id ?? editingClient.factory_id),
       };
-      overrides.set(id, optimistic);
-      overrides = overrides;
+      list.override(id, optimistic);
       modal.close();
 
-      const saved = await submitAction('update', payload, () => {
-        overrides.delete(id); overrides = overrides;
-      });
-      overrides.delete(id);
-      if (saved) { overrides.set(id, saved); }
-      overrides = overrides;
+      const saved = await submitAction('update', payload, () => list.clear(id));
+      list.clear(id);
+      if (saved) list.override(id, saved);
     } else {
       // 등록 — 모달 닫고 저장, 성공 시 1페이지로 이동 (SSR이 새 row 가져옴)
       modal.close();
@@ -230,32 +221,24 @@
     if (!editingClient) return;
     const id   = editingClient.id;
     const prev = data.clients.find(c => c.id === id);
-    overrides.set(id, { ...(prev ?? editingClient), deleted_at: new Date().toISOString() });
-    overrides = overrides;
+    list.override(id, { ...(prev ?? editingClient), deleted_at: new Date().toISOString() });
     modal.close();
 
-    const saved = await submitAction('hide', { id }, () => {
-      overrides.delete(id); overrides = overrides;
-    });
-    overrides.delete(id);
-    if (saved) { overrides.set(id, saved); }
-    overrides = overrides;
+    const saved = await submitAction('hide', { id }, () => list.clear(id));
+    list.clear(id);
+    if (saved) list.override(id, saved);
   }
 
   async function handleRestore() {
     if (!editingClient) return;
     const id   = editingClient.id;
     const prev = data.clients.find(c => c.id === id);
-    overrides.set(id, { ...(prev ?? editingClient), deleted_at: null });
-    overrides = overrides;
+    list.override(id, { ...(prev ?? editingClient), deleted_at: null });
     modal.close();
 
-    const saved = await submitAction('restore', { id }, () => {
-      overrides.delete(id); overrides = overrides;
-    });
-    overrides.delete(id);
-    if (saved) { overrides.set(id, saved); }
-    overrides = overrides;
+    const saved = await submitAction('restore', { id }, () => list.clear(id));
+    list.clear(id);
+    if (saved) list.override(id, saved);
   }
 
   // ── 검색 이벤트
@@ -468,14 +451,14 @@
         </tr>
       </thead>
       <tbody>
-        {#if displayClients.length === 0}
+        {#if list.items.length === 0}
           <tr>
             <td colspan="8" class="py-16 text-center text-base-content/40 text-sm">
               등록된 거래처가 없습니다.
             </td>
           </tr>
         {:else}
-          {#each displayClients as c (c.id)}
+          {#each list.items as c (c.id)}
             {@const status = contractStatus(c.contract_start_date, c.contract_end_date)}
             <tr class="hover:bg-base-200 transition-colors {c.deleted_at ? 'opacity-40' : ''}">
 

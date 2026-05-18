@@ -25,6 +25,7 @@
 |------|-------------|------|
 | `action.ts` | `submitAction(action, payload, options)` | server action 호출 공통 헬퍼. fetch + deserialize + 에러처리 + 롤백 + revalidate 옵션 포함 |
 | `action.ts` | `friendlyError(raw?)` | 서버 에러 메시지 → 사용자 친화적 한국어 변환 |
+| `listStore.svelte.ts` | `createListStore(getItems)` | 서버 페이지 데이터 기반 낙관적 업데이트 헬퍼. overrides Map으로 현재 페이지 아이템 패치 |
 | `phone.ts` | `formatPhone`, `unformatPhone`, `displayPhone` | 전화번호 포맷/파싱 |
 
 ### 모달 스토어 (`src/lib/modal.svelte.ts`)
@@ -274,69 +275,62 @@ async function updateDisplayName(id: string, name: string, onRollback: () => voi
 
 **모든 mutation은 낙관적 업데이트를 기본으로 한다.**
 
-### 패턴: 즉시 UI 반영 → 백그라운드 저장 → 실패 시 롤백
+### 페이지네이션이 있는 목록 → `createListStore` 사용
+
+`createListStore`는 서버 SSR 데이터를 기반으로 하면서 현재 페이지 아이템만 낙관적으로 패치하는 헬퍼다.
+페이지 이동/검색 시 서버 데이터가 바뀌면 자동 반영되고, `$effect`/`_suppress` 플래그 없이 동작한다.
 
 ```ts
-function updateItemName(item: Item, newName: string) {
-  // 1. 이전 값 저장
-  const prev = item.name_ko;
+import { createListStore } from '$lib';
 
-  // 2. 즉시 로컬 상태 반영
-  localItems = localItems.map(i => i.id === item.id ? { ...i, name_ko: newName } : i);
+// 선언 (컴포넌트 최상위)
+const list = createListStore(() => data.clients);
 
-  // 3. 백그라운드로 서버에 저장
-  submitAction('updateItem', { id: item.id, name: newName }, () => {
-    // 4. 실패 시 롤백
-    localItems = localItems.map(i => i.id === item.id ? { ...i, name_ko: prev } : i);
-  });
+// 템플릿에서
+// {#each list.items as c} ...
+```
+
+**update / hide / restore 패턴**
+
+```ts
+async function handleUpdate(id: string, patch: ClientRow) {
+  const prev = data.clients.find(c => c.id === id);
+
+  list.override(id, patch);   // 즉시 UI 반영
+  modal.close();
+
+  const saved = await submitAction('update', payload, () => list.clear(id)); // 실패 시 롤백
+  list.clear(id);
+  if (saved) list.override(id, saved); // 서버 응답으로 정확한 값 교체
 }
 ```
 
-### 신규 항목 추가 시: tmpId 패턴
+**create 패턴 — 저장 후 1페이지 이동**
+
+create는 서버가 ID/정렬순서를 결정하므로 낙관적 추가 없이 저장 후 1페이지로 이동한다.
 
 ```ts
-async function addItem(name: string) {
-  const tmpId = `tmp-${Date.now()}`;
-
-  // 즉시 추가
-  localItems = [...localItems, { id: tmpId, name_ko: name, sort_order: 999 }];
-
-  // 서버 저장
-  const ok = await submitAction('createItem', { name }, () => {
-    // 실패 시 tmpId 항목 제거
-    localItems = localItems.filter(i => i.id !== tmpId);
-  });
-
-  if (ok) {
-    // 성공 시 실제 데이터로 교체 (invalidateAll로 서버 데이터 재수신)
-    await invalidateAll();
-  }
+async function handleCreate(payload: Record<string, string>) {
+  modal.close();
+  const ok = await submitAction('create', payload);
+  if (ok) await navTo({ page: 1 }); // SSR이 새 row 포함한 목록을 가져옴
 }
 ```
 
-### $effect로 서버 데이터를 로컬에 동기화할 때 낙관적 업데이트 보호
+### 페이지네이션이 없는 목록 → 인라인 직접 작성
+
+`createListStore`와 동일한 원리를 인라인으로 작성한다 (추상화 불필요):
 
 ```ts
-// 낙관적 업데이트 진행 중에는 $effect가 덮어쓰지 않도록 플래그 사용
-let _suppress = false;
-const serverItems = $derived(data.items);
+// 수정
+const prev = items.find(i => i.id === id);
+items = items.map(i => i.id === id ? { ...i, ...patch } : i);
+// 실패 시: items = items.map(i => i.id === id ? prev : i);
 
-$effect(() => {
-  if (!_suppress) localItems = [...serverItems];
-});
-
-async function addItem(name: string) {
-  const tmpId = `tmp-${Date.now()}`;
-  _suppress = true;                          // $effect 동기화 잠시 억제
-  localItems = [...localItems, { id: tmpId, name_ko: name }];
-
-  const ok = await submitAction('createItem', { name }, () => {
-    localItems = localItems.filter(i => i.id !== tmpId);
-  });
-
-  _suppress = false;
-  if (ok) await invalidateAll();             // 서버 데이터 갱신 후 $effect가 다시 동기화
-}
+// 삭제
+const prev = items.slice();
+items = items.filter(i => i.id !== id);
+// 실패 시: items = prev;
 ```
 
 ---
