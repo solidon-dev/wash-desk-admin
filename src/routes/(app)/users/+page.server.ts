@@ -147,25 +147,41 @@ export const actions: Actions = {
 				return fail(403, { error: '본인 공장 소속 사용자만 수정할 수 있습니다.' });
 			}
 
-			const { error } = await locals.supabase
+			const { data: updated, error } = await locals.supabase
 				.from('profiles')
 				.update({ full_name, phone })
-				.eq('id', targetId);
+				.eq('id', targetId)
+				.select('id, full_name, phone, role, factory_id, created_at, deleted_at, factories(id, name)')
+				.single();
 
 			if (error) return fail(500, { error: error.message });
-			return { success: true };
+
+			const user = {
+				...updated,
+				username: '',
+				factory_name: (updated.factories as { name: string } | null)?.name ?? null,
+			};
+			return { success: true, user };
 		}
 
 		// super_admin: 모든 필드
 		if (!factory_id) return fail(400, { error: '공장을 선택해주세요.' });
 
-		const { error } = await locals.supabase
+		const { data: updated, error } = await locals.supabase
 			.from('profiles')
 			.update({ full_name, phone, role: role as 'factory_admin' | 'worker', factory_id })
-			.eq('id', targetId);
+			.eq('id', targetId)
+			.select('id, full_name, phone, role, factory_id, created_at, deleted_at, factories(id, name)')
+			.single();
 
 		if (error) return fail(500, { error: error.message });
-		return { success: true };
+
+		const user = {
+			...updated,
+			username: '',
+			factory_name: (updated.factories as { name: string } | null)?.name ?? null,
+		};
+		return { success: true, user };
 	},
 
 	// ── 비밀번호 변경
@@ -215,7 +231,18 @@ export const actions: Actions = {
 		if (banErr) return fail(500, { error: banErr.message });
 
 		await locals.supabase.from('profiles').update({ deleted_at: new Date().toISOString() }).eq('id', id);
-		return { success: true };
+
+		const { data: updated } = await locals.supabase
+			.from('profiles')
+			.select('id, full_name, phone, role, factory_id, created_at, deleted_at, factories(id, name)')
+			.eq('id', id)
+			.single();
+		const user = updated ? {
+			...updated,
+			username: '',
+			factory_name: (updated.factories as { name: string } | null)?.name ?? null,
+		} : null;
+		return { success: true, user };
 	},
 
 	// ── 활성화 — super_admin 전용
@@ -231,6 +258,17 @@ export const actions: Actions = {
 		if (banErr) return fail(500, { error: banErr.message });
 
 		await locals.supabase.from('profiles').update({ deleted_at: null }).eq('id', id);
-		return { success: true };
+
+		const { data: updated } = await locals.supabase
+			.from('profiles')
+			.select('id, full_name, phone, role, factory_id, created_at, deleted_at, factories(id, name)')
+			.eq('id', id)
+			.single();
+		const user = updated ? {
+			...updated,
+			username: '',
+			factory_name: (updated.factories as { name: string } | null)?.name ?? null,
+		} : null;
+		return { success: true, user };
 	},
 };
