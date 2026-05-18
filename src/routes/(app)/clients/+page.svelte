@@ -45,19 +45,20 @@
   let { data }: Props = $props();
 
   // ── 서버 데이터 $derived
-  const myRole        = $derived(data.role as 'super_admin' | 'factory_admin' | 'worker');
-  const myFactoryId   = $derived(data.factory_id);
-  const factories     = $derived(data.factories);
-  const totalPages    = $derived(Math.max(1, Math.ceil(data.total / data.PAGE_SIZE)));
-  // ── 로컬 상태 (낙관적 업데이트 — 액션 중 아닐 때는 서버 데이터와 동기화)
-  let localClients = $state<ClientRow[]>([...data.clients]);
-  let _acting = false; // 액션 진행 중엔 $effect가 덮어쓰지 않도록
+  const myRole      = $derived(data.role as 'super_admin' | 'factory_admin' | 'worker');
+  const myFactoryId = $derived(data.factory_id);
+  const factories   = $derived(data.factories);
+  const totalPages  = $derived(Math.max(1, Math.ceil(data.total / data.PAGE_SIZE)));
 
-  const serverClients = $derived(data.clients);
-  $effect(() => {
-    const next = serverClients;
-    if (!_acting) localClients = [...next];
-  });
+  // ── 낙관적 업데이트: overrides(수정/삭제) + pendingNew(등록 중 tmpRow)
+  //    displayClients = 서버 데이터 기반 $derived — 페이지 이동/검색 자동 반영
+  let overrides  = $state(new Map<string, ClientRow>());
+  let pendingNew = $state<ClientRow[]>([]);
+
+  const displayClients = $derived([
+    ...pendingNew,
+    ...data.clients.map(c => overrides.get(c.id) ?? c),
+  ].slice(0, data.PAGE_SIZE));
 
   // ── 에러 모달 상태
   let errorMessage = $state('');
@@ -194,10 +195,10 @@
     if (myRole === 'super_admin') payload.factory_id = formFactoryId;
 
     if (editingClient) {
-      // 수정 — 낙관적 업데이트 후 서버 응답으로 교체
+      // 수정 — overrides에 낙관적 값 저장, 서버 응답 오면 교체 후 제거
       const id   = editingClient.id;
       payload.id = id;
-      const prev = localClients.find(c => c.id === id);
+      const prev = data.clients.find(c => c.id === id);
       const optimistic: ClientRow = {
         ...(prev ?? editingClient),
         name:                formName.trim(),
@@ -209,17 +210,18 @@
         contract_end_date:   formContractEnd   || null,
         factory_id:          myRole === 'super_admin' ? formFactoryId : (prev?.factory_id ?? editingClient.factory_id),
       };
-      localClients = localClients.map(c => c.id === id ? optimistic : c);
+      overrides.set(id, optimistic);
+      overrides = overrides;
       modal.close();
 
-      _acting = true;
       const saved = await submitAction('update', payload, () => {
-        localClients = localClients.map(c => c.id === id ? (prev ?? c) : c);
+        overrides.delete(id); overrides = overrides;
       });
-      _acting = false;
-      if (saved) localClients = localClients.map(c => c.id === id ? saved : c);
+      overrides.delete(id);
+      if (saved) { overrides.set(id, saved); }
+      overrides = overrides;
     } else {
-      // 등록 — 모달 닫고 tmpId로 즉시 추가, 서버 응답으로 tmpId 교체
+      // 등록 — pendingNew에 tmpRow 추가, 서버 응답 오면 제거 (실제 row는 다음 페이지 이동 시 SSR로 표시)
       const tmpId = `tmp-${Date.now()}`;
       const tmpRow: ClientRow = {
         id:                  tmpId,
@@ -234,50 +236,49 @@
         created_at:          new Date().toISOString(),
         deleted_at:          null,
       };
-      localClients = [tmpRow, ...localClients].slice(0, data.PAGE_SIZE);
+      pendingNew = [tmpRow];
       modal.close();
 
-      _acting = true;
       const created = await submitAction('create', payload, () => {
-        localClients = localClients.filter(c => c.id !== tmpId);
+        pendingNew = [];
       });
-      _acting = false;
-      if (created) localClients = localClients.map(c => c.id === tmpId ? created : c);
+      pendingNew = [];
+      // 서버에 저장됨 — overrides에 넣으면 data.clients에 아직 없어서 표시될 위치가 없음
+      // 각자의 페이지에서 SSR 데이터로 자연스럽게 표시됨 (created는 등름)
+      void created;
     }
   }
 
   async function handleHide() {
     if (!editingClient) return;
     const id   = editingClient.id;
-    const prev = localClients.find(c => c.id === id);
-    localClients = localClients.map(c =>
-      c.id === id ? { ...c, deleted_at: new Date().toISOString() } : c
-    );
+    const prev = data.clients.find(c => c.id === id);
+    overrides.set(id, { ...(prev ?? editingClient), deleted_at: new Date().toISOString() });
+    overrides = overrides;
     modal.close();
 
-    _acting = true;
     const saved = await submitAction('hide', { id }, () => {
-      localClients = localClients.map(c => c.id === id ? (prev ?? c) : c);
+      overrides.delete(id); overrides = overrides;
     });
-    _acting = false;
-    if (saved) localClients = localClients.map(c => c.id === id ? saved : c);
+    overrides.delete(id);
+    if (saved) { overrides.set(id, saved); }
+    overrides = overrides;
   }
 
   async function handleRestore() {
     if (!editingClient) return;
     const id   = editingClient.id;
-    const prev = localClients.find(c => c.id === id);
-    localClients = localClients.map(c =>
-      c.id === id ? { ...c, deleted_at: null } : c
-    );
+    const prev = data.clients.find(c => c.id === id);
+    overrides.set(id, { ...(prev ?? editingClient), deleted_at: null });
+    overrides = overrides;
     modal.close();
 
-    _acting = true;
     const saved = await submitAction('restore', { id }, () => {
-      localClients = localClients.map(c => c.id === id ? (prev ?? c) : c);
+      overrides.delete(id); overrides = overrides;
     });
-    _acting = false;
-    if (saved) localClients = localClients.map(c => c.id === id ? saved : c);
+    overrides.delete(id);
+    if (saved) { overrides.set(id, saved); }
+    overrides = overrides;
   }
 
   // ── 검색 이벤트
@@ -490,14 +491,14 @@
         </tr>
       </thead>
       <tbody>
-        {#if localClients.length === 0}
+        {#if displayClients.length === 0}
           <tr>
             <td colspan="8" class="py-16 text-center text-base-content/40 text-sm">
               등록된 거래처가 없습니다.
             </td>
           </tr>
         {:else}
-          {#each localClients as c (c.id)}
+          {#each displayClients as c (c.id)}
             {@const status = contractStatus(c.contract_start_date, c.contract_end_date)}
             <tr class="hover:bg-base-200 transition-colors {c.deleted_at ? 'opacity-40' : ''}">
 
