@@ -1,14 +1,12 @@
 <script lang="ts">
-  import { enhance } from '$app/forms';
-  import { goto } from '$app/navigation';
+  import { deserialize } from '$app/forms';
+  import { goto, invalidateAll } from '$app/navigation';
   import Icon from '@iconify/svelte';
-  import SearchBar from '$lib/components/SearchBar.svelte';
-  import Pagination from '$lib/components/Pagination.svelte';
-  import TableCard from '$lib/components/TableCard.svelte';
-  import { supabase } from '$lib/supabase/client';
+  import { modal, SearchBar, Pagination, TableCard } from '$lib';
   import type { PageData } from './$types';
   import { formatPhone, displayPhone } from '$lib/utils/phone';
 
+  // ── 타입
   type ClientRow = {
     id: string;
     factory_id: string;
@@ -23,9 +21,17 @@
     deleted_at: string | null;
   };
 
+  type AllClientRow = {
+    id: string;
+    name: string;
+    business_number: string | null;
+    deleted_at: string | null;
+  };
+
   type Props = {
     data: PageData & {
       clients: ClientRow[];
+      allClients: AllClientRow[];
       total: number;
       page: number;
       PAGE_SIZE: number;
@@ -35,56 +41,62 @@
       factory_id: string | null;
       factories: { id: string; name: string }[];
     };
-    form: { success?: boolean; error?: string } | null;
   };
-  let { data, form }: Props = $props();
+  let { data }: Props = $props();
 
-  const myRole      = $derived(data.role as 'super_admin' | 'factory_admin' | 'worker');
-  const myFactoryId = $derived(data.factory_id);
-  const factories   = $derived(data.factories);
-  const totalPages  = $derived(Math.max(1, Math.ceil(data.total / data.PAGE_SIZE)));
+  // ── 서버 데이터 $derived
+  const myRole        = $derived(data.role as 'super_admin' | 'factory_admin' | 'worker');
+  const myFactoryId   = $derived(data.factory_id);
+  const factories     = $derived(data.factories);
+  const totalPages    = $derived(Math.max(1, Math.ceil(data.total / data.PAGE_SIZE)));
+  const serverClients = $derived(data.clients);
 
-  // ── URL 이동 헬퍼
-  function navTo(params: { q?: string; page?: number; hidden?: boolean }) {
-    const q      = params.q      ?? data.q;
-    const page   = params.page   ?? 1;
-    const hidden = params.hidden ?? data.showHidden;
-    const parts: string[] = [];
-    if (q)        parts.push(`q=${encodeURIComponent(q)}`);
-    if (hidden)   parts.push('hidden=1');
-    if (page > 1) parts.push(`page=${page}`);
-    goto(parts.length ? `?${parts.join('&')}` : '?');
+  // ── 낙관적 업데이트용 로컬 상태
+  let localClients = $state<ClientRow[]>([...data.clients]);
+  let _suppress    = false;
+
+  $effect(() => {
+    const s = serverClients;
+    if (!_suppress) localClients = [...s];
+  });
+
+  // ── 에러 모달 상태
+  let errorMessage = $state('');
+
+  function showErrorModal(message?: string) {
+    errorMessage = message ?? '업데이트에 실패했습니다. 같은 문제가 반복된다면 관리자에게 문의해 주세요.';
+    modal.open(errorContent);
   }
 
-  // ── 검색 드롭다운 (debounce, URL 변경 없음 — factories 동일 패턴)
-  let suggestions = $state<{ id: string; label: string; sub?: string }[]>([]);
-  let debounceTimer: ReturnType<typeof setTimeout>;
+  // ── UI 상태
+  let editingClient     = $state<ClientRow | null>(null);
+  let formName          = $state('');
+  let formBusinessNo    = $state('');
+  let formEmail         = $state('');
+  let formManagerName   = $state('');
+  let formManagerPhone  = $state('');
+  let formContractStart = $state('');
+  let formContractEnd   = $state('');
+  let formFactoryId     = $state('');
 
-  async function fetchSuggestions(q: string) {
-    if (!q.trim()) { suggestions = []; return; }
-    let sq = supabase
-      .from('clients')
-      .select('id, name, business_number')
-      .ilike('name', `%${q.trim()}%`)
-      .limit(8);
-    if (!data.showHidden) sq = sq.is('deleted_at', null);
-    const { data: rows } = await sq;
-    suggestions = (rows ?? []).map(r => ({ id: r.id, label: r.name, sub: r.business_number ?? undefined }));
-  }
+  // ── 검색 suggestions ($derived — allClients 기반 클라이언트 필터링)
+  let searchInputValue = $state('');
 
-  function onSearchInput(q: string) {
-    clearTimeout(debounceTimer);
-    if (!q.trim()) { suggestions = []; return; }
-    debounceTimer = setTimeout(() => fetchSuggestions(q), 180);
-  }
+  const suggestions = $derived.by(() => {
+    const q = searchInputValue.trim().toLowerCase();
+    if (!q) return [];
+    const allClients = data.allClients;
+    const showHidden = data.showHidden;
+    return allClients
+      .filter(c => {
+        if (!showHidden && c.deleted_at) return false;
+        return c.name.toLowerCase().includes(q);
+      })
+      .slice(0, 8)
+      .map(c => ({ id: c.id, label: c.name, sub: c.business_number ?? undefined }));
+  });
 
-  function onSearchSelect(id: string) {
-    const found = suggestions.find(s => s.id === id);
-    suggestions = [];
-    navTo({ q: found?.label ?? '' });
-  }
-
-  // ── 계약 상태
+  // ── 유틸
   type ContractStatus = 'active' | 'pending' | 'expired' | 'none';
 
   function contractStatus(start: string | null, end: string | null): ContractStatus {
@@ -104,24 +116,44 @@
 
   function formatDate(v: string | null) { return v ? v.slice(0, 10) : '—'; }
 
-  // ── 모달
-  let showModal     = $state(false);
-  let editingClient = $state<ClientRow | null>(null);
-  let formName          = $state('');
-  let formBusinessNo    = $state('');
-  let formEmail         = $state('');
-  let formManagerName   = $state('');
-  let formManagerPhone  = $state('');
-  let formContractStart = $state('');
-  let formContractEnd   = $state('');
-  let formFactoryId     = $state('');
-  let saveError         = $state('');
+  // ── URL 이동 헬퍼
+  async function navTo(params: { q?: string; page?: number; hidden?: boolean }) {
+    const q      = params.q      ?? data.q;
+    const page   = params.page   ?? 1;
+    const hidden = params.hidden ?? data.showHidden;
+    const parts: string[] = [];
+    if (q)        parts.push(`q=${encodeURIComponent(q)}`);
+    if (hidden)   parts.push('hidden=1');
+    if (page > 1) parts.push(`page=${page}`);
+    await goto(parts.length ? `?${parts.join('&')}` : '?');
+  }
 
-  $effect(() => {
-    if (form?.success) closeModal();
-    if (form?.error)   saveError = form.error ?? '';
-  });
+  // ── submitAction (인라인 구현)
+  async function submitAction(
+    action: string,
+    payload: Record<string, string>,
+    onRollback?: () => void
+  ): Promise<boolean> {
+    const formData = new FormData();
+    for (const [k, v] of Object.entries(payload)) formData.append(k, v);
+    try {
+      const res    = await fetch(`?/${action}`, { method: 'POST', body: formData });
+      const result = deserialize(await res.text());
+      if (result.type === 'failure' || result.type === 'error') {
+        onRollback?.();
+        const msg = (result as { data?: { error?: string } }).data?.error;
+        showErrorModal(msg);
+        return false;
+      }
+      return true;
+    } catch {
+      onRollback?.();
+      showErrorModal();
+      return false;
+    }
+  }
 
+  // ── 모달 open/close
   function openAdd() {
     editingClient     = null;
     formName          = '';
@@ -132,8 +164,7 @@
     formContractStart = '';
     formContractEnd   = '';
     formFactoryId     = myRole === 'factory_admin' ? (myFactoryId ?? '') : (factories[0]?.id ?? '');
-    saveError         = '';
-    showModal         = true;
+    modal.open(clientFormModal);
   }
 
   function openEdit(c: ClientRow) {
@@ -146,13 +177,275 @@
     formContractStart = c.contract_start_date ?? '';
     formContractEnd   = c.contract_end_date   ?? '';
     formFactoryId     = c.factory_id;
-    saveError         = '';
-    showModal         = true;
+    modal.open(clientFormModal);
   }
 
-  function closeModal() { showModal = false; }
+  // ── 액션 핸들러
+  async function handleSave() {
+    if (!formName.trim()) { showErrorModal('거래처명을 입력해주세요.'); return; }
+
+    const payload: Record<string, string> = {
+      name:               formName.trim(),
+      business_number:    formBusinessNo.trim(),
+      email:              formEmail.trim(),
+      manager_name:       formManagerName.trim(),
+      manager_phone:      formManagerPhone,
+      contract_start_date: formContractStart,
+      contract_end_date:   formContractEnd,
+    };
+    if (myRole === 'super_admin') payload.factory_id = formFactoryId;
+
+    if (editingClient) {
+      // 수정 — 낙관적 업데이트
+      const id      = editingClient.id;
+      payload.id    = id;
+      const prev    = localClients.find(c => c.id === id);
+      const updated: ClientRow = {
+        ...(prev ?? editingClient),
+        name:                formName.trim(),
+        business_number:     formBusinessNo.trim() || null,
+        email:               formEmail.trim() || null,
+        manager_name:        formManagerName.trim() || null,
+        manager_phone:       formManagerPhone || null,
+        contract_start_date: formContractStart || null,
+        contract_end_date:   formContractEnd   || null,
+        factory_id:          myRole === 'super_admin' ? formFactoryId : (prev?.factory_id ?? editingClient.factory_id),
+      };
+
+      _suppress = true;
+      localClients = localClients.map(c => c.id === id ? updated : c);
+
+      const ok = await submitAction('update', payload, () => {
+        localClients = localClients.map(c => c.id === id ? (prev ?? c) : c);
+      });
+      _suppress = false;
+      if (ok) { modal.close(); await invalidateAll(); }
+    } else {
+      // 등록 — tmpId 패턴
+      const tmpId = `tmp-${Date.now()}`;
+      const tmpRow: ClientRow = {
+        id:                  tmpId,
+        factory_id:          formFactoryId,
+        name:                formName.trim(),
+        business_number:     formBusinessNo.trim() || null,
+        email:               formEmail.trim() || null,
+        manager_name:        formManagerName.trim() || null,
+        manager_phone:       formManagerPhone || null,
+        contract_start_date: formContractStart || null,
+        contract_end_date:   formContractEnd   || null,
+        created_at:          new Date().toISOString(),
+        deleted_at:          null,
+      };
+
+      _suppress = true;
+      localClients = [tmpRow, ...localClients];
+
+      const ok = await submitAction('create', payload, () => {
+        localClients = localClients.filter(c => c.id !== tmpId);
+      });
+      _suppress = false;
+      if (ok) { modal.close(); await invalidateAll(); }
+    }
+  }
+
+  async function handleHide() {
+    if (!editingClient) return;
+    const id   = editingClient.id;
+    const prev = localClients.find(c => c.id === id);
+
+    _suppress = true;
+    localClients = localClients.map(c =>
+      c.id === id ? { ...c, deleted_at: new Date().toISOString() } : c
+    );
+
+    const ok = await submitAction('hide', { id }, () => {
+      localClients = localClients.map(c => c.id === id ? (prev ?? c) : c);
+    });
+    _suppress = false;
+    if (ok) { modal.close(); await invalidateAll(); }
+  }
+
+  async function handleRestore() {
+    if (!editingClient) return;
+    const id   = editingClient.id;
+    const prev = localClients.find(c => c.id === id);
+
+    _suppress = true;
+    localClients = localClients.map(c =>
+      c.id === id ? { ...c, deleted_at: null } : c
+    );
+
+    const ok = await submitAction('restore', { id }, () => {
+      localClients = localClients.map(c => c.id === id ? (prev ?? c) : c);
+    });
+    _suppress = false;
+    if (ok) { modal.close(); await invalidateAll(); }
+  }
+
+  // ── 검색 이벤트
+  function onSearchInput(q: string) {
+    searchInputValue = q;
+  }
+
+  function onSearchSelect(id: string) {
+    const found = suggestions.find(s => s.id === id);
+    searchInputValue = '';
+    navTo({ q: found?.label ?? '' });
+  }
 </script>
 
+<!-- ───────────── 에러 모달 snippet ───────────── -->
+{#snippet errorContent()}
+  <div class="modal-box max-w-sm">
+    <div class="flex items-start gap-3">
+      <Icon icon="lucide:alert-circle" class="text-error mt-0.5 h-5 w-5 shrink-0" />
+      <div>
+        <h3 class="font-semibold text-base-content">오류가 발생했습니다</h3>
+        <p class="mt-1 text-sm text-base-content/70">{errorMessage}</p>
+      </div>
+    </div>
+    <div class="modal-action mt-4">
+      <button class="btn btn-sm" onclick={modal.close}>확인</button>
+    </div>
+  </div>
+{/snippet}
+
+<!-- ───────────── 거래처 등록/수정 모달 snippet ───────────── -->
+{#snippet clientFormModal()}
+  <div class="modal-box max-w-lg rounded-2xl p-6 flex flex-col" style="max-height: 600px;">
+
+    <!-- 헤더 -->
+    <div class="flex items-center justify-between mb-5 shrink-0">
+      <div class="flex items-center gap-2 flex-wrap">
+        <h3 class="text-lg font-extrabold text-base-content">
+          {editingClient ? '거래처 수정' : '거래처 등록'}
+        </h3>
+        {#if editingClient}
+          {@const st = contractStatus(editingClient.contract_start_date, editingClient.contract_end_date)}
+          {#if st !== 'none'}
+            <span class="badge badge-sm {statusMeta[st].cls}">{statusMeta[st].label}</span>
+          {/if}
+          {#if editingClient.deleted_at}
+            <span class="badge badge-sm badge-error gap-1">
+              <Icon icon="lucide:ban" class="w-3 h-3" />
+              비활성화
+            </span>
+          {/if}
+        {/if}
+      </div>
+      <button onclick={modal.close} class="btn btn-ghost btn-sm btn-circle">
+        <Icon icon="lucide:x" class="w-5 h-5" />
+      </button>
+    </div>
+
+    <!-- 폼 필드 -->
+    <div class="flex flex-col gap-0 overflow-hidden flex-1">
+      <div class="flex flex-col gap-4 overflow-y-auto flex-1 pr-1">
+
+        <div>
+          <label for="cName" class="label pb-1">
+            <span class="label-text text-xs font-bold text-base-content/60">거래처명 <span class="text-error">*</span></span>
+          </label>
+          <input id="cName" type="text" bind:value={formName}
+            placeholder="거래처명 입력" class="input input-bordered w-full text-sm" />
+        </div>
+
+        <div>
+          <label for="cBizNo" class="label pb-1">
+            <span class="label-text text-xs font-bold text-base-content/60">사업자번호</span>
+          </label>
+          <input id="cBizNo" type="text" bind:value={formBusinessNo}
+            placeholder="000-00-00000" class="input input-bordered w-full text-sm" />
+        </div>
+
+        <div>
+          <label for="cEmail" class="label pb-1">
+            <span class="label-text text-xs font-bold text-base-content/60">이메일</span>
+          </label>
+          <input id="cEmail" type="email" bind:value={formEmail}
+            placeholder="example@email.com" class="input input-bordered w-full text-sm" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label for="cMgrName" class="label pb-1">
+              <span class="label-text text-xs font-bold text-base-content/60">담당자</span>
+            </label>
+            <input id="cMgrName" type="text" bind:value={formManagerName}
+              placeholder="담당자명" class="input input-bordered w-full text-sm" />
+          </div>
+          <div>
+            <label for="cMgrPhone" class="label pb-1">
+              <span class="label-text text-xs font-bold text-base-content/60">연락처</span>
+            </label>
+            <input id="cMgrPhone" type="tel" bind:value={formManagerPhone}
+              oninput={() => { formManagerPhone = formatPhone(formManagerPhone); }}
+              placeholder="010-0000-0000" class="input input-bordered w-full text-sm" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label for="cStartDate" class="label pb-1">
+              <span class="label-text text-xs font-bold text-base-content/60">거래 시작일</span>
+            </label>
+            <input id="cStartDate" type="date" bind:value={formContractStart}
+              class="input input-bordered w-full text-sm" />
+          </div>
+          <div>
+            <label for="cEndDate" class="label pb-1">
+              <span class="label-text text-xs font-bold text-base-content/60">거래 종료일</span>
+            </label>
+            <input id="cEndDate" type="date" bind:value={formContractEnd}
+              class="input input-bordered w-full text-sm" />
+          </div>
+        </div>
+
+        {#if myRole === 'super_admin'}
+          <div>
+            <label for="cFactory" class="label pb-1">
+              <span class="label-text text-xs font-bold text-base-content/60">소속 공장 <span class="text-error">*</span></span>
+            </label>
+            <select id="cFactory" bind:value={formFactoryId} class="select select-bordered w-full text-sm">
+              {#each factories as f (f.id)}
+                <option value={f.id}>{f.name}</option>
+              {/each}
+            </select>
+          </div>
+        {/if}
+
+      </div>
+
+      <!-- 하단 버튼 -->
+      <div class="modal-action mt-5 pt-4 border-t border-base-200 shrink-0 flex justify-between">
+        <div>
+          {#if editingClient}
+            {#if editingClient.deleted_at}
+              <button onclick={handleRestore} class="btn btn-sm btn-success gap-1.5 font-bold">
+                <Icon icon="lucide:circle-check" class="w-4 h-4" />
+                활성화
+              </button>
+            {:else}
+              <button onclick={handleHide} class="btn btn-sm btn-error btn-outline gap-1.5 font-bold">
+                <Icon icon="lucide:ban" class="w-4 h-4" />
+                비활성화
+              </button>
+            {/if}
+          {/if}
+        </div>
+        <div class="flex gap-2">
+          <button onclick={modal.close} class="btn btn-ghost font-bold">취소</button>
+          <button onclick={handleSave} class="btn btn-primary font-bold">
+            {editingClient ? '저장' : '등록'}
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+{/snippet}
+
+<!-- ───────────── 페이지 본문 ───────────── -->
 <div class="min-h-full bg-base-200 px-8 py-10">
   <h2 class="text-2xl font-extrabold text-base-content mb-5">거래처 관리</h2>
 
@@ -199,14 +492,14 @@
         </tr>
       </thead>
       <tbody>
-        {#if data.clients.length === 0}
+        {#if localClients.length === 0}
           <tr>
             <td colspan="8" class="py-16 text-center text-base-content/40 text-sm">
               등록된 거래처가 없습니다.
             </td>
           </tr>
         {:else}
-          {#each data.clients as c (c.id)}
+          {#each localClients as c (c.id)}
             {@const status = contractStatus(c.contract_start_date, c.contract_end_date)}
             <tr class="hover:bg-base-200 transition-colors {c.deleted_at ? 'opacity-40' : ''}">
 
@@ -267,186 +560,3 @@
     />
   </div>
 </div>
-
-<!-- ───────────── 등록/수정 모달 ───────────── -->
-{#if showModal}
-  <dialog open class="modal modal-open">
-    <div
-      class="modal-backdrop"
-      role="button"
-      tabindex="-1"
-      onclick={closeModal}
-      onkeydown={(e) => e.key === 'Escape' && closeModal()}
-    ></div>
-    <div class="modal-box max-w-lg rounded-2xl p-6 flex flex-col" style="max-height: 600px;">
-
-      <!-- 헤더 -->
-      <div class="flex items-center justify-between mb-5 shrink-0">
-        <div class="flex items-center gap-2 flex-wrap">
-          <h3 class="text-lg font-extrabold text-base-content">
-            {editingClient ? '거래처 수정' : '거래처 등록'}
-          </h3>
-          {#if editingClient}
-            {@const st = contractStatus(editingClient.contract_start_date, editingClient.contract_end_date)}
-            {#if st !== 'none'}
-              <span class="badge badge-sm {statusMeta[st].cls}">{statusMeta[st].label}</span>
-            {/if}
-            {#if editingClient.deleted_at}
-              <span class="badge badge-sm badge-error gap-1">
-                <Icon icon="lucide:ban" class="w-3 h-3" />
-                비활성화
-              </span>
-            {/if}
-          {/if}
-        </div>
-        <button onclick={closeModal} class="btn btn-ghost btn-sm btn-circle">
-          <Icon icon="lucide:x" class="w-5 h-5" />
-        </button>
-      </div>
-
-      <!-- 수정 폼 -->
-      <form
-        method="POST"
-        action={editingClient ? '?/update' : '?/create'}
-        use:enhance={({ formData }) => {
-          saveError = '';
-          if (editingClient) formData.set('id', editingClient.id);
-          if (myRole === 'super_admin') formData.set('factory_id', formFactoryId);
-          return async ({ result, update }) => {
-            if (result.type === 'failure') {
-              saveError = (result.data as { error?: string })?.error ?? '오류가 발생했습니다.';
-            } else {
-              await update();
-              closeModal();
-            }
-          };
-        }}
-        class="flex flex-col gap-0 overflow-hidden flex-1"
-      >
-        <div class="flex flex-col gap-4 overflow-y-auto flex-1 pr-1">
-
-          <div>
-            <label for="cName" class="label pb-1">
-              <span class="label-text text-xs font-bold text-base-content/60">거래처명 <span class="text-error">*</span></span>
-            </label>
-            <input id="cName" name="name" type="text" bind:value={formName}
-              placeholder="거래처명 입력" required class="input input-bordered w-full text-sm" />
-          </div>
-
-          <div>
-            <label for="cBizNo" class="label pb-1">
-              <span class="label-text text-xs font-bold text-base-content/60">사업자번호</span>
-            </label>
-            <input id="cBizNo" name="business_number" type="text" bind:value={formBusinessNo}
-              placeholder="000-00-00000" class="input input-bordered w-full text-sm" />
-          </div>
-
-          <div>
-            <label for="cEmail" class="label pb-1">
-              <span class="label-text text-xs font-bold text-base-content/60">이메일</span>
-            </label>
-            <input id="cEmail" name="email" type="email" bind:value={formEmail}
-              placeholder="example@email.com" class="input input-bordered w-full text-sm" />
-          </div>
-
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label for="cMgrName" class="label pb-1">
-                <span class="label-text text-xs font-bold text-base-content/60">담당자</span>
-              </label>
-              <input id="cMgrName" name="manager_name" type="text" bind:value={formManagerName}
-                placeholder="담당자명" class="input input-bordered w-full text-sm" />
-            </div>
-            <div>
-              <label for="cMgrPhone" class="label pb-1">
-                <span class="label-text text-xs font-bold text-base-content/60">연락처</span>
-              </label>
-              <input id="cMgrPhone" name="manager_phone" type="tel" bind:value={formManagerPhone}
-                oninput={() => { formManagerPhone = formatPhone(formManagerPhone); }}
-                placeholder="010-0000-0000" class="input input-bordered w-full text-sm" />
-            </div>
-          </div>
-
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label for="cStartDate" class="label pb-1">
-                <span class="label-text text-xs font-bold text-base-content/60">거래 시작일</span>
-              </label>
-              <input id="cStartDate" name="contract_start_date" type="date" bind:value={formContractStart}
-                class="input input-bordered w-full text-sm" />
-            </div>
-            <div>
-              <label for="cEndDate" class="label pb-1">
-                <span class="label-text text-xs font-bold text-base-content/60">거래 종료일</span>
-              </label>
-              <input id="cEndDate" name="contract_end_date" type="date" bind:value={formContractEnd}
-                class="input input-bordered w-full text-sm" />
-            </div>
-          </div>
-
-          {#if myRole === 'super_admin'}
-            <div>
-              <label for="cFactory" class="label pb-1">
-                <span class="label-text text-xs font-bold text-base-content/60">소속 공장 <span class="text-error">*</span></span>
-              </label>
-              <select id="cFactory" bind:value={formFactoryId} class="select select-bordered w-full text-sm">
-                {#each factories as f (f.id)}
-                  <option value={f.id}>{f.name}</option>
-                {/each}
-              </select>
-            </div>
-          {/if}
-
-          {#if saveError}
-            <p class="text-error text-xs">{saveError}</p>
-          {/if}
-        </div>
-
-        <div class="modal-action mt-5 pt-4 border-t border-base-200 shrink-0 flex justify-between">
-          <div>
-            {#if editingClient}
-              {#if editingClient.deleted_at}
-                <button type="submit" form="form-activate" class="btn btn-sm btn-success gap-1.5 font-bold">
-                  <Icon icon="lucide:circle-check" class="w-4 h-4" />
-                  활성화
-                </button>
-              {:else}
-                <button type="submit" form="form-deactivate" class="btn btn-sm btn-error btn-outline gap-1.5 font-bold">
-                  <Icon icon="lucide:ban" class="w-4 h-4" />
-                  비활성화
-                </button>
-              {/if}
-            {/if}
-          </div>
-          <div class="flex gap-2">
-            <button type="button" onclick={closeModal} class="btn btn-ghost font-bold">취소</button>
-            <button type="submit" class="btn btn-primary font-bold">
-              {editingClient ? '저장' : '등록'}
-            </button>
-          </div>
-        </div>
-      </form>
-
-    </div>
-  </dialog>
-{/if}
-
-<!-- 비활성화 / 활성화 전용 form (모달 바깥, form 속성으로 연결) -->
-{#if editingClient}
-  <form
-    id="form-deactivate"
-    method="POST"
-    action="?/hide"
-    use:enhance={() => async ({ update }) => { await update(); closeModal(); }}
-  >
-    <input type="hidden" name="id" value={editingClient.id} />
-  </form>
-  <form
-    id="form-activate"
-    method="POST"
-    action="?/restore"
-    use:enhance={() => async ({ update }) => { await update(); closeModal(); }}
-  >
-    <input type="hidden" name="id" value={editingClient.id} />
-  </form>
-{/if}

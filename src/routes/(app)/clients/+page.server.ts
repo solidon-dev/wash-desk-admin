@@ -19,9 +19,14 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	if (q)           query = query.ilike('name', `%${q}%`);
 
 	const { data: clients, count, error } = await query;
-	if (error) return { clients: [], total: 0, page, PAGE_SIZE, showHidden, q };
+	if (error) return { clients: [], total: 0, page, PAGE_SIZE, showHidden, q, allClients: [] };
 
-	return { clients: clients ?? [], total: count ?? 0, page, PAGE_SIZE, showHidden, q };
+	const { data: allClientsData } = await locals.supabase
+		.from('clients')
+		.select('id, name, business_number, deleted_at')
+		.order('name');
+
+	return { clients: clients ?? [], total: count ?? 0, page, PAGE_SIZE, showHidden, q, allClients: allClientsData ?? [] };
 };
 
 export const actions: Actions = {
@@ -71,9 +76,9 @@ export const actions: Actions = {
 		const manager_phone      = (form.get('manager_phone')      as string)?.trim().replace(/-/g, '') || null;
 		const contract_start_date = (form.get('contract_start_date') as string) || null;
 		const contract_end_date   = (form.get('contract_end_date')   as string) || null;
-		const factory_id         = myRole === 'super_admin'
-			? ((form.get('factory_id') as string) || null)
-			: myFactoryId;
+		const factory_id: string | undefined        = myRole === 'super_admin'
+			? ((form.get('factory_id') as string) || undefined)
+			: (myFactoryId ?? undefined);
 
 		if (!id || !name) return fail(400, { error: '필수 항목 누락' });
 
