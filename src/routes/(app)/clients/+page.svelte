@@ -225,7 +225,7 @@
         created_at:          new Date().toISOString(),
         deleted_at:          null,
       };
-      localClients = [tmpRow, ...localClients];
+      localClients = [tmpRow, ...localClients].slice(0, data.PAGE_SIZE);
       modal.close();
 
       const created = await submitAction('create', payload, () => {
