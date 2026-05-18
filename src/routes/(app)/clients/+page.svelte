@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { deserialize } from '$app/forms';
-  import { goto, invalidateAll } from '$app/navigation';
+  import { goto } from '$app/navigation';
   import Icon from '@iconify/svelte';
   import { modal, SearchBar, Pagination, TableCard, createListStore } from '$lib';
+  import { submitAction } from '$lib/utils/action';
   import type { PageData } from './$types';
   import { formatPhone, displayPhone } from '$lib/utils/phone';
 
@@ -121,30 +121,6 @@
     await goto(parts.length ? `?${parts.join('&')}` : '?');
   }
 
-  // ── submitAction — 서버 응답 data를 그대로 반환 (null이면 실패)
-  async function submitAction(
-    action: string,
-    payload: Record<string, string>,
-    onRollback?: () => void
-  ): Promise<ClientRow | null> {
-    const formData = new FormData();
-    for (const [k, v] of Object.entries(payload)) formData.append(k, v);
-    try {
-      const res    = await fetch(`?/${action}`, { method: 'POST', body: formData });
-      const result = deserialize(await res.text()) as { type: string; data?: { error?: string; client?: ClientRow } };
-      if (result.type === 'failure' || result.type === 'error') {
-        onRollback?.();
-        showErrorModal(result.data?.error);
-        return null;
-      }
-      return result.data?.client ?? null;
-    } catch {
-      onRollback?.();
-      showErrorModal();
-      return null;
-    }
-  }
-
   // ── 모달 open/close
   function openAdd() {
     editingClient     = null;
@@ -210,14 +186,20 @@
       list.override(id, optimistic);
       modal.close();
 
-      const saved = await submitAction('update', payload, () => list.clear(id));
+      const saved = await submitAction<ClientRow>('update', payload, {
+        responseKey: 'client',
+        onRollback: () => list.clear(id),
+        onError: showErrorModal,
+      });
       list.clear(id);
       if (saved) list.override(id, saved);
     } else {
       // 등록 — 모달 닫고 저장, 성공 시 invalidateAll로 서버 데이터 재요청
       modal.close();
-      const ok = await submitAction('create', payload);
-      if (ok) await invalidateAll();
+      await submitAction('create', payload, {
+        onError: showErrorModal,
+        revalidate: true,
+      });
     }
   }
 
@@ -228,7 +210,11 @@
     list.override(id, { ...(prev ?? editingClient), deleted_at: new Date().toISOString() });
     modal.close();
 
-    const saved = await submitAction('hide', { id }, () => list.clear(id));
+    const saved = await submitAction<ClientRow>('hide', { id }, {
+      responseKey: 'client',
+      onRollback: () => list.clear(id),
+      onError: showErrorModal,
+    });
     list.clear(id);
     if (saved) list.override(id, saved);
   }
@@ -240,7 +226,11 @@
     list.override(id, { ...(prev ?? editingClient), deleted_at: null });
     modal.close();
 
-    const saved = await submitAction('restore', { id }, () => list.clear(id));
+    const saved = await submitAction<ClientRow>('restore', { id }, {
+      responseKey: 'client',
+      onRollback: () => list.clear(id),
+      onError: showErrorModal,
+    });
     list.clear(id);
     if (saved) list.override(id, saved);
   }

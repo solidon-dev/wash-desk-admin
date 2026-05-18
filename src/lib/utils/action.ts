@@ -27,27 +27,50 @@ export function friendlyError(raw?: string): string {
   return raw;
 }
 
+type BaseOptions = {
+  onError?: (message: string) => void;
+  onRollback?: () => void;
+  revalidate?: boolean;
+};
+
 /**
  * 서버 action 호출 (fetch + deserialize 패턴)
  *
- * @param action     - URL action 이름 (예: 'updateItem')
- * @param payload    - FormData에 담을 key-value 쌍
- * @param options
- *   - onError:    에러 메시지 문자열을 받는 콜백 (에러 모달 표시용)
- *   - onRollback: 실패 시 낙관적 업데이트 롤백 콜백
- *   - revalidate: true면 성공 후 invalidateAll() 호출
- * @returns 성공 여부 (true / false)
+ * ### responseKey 있는 경우 — 서버 응답에서 row를 꺼내 반환
+ * ```ts
+ * const saved = await submitAction<ClientRow>('update', payload, {
+ *   responseKey: 'client',
+ *   onRollback: () => list.clear(id),
+ *   onError: showErrorModal,
+ * });
+ * // saved: ClientRow | null
+ * ```
+ *
+ * ### responseKey 없는 경우 — 성공 시 true 반환
+ * ```ts
+ * const ok = await submitAction('create', payload, {
+ *   onError: showErrorModal,
+ *   revalidate: true,
+ * });
+ * // ok: true | null
+ * ```
  */
+export async function submitAction<T>(
+  action: string,
+  payload: Record<string, string>,
+  options: BaseOptions & { responseKey: string }
+): Promise<T | null>;
 export async function submitAction(
   action: string,
   payload: Record<string, string>,
-  options?: {
-    onError?: (message: string) => void;
-    onRollback?: () => void;
-    revalidate?: boolean;
-  }
-): Promise<boolean> {
-  const { onError, onRollback, revalidate = false } = options ?? {};
+  options?: BaseOptions & { responseKey?: never }
+): Promise<true | null>;
+export async function submitAction<T>(
+  action: string,
+  payload: Record<string, string>,
+  options?: BaseOptions & { responseKey?: string }
+): Promise<T | true | null> {
+  const { responseKey, onError, onRollback, revalidate = false } = options ?? {};
 
   const form = new FormData();
   for (const [k, v] of Object.entries(payload)) {
@@ -62,17 +85,21 @@ export async function submitAction(
       onRollback?.();
       const raw = parseActionError(result);
       onError?.(friendlyError(raw || undefined));
-      return false;
+      return null;
     }
 
     if (revalidate) {
       await invalidateAll();
     }
 
+    if (responseKey) {
+      const data = 'data' in result ? result.data : undefined;
+      return ((data as Record<string, unknown>)?.[responseKey] as T) ?? null;
+    }
     return true;
   } catch {
     onRollback?.();
     onError?.(friendlyError());
-    return false;
+    return null;
   }
 }

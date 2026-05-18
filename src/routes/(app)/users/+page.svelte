@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { deserialize } from '$app/forms';
-  import { goto, invalidateAll } from '$app/navigation';
+  import { goto } from '$app/navigation';
   import Icon from '@iconify/svelte';
   import { modal, SearchBar, Pagination, TableCard, createListStore } from '$lib';
+  import { submitAction } from '$lib/utils/action';
   import type { PageData } from './$types';
   import { formatPhone, displayPhone } from '$lib/utils/phone';
 
@@ -101,30 +101,6 @@
     modal.open(errorContent);
   }
 
-  // ── submitAction ──
-  async function submitAction(
-    action: string,
-    payload: Record<string, string>,
-    onRollback?: () => void
-  ): Promise<UserRow | null> {
-    const formData = new FormData();
-    for (const [k, v] of Object.entries(payload)) formData.append(k, v);
-    try {
-      const res    = await fetch(`?/${action}`, { method: 'POST', body: formData });
-      const result = deserialize(await res.text()) as { type: string; data?: { error?: string; user?: UserRow } };
-      if (result.type === 'failure' || result.type === 'error') {
-        onRollback?.();
-        showErrorModal(result.data?.error);
-        return null;
-      }
-      return result.data?.user ?? null;
-    } catch {
-      onRollback?.();
-      showErrorModal();
-      return null;
-    }
-  }
-
   // ── 모달 열기 ──
   function openAdd() {
     editingUser      = null;
@@ -180,15 +156,21 @@
       list.override(editingUser.id, optimistic);
       modal.close();
 
-      const saved = await submitAction('update', payload, () => list.clear(editingUser!.id));
+      const saved = await submitAction<UserRow>('update', payload, {
+        responseKey: 'user',
+        onRollback: () => list.clear(editingUser!.id),
+        onError: showErrorModal,
+      });
       list.clear(editingUser.id);
       if (saved) list.override(saved.id, { ...saved, username: prev?.username ?? '' });
     } else {
       payload.username = formUsername;
       payload.password = formPassword;
       modal.close();
-      const ok = await submitAction('create', payload);
-      if (ok !== undefined) await invalidateAll();
+      await submitAction('create', payload, {
+        onError: showErrorModal,
+        revalidate: true,
+      });
     }
   }
 
@@ -199,7 +181,11 @@
     const prev = data.users.find(u => u.id === id);
     list.override(id, { ...(prev ?? editingUser), deleted_at: new Date().toISOString() });
     modal.close();
-    const saved = await submitAction('deactivate', { id }, () => list.clear(id));
+    const saved = await submitAction<UserRow>('deactivate', { id }, {
+      responseKey: 'user',
+      onRollback: () => list.clear(id),
+      onError: showErrorModal,
+    });
     list.clear(id);
     if (saved) list.override(id, { ...saved, username: prev?.username ?? '' });
   }
@@ -211,7 +197,11 @@
     const prev = data.users.find(u => u.id === id);
     list.override(id, { ...(prev ?? editingUser), deleted_at: null });
     modal.close();
-    const saved = await submitAction('activate', { id }, () => list.clear(id));
+    const saved = await submitAction<UserRow>('activate', { id }, {
+      responseKey: 'user',
+      onRollback: () => list.clear(id),
+      onError: showErrorModal,
+    });
     list.clear(id);
     if (saved) list.override(id, { ...saved, username: prev?.username ?? '' });
   }
@@ -314,16 +304,11 @@
               disabled={passwordMismatch || !formPassword}
               onclick={async () => {
                 if (!formPassword || passwordMismatch || !editingUser) return;
-                const fd = new FormData();
-                fd.append('id', editingUser.id);
-                fd.append('password', formPassword);
-                const res = await fetch('?/setPassword', { method: 'POST', body: fd });
-                const result = deserialize(await res.text()) as { type: string; data?: { error?: string } };
-                if (result.type === 'failure' || result.type === 'error') {
-                  showErrorModal(result.data?.error ?? '비밀번호 변경에 실패했습니다.');
-                } else {
-                  formPassword = ''; formPasswordConf = '';
-                }
+                const ok = await submitAction('setPassword', {
+                  id: editingUser.id,
+                  password: formPassword,
+                }, { onError: showErrorModal });
+                if (ok) { formPassword = ''; formPasswordConf = ''; }
               }}
               class="btn btn-sm btn-outline btn-primary font-bold disabled:opacity-50 self-start"
             >비밀번호 변경</button>

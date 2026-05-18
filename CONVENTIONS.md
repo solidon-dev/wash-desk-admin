@@ -145,10 +145,9 @@ $effect(() => { items = [...data.items]; });
 
 ---
 
-## 2. 액션 처리 — submitAction 인라인 패턴
+## 2. 액션 처리 — submitAction 공통 유틸
 
-모든 server action 호출은 각 페이지에서 아래 패턴을 인라인으로 작성한다.
-`use:enhance` 및 `form` prop을 통한 결과 처리는 사용하지 않는다.
+`submitAction`은 `$lib/utils/action`에서 import해서 사용한다. 각 페이지에 인라인으로 재구현하지 않는다.
 
 **서버 액션은 반드시 수정된 row 전체를 반환한다** — 클라이언트가 서버 응답으로 로컬 상태를 교체하기 위해 필요하다.
 
@@ -178,31 +177,30 @@ export const actions: Actions = {
 
 ```ts
 // +page.svelte <script>
-import { deserialize } from '$app/forms';
+import { submitAction } from '$lib/utils/action';
 
-async function submitAction<T = unknown>(
-  action: string,
-  payload: Record<string, string>,
-  onRollback?: () => void
-): Promise<T | null> {
-  const formData = new FormData();
-  for (const [k, v] of Object.entries(payload)) formData.append(k, v);
-  try {
-    const res    = await fetch(`?/${action}`, { method: 'POST', body: formData });
-    const result = deserialize(await res.text()) as { type: string; data?: { error?: string } & Record<string, T> };
-    if (result.type === 'failure' || result.type === 'error') {
-      onRollback?.();
-      showErrorModal(result.data?.error);
-      return null;
-    }
-    return (result.data as Record<string, T>)?.[responseKey] ?? null;
-  } catch {
-    onRollback?.();
-    showErrorModal();
-    return null;
-  }
-}
+// row를 반환받는 경우 (update / hide / restore)
+const saved = await submitAction<ClientRow>('update', payload, {
+  responseKey: 'client',   // ← 서버 응답 data에서 꺼낼 키
+  onRollback: () => list.clear(id),
+  onError: showErrorModal,
+});
+
+// 성공 여부만 필요한 경우 (create)
+await submitAction('create', payload, {
+  onError: showErrorModal,
+  revalidate: true,  // ← 성공 시 invalidateAll() 자동 호출
+});
 ```
+
+**옵션 레퍼런스**
+
+| 옵션 | 타입 | 설명 |
+|------|------|------|
+| `responseKey` | `string` | 서버 응답 `data`에서 꺼낼 키. 지정하면 `T \| null` 반환, 미지정이면 `true \| null` |
+| `onError` | `(msg: string) => void` | 에러 발생 시 콜백. `friendlyError`가 자동 적용됨 |
+| `onRollback` | `() => void` | 실패 시 낙관적 업데이트 롤백 콜백 |
+| `revalidate` | `boolean` | 성공 후 `invalidateAll()` 호출 여부 (기본 `false`) |
 
 ---
 
