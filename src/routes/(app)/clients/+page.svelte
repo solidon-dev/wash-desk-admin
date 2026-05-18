@@ -1,6 +1,6 @@
 <script lang="ts">
   import { deserialize } from '$app/forms';
-  import { goto } from '$app/navigation';
+  import { goto, invalidateAll } from '$app/navigation';
   import Icon from '@iconify/svelte';
   import { modal, SearchBar, Pagination, TableCard, createListStore } from '$lib';
   import type { PageData } from './$types';
@@ -210,10 +210,10 @@
       list.clear(id);
       if (saved) list.override(id, saved);
     } else {
-      // 등록 — 모달 닫고 저장, 성공 시 1페이지로 이동 (SSR이 새 row 가져옴)
+      // 등록 — 모달 닫고 저장, 성공 시 invalidateAll로 서버 데이터 재요청
       modal.close();
       const ok = await submitAction('create', payload);
-      if (ok) await navTo({ page: 1 });
+      if (ok) await invalidateAll();
     }
   }
 
