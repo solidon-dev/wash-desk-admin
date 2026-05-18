@@ -12,14 +12,13 @@
 
 	let { months, series }: Props = $props();
 
-	const PL = 32; // px — HTML Y축 레이블 영역 너비
+	const PL = 32;
 
 	const colTotals = $derived(
 		months.map((_, mi) => series.reduce((s, sr) => s + (sr.data[mi] ?? 0), 0))
 	);
 	const maxTotal = $derived(Math.max(...colTotals, 1));
 
-	// SVG 내부 좌표계 (Y축 레이블 없이 순수 바 영역)
 	const W = 480;
 	const H = 100;
 	const PT = 6;
@@ -59,11 +58,31 @@
 		})()
 	);
 
-	const tickPcts = [0, 0.5, 1]; // 0%, 50%, 100%
+	const tickPcts = [0, 0.5, 1];
+
+	// ─── 툴팁 ────────────────────────────────────────────────────────────────
+	let hoverIdx = $state<number | null>(null);
+	let svgEl = $state<SVGSVGElement | null>(null);
+
+	function onMouseMove(e: MouseEvent) {
+		if (!svgEl || months.length === 0) return;
+		const rect = svgEl.getBoundingClientRect();
+		const svgX = ((e.clientX - rect.left) / rect.width) * W;
+		const slot = W / months.length;
+		const idx = Math.min(Math.floor(svgX / slot), months.length - 1);
+		hoverIdx = Math.max(0, idx);
+	}
+
+	function onMouseLeave() {
+		hoverIdx = null;
+	}
+
+	const tooltipPct = $derived(hoverIdx !== null ? (xCenter(hoverIdx) / W) * 100 : 0);
+	const tooltipAlign = $derived(hoverIdx !== null && tooltipPct > 65 ? 'right' : 'left');
 </script>
 
 <div class="flex h-full w-full gap-0">
-	<!-- Y축 레이블 (HTML) -->
+	<!-- Y축 레이블 -->
 	<div class="flex shrink-0 flex-col-reverse justify-between pb-[18px]" style="width:{PL}px">
 		{#each tickPcts as f (f)}
 			<div class="text-base-content/50 pr-1.5 text-right text-[11px] leading-none font-medium">
@@ -77,16 +96,21 @@
 	<!-- 바 + X축 -->
 	<div class="flex h-full min-w-0 flex-1 flex-col">
 		<!-- SVG 바 영역 -->
-		<div class="min-h-0 w-full flex-1">
+		<div class="relative min-h-0 w-full flex-1">
 			<svg
+				bind:this={svgEl}
 				viewBox="0 0 {W} {H}"
 				width="100%"
 				height="100%"
 				xmlns="http://www.w3.org/2000/svg"
 				class="block"
 				preserveAspectRatio="none"
+				onmousemove={onMouseMove}
+				onmouseleave={onMouseLeave}
+				role="img"
+				aria-label="스택 바 차트"
 			>
-				<!-- 그리드 라인만 -->
+				<!-- 그리드 라인 -->
 				{#each tickPcts as f (f)}
 					{@const y = PT + innerH - f * innerH}
 					<line
@@ -98,6 +122,20 @@
 						stroke-width="0.8"
 					/>
 				{/each}
+
+				<!-- 호버 컬럼 하이라이트 -->
+				{#if hoverIdx !== null}
+					{@const slot = W / months.length}
+					<rect
+						x={hoverIdx * slot}
+						y={PT}
+						width={slot}
+						height={innerH}
+						fill="var(--color-base-content)"
+						opacity="0.04"
+						rx="2"
+					/>
+				{/if}
 
 				<!-- 바 -->
 				{#each rects as rect (rect.key)}
@@ -112,9 +150,42 @@
 					/>
 				{/each}
 			</svg>
+
+			<!-- HTML 툴팁 -->
+			{#if hoverIdx !== null}
+				<div
+					class="bg-base-100 border-base-300 pointer-events-none absolute top-1 z-20 min-w-[120px] rounded-lg border px-2.5 py-2 shadow-lg"
+					style="{tooltipAlign === 'left'
+						? `left:${tooltipPct}%`
+						: `right:${100 - tooltipPct}%`}; transform: translateX({tooltipAlign === 'left'
+						? '6px'
+						: '-6px'});"
+				>
+					<p class="text-base-content/50 mb-1.5 text-[10px] font-bold">
+						{months[hoverIdx]}월 · 합계 {colTotals[hoverIdx].toLocaleString('ko-KR')}
+					</p>
+					{#each series as sr (sr.label)}
+						{@const v = sr.data[hoverIdx] ?? 0}
+						{#if v > 0}
+							<div class="flex items-center justify-between gap-3">
+								<div class="flex items-center gap-1">
+									<span
+										class="inline-block h-2 w-2 shrink-0 rounded-sm"
+										style="background:{sr.color}"
+									></span>
+									<span class="text-base-content/60 text-[10px]">{sr.label}</span>
+								</div>
+								<span class="text-base-content text-[11px] font-bold tabular-nums"
+									>{v.toLocaleString('ko-KR')}</span
+								>
+							</div>
+						{/if}
+					{/each}
+				</div>
+			{/if}
 		</div>
 
-		<!-- X축 레이블 (HTML) -->
+		<!-- X축 레이블 -->
 		<div class="flex shrink-0">
 			{#each months as m (m)}
 				<div

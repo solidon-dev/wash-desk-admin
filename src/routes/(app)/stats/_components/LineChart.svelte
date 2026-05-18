@@ -10,13 +10,14 @@
 		series: SeriesItem[];
 		labels: string[];
 		showArea?: boolean;
+		formatValue?: (v: number) => string;
 	}
 
-	let { series, labels, showArea = false }: Props = $props();
+	let { series, labels, showArea = false, formatValue }: Props = $props();
 
 	const PL = 34; // px — HTML Y축 레이블 영역 너비
 
-	// SVG 내부 좌표계 (Y축 레이블 없이 순수 라인 영역)
+	// SVG 내부 좌표계
 	const W = 480;
 	const H = 100;
 	const PT = 8;
@@ -52,8 +53,46 @@
 	}
 
 	const built = $derived(series.map((s) => buildPath(s.data)));
-
 	const tickPcts = [0, 0.5, 1];
+
+	// ─── 툴팁 상태 ────────────────────────────────────────────────────────────
+	let hoverIdx = $state<number | null>(null);
+	let tooltipX = $state(0); // 컨테이너 기준 px (0~100%)
+	let svgEl = $state<SVGSVGElement | null>(null);
+
+	function fmt(v: number): string {
+		if (formatValue) return formatValue(v);
+		if (v >= 100_000_000) return `${(v / 100_000_000).toFixed(1)}억`;
+		if (v >= 10_000) return `${(v / 10_000).toFixed(1)}만`;
+		return v.toLocaleString('ko-KR');
+	}
+
+	function onMouseMove(e: MouseEvent) {
+		if (!svgEl || n === 0) return;
+		const rect = svgEl.getBoundingClientRect();
+		// SVG는 preserveAspectRatio="none" → 선형 매핑
+		const svgX = ((e.clientX - rect.left) / rect.width) * W;
+		// 가장 가까운 인덱스 찾기
+		let closest = 0;
+		let minDist = Infinity;
+		for (let i = 0; i < n; i++) {
+			const d = Math.abs(svgX - xPos(i));
+			if (d < minDist) {
+				minDist = d;
+				closest = i;
+			}
+		}
+		hoverIdx = closest;
+		// 툴팁 X 위치: SVG 내 xPos를 컨테이너 퍼센트로 변환
+		tooltipX = (xPos(closest) / W) * 100;
+	}
+
+	function onMouseLeave() {
+		hoverIdx = null;
+	}
+
+	// 툴팁이 오른쪽 가장자리에 걸리지 않도록 방향 결정
+	const tooltipAlign = $derived(hoverIdx !== null && tooltipX > 65 ? 'right' : 'left');
 </script>
 
 <div class="flex h-full w-full gap-0">
@@ -70,15 +109,20 @@
 
 	<!-- 라인 + X축 -->
 	<div class="flex h-full min-w-0 flex-1 flex-col">
-		<!-- SVG 라인 영역 -->
-		<div class="min-h-0 w-full flex-1">
+		<!-- SVG 라인 영역 (툴팁 컨테이너) -->
+		<div class="relative min-h-0 w-full flex-1">
 			<svg
+				bind:this={svgEl}
 				viewBox="0 0 {W} {H}"
 				width="100%"
 				height="100%"
 				xmlns="http://www.w3.org/2000/svg"
 				class="block overflow-visible"
 				preserveAspectRatio="none"
+				onmousemove={onMouseMove}
+				onmouseleave={onMouseLeave}
+				role="img"
+				aria-label="라인 차트"
 			>
 				<defs>
 					{#each series as s, i (s.label)}
@@ -91,7 +135,7 @@
 					{/each}
 				</defs>
 
-				<!-- 그리드 라인만 -->
+				<!-- 그리드 라인 -->
 				{#each tickPcts as f (f)}
 					{@const y = PT + innerH - f * innerH}
 					<line x1={0} y1={y} x2={W} y2={y} stroke="var(--color-base-300)" stroke-width="0.8" />
@@ -118,20 +162,66 @@
 								<circle
 									cx={pt.x}
 									cy={pt.y}
-									r="2.5"
+									r={hoverIdx === pi ? 4 : 2.5}
 									fill={s.color}
 									stroke="white"
 									stroke-width="1.5"
 									vector-effect="non-scaling-stroke"
+									style="transition: r 0.1s"
 								/>
 							{/if}
 						{/each}
 					{/if}
 				{/each}
+
+				<!-- 호버 버티컬 라인 -->
+				{#if hoverIdx !== null}
+					{@const vx = xPos(hoverIdx)}
+					<line
+						x1={vx}
+						y1={PT}
+						x2={vx}
+						y2={PT + innerH}
+						stroke="var(--color-base-content)"
+						stroke-width="0.8"
+						stroke-dasharray="3,2"
+						opacity="0.3"
+						vector-effect="non-scaling-stroke"
+					/>
+				{/if}
 			</svg>
+
+			<!-- HTML 툴팁 -->
+			{#if hoverIdx !== null}
+				<div
+					class="bg-base-100 border-base-300 pointer-events-none absolute top-0 z-20 min-w-[110px] rounded-lg border px-2.5 py-2 shadow-lg"
+					style="{tooltipAlign === 'left'
+						? `left:${tooltipX}%`
+						: `right:${100 - tooltipX}%`}; transform: translateX({tooltipAlign === 'left'
+						? '6px'
+						: '-6px'}); top: 4px;"
+				>
+					<p class="text-base-content/50 mb-1.5 text-[10px] font-bold">
+						{labels[hoverIdx] || `#${hoverIdx + 1}`}
+					</p>
+					{#each series as s (s.label)}
+						{@const v = s.data[hoverIdx] ?? 0}
+						<div class="flex items-center justify-between gap-3">
+							<div class="flex items-center gap-1">
+								<span
+									class="inline-block h-2 w-2 shrink-0 rounded-full"
+									style="background:{s.color}; {s.dash ? 'opacity:0.5' : ''}"
+								></span>
+								<span class="text-base-content/60 text-[10px]">{s.label}</span>
+							</div>
+							<span class="text-base-content text-[11px] font-bold tabular-nums">{fmt(v)}</span>
+						</div>
+					{/each}
+				</div>
+			{/if}
 		</div>
 
-		<!-- X축 레이블 (HTML, 절대 위치) -->
+		<!-- X축 레이블 (HTML) -->
 		<div class="relative h-5 shrink-0">
 			{#each labels as lbl, i (i)}
 				{#if lbl}
