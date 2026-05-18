@@ -11,7 +11,7 @@
     class?: string;
   }
 
-  let { placeholder = '검색...', items, onselect, oninput, onenter, initialValue = '', class: className = '' }: Props = $props();
+  let { placeholder = '검색...', items, onselect, oninput, onenter, initialValue = '', class: className = 'w-60 sm:w-72' }: Props = $props();
 
   let query     = $state('');
   let activeIdx = $state(-1);

@@ -109,7 +109,6 @@
 			items={searchItems}
 			onselect={(id) => { selectedId = id; searchQuery = ''; }}
 			oninput={(v) => { searchQuery = v; selectedId = ''; }}
-			class="w-64 sm:w-72"
 		/>
 
 		<!-- 읽음 상태 필터 -->

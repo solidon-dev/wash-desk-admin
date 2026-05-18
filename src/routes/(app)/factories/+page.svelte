@@ -250,7 +250,6 @@
       oninput={onSearchInput}
       onenter={(q) => navTo({ q })}
       initialValue={data.q}
-      class="w-60 sm:w-72"
     />
     <label class="flex items-center gap-2 cursor-pointer select-none text-sm text-base-content/60 font-semibold">
       <input type="checkbox" checked={data.showHidden}
