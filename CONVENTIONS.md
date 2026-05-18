@@ -23,36 +23,34 @@
 
 | 파일 | 주요 export | 용도 |
 |------|-------------|------|
-| `action.ts` | `submitAction(action, payload, options)` | server action 호출 공통 헬퍼. fetch + deserialize + 에러처리 + 롤백 + revalidate 옵션 포함 |
-| `action.ts` | `friendlyError(raw?)` | 서버 에러 메시지 → 사용자 친화적 한국어 변환 |
-| `listStore.svelte.ts` | `createListStore(getItems)` | 서버 페이지 데이터 기반 낙관적 업데이트 헬퍼. overrides Map으로 현재 페이지 아이템 패치 |
+| `listStore.svelte.ts` | `createListStore(getItems)` | 서버 SSR 데이터 기반 낙관적 업데이트 헬퍼. `SvelteMap` overrides로 현재 페이지 아이템 패치 |
 | `phone.ts` | `formatPhone`, `unformatPhone`, `displayPhone` | 전화번호 포맷/파싱 |
 
 ### 모달 스토어 (`src/lib/modal.svelte.ts`)
 
-**모든 모달은 이 스토어를 통해 연다. `{#if}` 로 직접 `modal modal-open` 다이얼로그를 렌더링하는 코드를 새로 작성하지 않는다.**
+**모든 모달은 이 스토어를 통해 연다. `{#if showModal}` 로 직접 dialog를 렌더링하는 코드를 새로 작성하지 않는다.**
 
 ```ts
 import { modal } from '$lib';
 
-// 모달 열기
-modal.open(mySnippet);   // snippet 변수를 넘김
-
-// 모달 닫기
-modal.close();
+modal.open(mySnippet);  // snippet을 넘겨 열기
+modal.close();          // 닫기
 ```
 
-**호출부 패턴 (+page.svelte)**
+**snippet 패턴 (+page.svelte)**
 
 ```svelte
 <script lang="ts">
   import { modal } from '$lib';
-
   let errorMessage = $state('');
+
+  function showErrorModal(message?: string) {
+    errorMessage = message ?? '업데이트에 실패했습니다. 같은 문제가 반복된다면 관리자에게 문의해 주세요.';
+    modal.open(errorContent);
+  }
 </script>
 
-<!-- 확인 모달 -->
-{#snippet confirmDelete()}
+{#snippet confirmModal()}
   <div class="modal-box max-w-sm">
     <h3 class="font-semibold">삭제하시겠습니까?</h3>
     <div class="modal-action">
@@ -62,7 +60,6 @@ modal.close();
   </div>
 {/snippet}
 
-<!-- 에러 모달 -->
 {#snippet errorContent()}
   <div class="modal-box max-w-sm">
     <div class="flex items-start gap-3">
@@ -78,15 +75,12 @@ modal.close();
   </div>
 {/snippet}
 
-<!-- 에러 시: -->
-<!-- errorMessage = '...'; modal.open(errorContent); -->
-
-<button onclick={() => modal.open(confirmDelete)}>삭제</button>
+<button onclick={() => modal.open(confirmModal)}>삭제</button>
 ```
 
 **규칙:**
 - 모달 내용은 `modal-box` div부터 작성한다 (`dialog`, `modal` 래퍼는 ModalShell이 담당)
-- 모달 닫기 버튼은 `onclick={modal.close}`
+- 닫기 버튼은 `onclick={modal.close}`
 - Escape 키 / backdrop 클릭은 ModalShell이 자동 처리
 
 ### Supabase (`src/lib/supabase/`)
@@ -100,52 +94,25 @@ modal.close();
 
 > ⚠️ `src/lib/types/supabase.ts`는 구버전 레거시 파일이다. import하지 않는다.
 
-### 낙관적 업데이트
-
-별도 헬퍼 없음 — **인라인으로 3줄로 직접 작성한다** (추상화 불필요):
-
-```ts
-// 수정
-const prev = items.slice();
-items = items.map(i => i.id === id ? { ...i, ...patch } : i);
-// 실패 시: items = prev;
-
-// 삭제
-const prev = items.slice();
-items = items.filter(i => i.id !== id);
-// 실패 시: items = prev;
-
-// 추가 (tmpId 패턴)
-const tmpId = `tmp-${Date.now()}`;
-items = [...items, { id: tmpId, ...newItem }];
-// 실패 시: items = items.filter(i => i.id !== tmpId);
-// 성공 시: invalidateAll() 호출로 서버 데이터 재수신
-```
-
 ---
 
 ## 1. 데이터 로딩 전략
 
-### 원칙
-- **초기 데이터는 무조건 `+page.server.ts`의 `load` 함수에서 SSR로 내려준다**
-- `onMount` 안에서 fetch로 초기 데이터를 가져오는 코드는 절대 작성하지 않는다
-- 클라이언트에서 파생되는 모든 값은 `$derived` 또는 `$derived.by()`로 계산한다
-- `$effect`는 진짜 사이드이펙트(DOM 조작, 외부 구독 등)에만 쓴다 — 파생 상태 계산에 쓰지 않는다
-
-### 올바른 패턴
+- **초기 데이터는 무조건 `+page.server.ts` `load`에서 SSR로 내려준다**
+- `onMount`에서 초기 fetch 금지
+- 파생값은 `$derived` / `$derived.by()`로 계산한다
+- `$effect`는 진짜 사이드이펙트(DOM 조작, 외부 구독)에만 쓴다
 
 ```ts
 // +page.server.ts
 export const load: PageServerLoad = async ({ locals, url }) => {
-  const clientId = url.searchParams.get('clientId');
-
   const { data, error } = await locals.supabase
-    .from('items')
-    .select('id, name_ko, sort_order')
-    .eq('client_id', clientId);
+    .from('clients')
+    .select('*')
+    .order('created_at', { ascending: false });
 
-  if (error) return { items: [] };
-  return { items: data };
+  if (error) return { clients: [] };
+  return { clients: data };
 };
 ```
 
@@ -154,53 +121,41 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 <script lang="ts">
   let { data }: PageProps = $props();
 
-  // ✅ 서버 데이터를 로컬 상태로 복사 (낙관적 업데이트용)
-  let localItems = $state([...data.items]);
-
-  // ✅ 서버 데이터가 revalidate되면 로컬도 동기화
-  const serverItems = $derived(data.items);
-  $effect(() => { localItems = [...serverItems]; });
+  // ✅ createListStore로 낙관적 업데이트 처리 (페이지네이션 있을 때)
+  const list = createListStore(() => data.clients);
 
   // ✅ 파생값은 $derived로
-  const sortedItems = $derived(localItems.toSorted((a, b) => a.sort_order - b.sort_order));
+  const activeClients = $derived(list.items.filter(c => !c.deleted_at));
 </script>
 ```
 
-### 금지 패턴
+### $state 초기값에 data 직접 사용 금지
 
-```svelte
-<!-- ❌ onMount에서 초기 데이터 fetch — 절대 사용 금지 -->
-<script lang="ts">
-  let items = $state([]);
-  onMount(async () => {
-    const res = await fetch('/api/items');
-    items = await res.json();
-  });
-</script>
+`$state` 초기값에 `data`를 넣으면 `state_referenced_locally` 경고가 발생한다.
+반응형 컨텍스트 밖에서 읽히기 때문이다.
 
-<!-- ❌ $effect로 파생 상태 계산 — 절대 사용 금지 -->
-<script lang="ts">
-  let sortedItems = $state([]);
-  $effect(() => {
-    sortedItems = items.toSorted(...); // $derived 써야 함
-  });
-</script>
+```ts
+// ❌ 금지
+let items = $state([...data.items]);
+
+// ✅ $effect로 초기화 (createListStore가 없는 경우)
+let items = $state<Item[]>([]);
+$effect(() => { items = [...data.items]; });
 ```
 
 ---
 
-## 2. 액션 처리 전략
+## 2. 액션 처리 — submitAction 인라인 패턴
 
-액션은 두 가지 경우로 나뉜다.
+모든 server action 호출은 각 페이지에서 아래 패턴을 인라인으로 작성한다.
+`use:enhance` 및 `form` prop을 통한 결과 처리는 사용하지 않는다.
 
-### 2-A. 민감한 정보가 포함된 액션 → `+page.server.ts` actions 사용
-
-`role`, `factory_id`, `session` 등 서버에서만 검증해야 하는 정보가 필요한 경우.
+**서버 액션은 반드시 수정된 row 전체를 반환한다** — 클라이언트가 서버 응답으로 로컬 상태를 교체하기 위해 필요하다.
 
 ```ts
 // +page.server.ts
 export const actions: Actions = {
-  updateItem: async ({ request, locals }) => {
+  update: async ({ request, locals }) => {
     const myRole = locals.session?.role;
     if (!myRole || myRole === 'worker') return fail(403, { error: '권한이 없습니다.' });
 
@@ -208,188 +163,150 @@ export const actions: Actions = {
     const id   = form.get('id') as string;
     const name = (form.get('name') as string)?.trim();
 
-    const { error } = await locals.supabase
-      .from('items').update({ name }).eq('id', id);
+    const { data: updated, error } = await locals.supabase
+      .from('clients')
+      .update({ name })
+      .eq('id', id)
+      .select('*')   // ← 반드시 수정된 row 반환
+      .single();
 
     if (error) return fail(500, { error: error.message });
-    return { success: true };
+    return { success: true, client: updated };  // ← client 키로 반환
   },
 };
 ```
-
-클라이언트에서 호출할 때는 `fetch` + `deserialize` 패턴을 사용한다:
 
 ```ts
 // +page.svelte <script>
 import { deserialize } from '$app/forms';
 
-async function submitAction(
+async function submitAction<T = unknown>(
   action: string,
   payload: Record<string, string>,
   onRollback?: () => void
-): Promise<boolean> {
-  const form = new FormData();
-  for (const [k, v] of Object.entries(payload)) form.append(k, v);
-
+): Promise<T | null> {
+  const formData = new FormData();
+  for (const [k, v] of Object.entries(payload)) formData.append(k, v);
   try {
-    const res    = await fetch(`?/${action}`, { method: 'POST', body: form });
-    const result = deserialize(await res.text());
-
+    const res    = await fetch(`?/${action}`, { method: 'POST', body: formData });
+    const result = deserialize(await res.text()) as { type: string; data?: { error?: string } & Record<string, T> };
     if (result.type === 'failure' || result.type === 'error') {
       onRollback?.();
-      const msg = (result as { data?: { error?: string } }).data?.error;
-      showErrorModal(msg);
-      return false;
+      showErrorModal(result.data?.error);
+      return null;
     }
-    return true;
+    return (result.data as Record<string, T>)?.[responseKey] ?? null;
   } catch {
     onRollback?.();
     showErrorModal();
-    return false;
-  }
-}
-```
-
-### 2-B. 권한 검증이 필요 없는 액션 → 클라이언트에서 직접 Supabase 호출
-
-role/session 검증이 불필요한 단순 CRUD는 클라이언트 supabase 클라이언트로 직접 처리한다.
-(RLS 정책으로 DB 레벨에서 이미 보호되고 있는 경우)
-
-```ts
-import { supabase } from '$lib/supabase/client';
-
-async function updateDisplayName(id: string, name: string, onRollback: () => void) {
-  const { error } = await supabase
-    .from('items').update({ name_ko: name }).eq('id', id);
-
-  if (error) {
-    onRollback();
-    showErrorModal(error.message);
+    return null;
   }
 }
 ```
 
 ---
 
-## 3. 낙관적 업데이트 (Optimistic Update)
+## 3. 낙관적 업데이트
 
-**모든 mutation은 낙관적 업데이트를 기본으로 한다.**
+### 원칙
 
-### 페이지네이션이 있는 목록 → `createListStore` 사용
+| 액션 | 방식 | 이유 |
+|------|------|------|
+| update / hide / restore | `list.override()` — 클라이언트 즉시 반영 | id 알고 있음, 변경값 예측 가능 |
+| create | `invalidateAll()` — 서버 재요청 | 서버가 id/created_at/정렬 결정, 예측 불가 |
 
-`createListStore`는 서버 SSR 데이터를 기반으로 하면서 현재 페이지 아이템만 낙관적으로 패치하는 헬퍼다.
-페이지 이동/검색 시 서버 데이터가 바뀌면 자동 반영되고, `$effect`/`_suppress` 플래그 없이 동작한다.
+### createListStore 사용 (페이지네이션 있는 목록)
 
 ```ts
 import { createListStore } from '$lib';
+import { invalidateAll } from '$app/navigation';
 
-// 선언 (컴포넌트 최상위)
 const list = createListStore(() => data.clients);
-
-// 템플릿에서
-// {#each list.items as c} ...
+// 템플릿: {#each list.items as c}
 ```
 
 **update / hide / restore 패턴**
 
 ```ts
-async function handleUpdate(id: string, patch: ClientRow) {
+async function handleUpdate() {
+  const id   = editingClient.id;
   const prev = data.clients.find(c => c.id === id);
 
-  list.override(id, patch);   // 즉시 UI 반영
+  // 1. 즉시 UI 반영 + 모달 닫기
+  list.override(id, optimistic);
   modal.close();
 
-  const saved = await submitAction('update', payload, () => list.clear(id)); // 실패 시 롤백
+  // 2. 백그라운드 저장
+  const saved = await submitAction('update', payload, () => list.clear(id)); // 실패 → 롤백
   list.clear(id);
   if (saved) list.override(id, saved); // 서버 응답으로 정확한 값 교체
 }
 ```
 
-**create 패턴 — 저장 후 1페이지 이동**
-
-create는 서버가 ID/정렬순서를 결정하므로 낙관적 추가 없이 저장 후 1페이지로 이동한다.
+**create 패턴**
 
 ```ts
-async function handleCreate(payload: Record<string, string>) {
+async function handleCreate() {
   modal.close();
   const ok = await submitAction('create', payload);
-  if (ok) await navTo({ page: 1 }); // SSR이 새 row 포함한 목록을 가져옴
+  if (ok) await invalidateAll(); // 서버에서 새 row 포함한 목록 재요청
 }
 ```
 
-### 페이지네이션이 없는 목록 → 인라인 직접 작성
-
-`createListStore`와 동일한 원리를 인라인으로 작성한다 (추상화 불필요):
+### 페이지네이션 없는 목록 — 인라인 직접 작성
 
 ```ts
-// 수정
+// update
 const prev = items.find(i => i.id === id);
 items = items.map(i => i.id === id ? { ...i, ...patch } : i);
-// 실패 시: items = items.map(i => i.id === id ? prev : i);
+const saved = await submitAction('update', payload, () => {
+  items = items.map(i => i.id === id ? (prev ?? i) : i);
+});
+if (saved) items = items.map(i => i.id === id ? saved : i);
 
-// 삭제
+// delete
 const prev = items.slice();
 items = items.filter(i => i.id !== id);
-// 실패 시: items = prev;
+const ok = await submitAction('delete', { id }, () => { items = prev; });
 ```
 
 ---
 
-## 4. 에러 처리 — 공통 에러 모달
+## 4. 에러 처리
 
-**액션 실패는 toast가 아닌 에러 모달로 표시한다.**
-사용자가 명확히 인지하고 닫아야 하기 때문이다.
-
-### 에러 모달 구현 (각 +page.svelte에 포함)
+**액션 실패는 에러 모달로 표시한다.** 각 페이지에 아래 패턴을 포함한다.
 
 ```svelte
 <script lang="ts">
-  let errorModal = $state<{ open: boolean; message: string }>({
-    open: false,
-    message: '',
-  });
+  let errorMessage = $state('');
 
   function showErrorModal(message?: string) {
-    errorModal = {
-      open: true,
-      message: message ?? '업데이트에 실패했습니다. 같은 문제가 반복된다면 관리자에게 문의해 주세요.',
-    };
-  }
-
-  function closeErrorModal() {
-    errorModal = { ...errorModal, open: false };
+    errorMessage = message ?? '업데이트에 실패했습니다. 같은 문제가 반복된다면 관리자에게 문의해 주세요.';
+    modal.open(errorContent);
   }
 </script>
 
-<!-- 에러 모달 -->
-{#if errorModal.open}
-  <dialog class="modal modal-open">
-    <div class="modal-box max-w-sm">
-      <div class="flex items-start gap-3">
-        <Icon icon="lucide:alert-circle" class="text-error mt-0.5 h-5 w-5 shrink-0" />
-        <div>
-          <h3 class="font-semibold text-base-content">오류가 발생했습니다</h3>
-          <p class="mt-1 text-sm text-base-content/70">{errorModal.message}</p>
-        </div>
-      </div>
-      <div class="modal-action mt-4">
-        <button class="btn btn-sm" onclick={closeErrorModal}>확인</button>
+{#snippet errorContent()}
+  <div class="modal-box max-w-sm">
+    <div class="flex items-start gap-3">
+      <Icon icon="lucide:alert-circle" class="text-error mt-0.5 h-5 w-5 shrink-0" />
+      <div>
+        <h3 class="font-semibold">오류가 발생했습니다</h3>
+        <p class="mt-1 text-sm text-base-content/70">{errorMessage}</p>
       </div>
     </div>
-    <div class="modal-backdrop" role="button" tabindex="-1"
-         onclick={closeErrorModal} onkeydown={() => {}}></div>
-  </dialog>
-{/if}
+    <div class="modal-action mt-4">
+      <button class="btn btn-sm" onclick={modal.close}>확인</button>
+    </div>
+  </div>
+{/snippet}
 ```
 
-### 에러 메시지 작성 기준
-
-| 상황 | 메시지 예시 |
-|------|-------------|
-| 기본 (원인 불명) | 업데이트에 실패했습니다. 같은 문제가 반복된다면 관리자에게 문의해 주세요. |
+| 상황 | 메시지 |
+|------|--------|
+| 기본 | 업데이트에 실패했습니다. 같은 문제가 반복된다면 관리자에게 문의해 주세요. |
 | 권한 오류 | 이 작업을 수행할 권한이 없습니다. |
 | 중복 항목 | 이미 동일한 항목이 존재합니다. |
-| 네트워크 오류 | 네트워크 연결을 확인하고 다시 시도해 주세요. |
 | 삭제 실패 | 삭제에 실패했습니다. 잠시 후 다시 시도해 주세요. |
 
 ---
@@ -397,22 +314,22 @@ items = items.filter(i => i.id !== id);
 ## 5. $effect 사용 기준
 
 ### 써도 되는 경우
-- 서버 데이터(`$derived`)가 바뀌면 로컬 상태(`$state`)를 동기화할 때
-- DOM 직접 조작이 필요할 때 (포커스, 스크롤 등)
-- 외부 구독/이벤트 리스너 등록/해제 (cleanup 반환)
-- URL 파라미터 변경에 반응해서 로컬 UI 상태를 초기화할 때
+- 페이지네이션 없는 목록에서 서버 데이터 변경 시 로컬 상태 동기화
+- DOM 직접 조작 (포커스, 스크롤 등)
+- 외부 구독/이벤트 리스너 등록/해제
+- URL 파라미터 변경에 반응해서 로컬 UI 상태 초기화
 
 ### 쓰면 안 되는 경우
-- 파생 값 계산 → `$derived` 사용
+- 파생값 계산 → `$derived` 사용
 - 초기 데이터 fetch → `+page.server.ts` `load` 사용
-- 다른 `$state`를 계산해서 또 다른 `$state`에 넣는 것 → `$derived` 사용
+- `$state` → `$state` 계산 → `$derived` 사용
 
 ```ts
-// ❌ 잘못된 패턴
+// ❌
 let fullName = $state('');
 $effect(() => { fullName = `${firstName} ${lastName}`; });
 
-// ✅ 올바른 패턴
+// ✅
 const fullName = $derived(`${firstName} ${lastName}`);
 ```
 
@@ -422,16 +339,15 @@ const fullName = $derived(`${firstName} ${lastName}`);
 
 ```
 src/routes/(app)/[route]/
-├── +page.server.ts   — load(SSR) + actions(민감한 서버 액션)
-└── +page.svelte      — UI + 로컬 상태 + 낙관적 업데이트 + 에러 모달
+├── +page.server.ts   — load(SSR) + actions
+└── +page.svelte      — UI + createListStore + submitAction + modal snippets
 ```
 
 ### +page.server.ts 섹션 순서
 
 ```ts
-// 1. 권한 헬퍼 함수
-// 2. load 함수
-// 3. actions (각 액션은 권한 체크 → 입력 검증 → DB 작업 순서)
+// 1. load 함수 (SSR 데이터)
+// 2. actions (권한 체크 → 입력 검증 → DB 작업 → row 반환)
 ```
 
 ### +page.svelte `<script>` 섹션 순서
@@ -440,44 +356,34 @@ src/routes/(app)/[route]/
 // 1. import
 // 2. $props()
 // 3. 타입 정의
-// 4. 서버 데이터 $derived 래핑
-// 5. 로컬 상태 $state (낙관적 업데이트용)
-// 6. $effect (서버 → 로컬 동기화)
-// 7. 에러 모달 상태 + showErrorModal / closeErrorModal
-// 8. UI 상태 $state (모달 open 여부, 선택값 등)
-// 9. $derived 파생값
-// 10. 액션 함수 (submitAction, 낙관적 업데이트 로직)
-// 11. 이벤트 핸들러
+// 4. createListStore (페이지네이션 있는 경우)
+// 5. $derived 파생값
+// 6. UI $state (모달용 폼 필드, 선택값 등)
+// 7. errorMessage $state + showErrorModal
+// 8. submitAction 인라인 구현
+// 9. 액션 핸들러 (handleCreate, handleUpdate, handleDelete 등)
+// 10. 이벤트 핸들러 (navTo, onSearchInput 등)
 ```
 
 ---
 
-## 7. 구조 변경 vs 단순 값 변경 구분
+## 7. Supabase 클라이언트 사용 규칙
 
-| 종류 | 예시 | 방법 |
-|------|------|------|
-| **단순 값 변경** | 이름 수정, 단가 변경, 날짜 변경 | 낙관적 업데이트 + `submitAction` (백그라운드) |
-| **구조 변경** | 항목 추가, 삭제, 순서 변경 | tmpId 낙관적 추가 → 서버 저장 → `invalidateAll()` |
-
-구조 변경은 서버의 실제 ID, sort_order 등을 받아야 하므로 `invalidateAll()`로 서버 데이터를 재수신한다.
-
----
-
-## 8. Supabase 클라이언트 사용 규칙
-
-- **서버 (`+page.server.ts`, hooks)** → `locals.supabase` (서버 클라이언트, RLS + session 적용)
-- **클라이언트 (`+page.svelte`)** → `$lib/supabase/client`의 브라우저 클라이언트
+- **서버** (`+page.server.ts`, hooks) → `locals.supabase`
+- **클라이언트** (`+page.svelte`) → `$lib/supabase/client` (RLS로 보호되는 경우만)
 - `service_role` 키는 절대 클라이언트 코드에 노출하지 않는다
 
 ---
 
-## 9. 체크리스트 (새 라우트 작성 전 확인)
+## 8. 체크리스트 (새 라우트 작성 전 확인)
 
-- [ ] 초기 데이터를 `+page.server.ts` `load`에서 내려주고 있는가?
-- [ ] `onMount`에서 초기 fetch를 하고 있지 않은가?
-- [ ] 파생값을 `$derived`로 계산하고 있는가? (`$effect` 미사용)
-- [ ] 모든 mutation에 낙관적 업데이트가 적용되어 있는가?
-- [ ] 액션 실패 시 에러 모달이 뜨고 롤백이 되는가?
-- [ ] 에러 메시지가 일반 사용자가 이해할 수 있는 표현인가?
-- [ ] `console.error`로만 에러를 처리하는 코드가 없는가?
+- [ ] 초기 데이터를 `+page.server.ts` `load`에서 SSR로 내려주고 있는가?
+- [ ] `$state` 초기값에 `data`를 직접 넣고 있지 않은가?
+- [ ] 파생값을 `$derived`로 계산하고 있는가?
+- [ ] 목록은 `createListStore`를 사용하고 있는가?
+- [ ] server action이 수정된 row를 반환하고 있는가?
+- [ ] update/hide/restore는 `list.override()`로 즉시 반영하고 있는가?
+- [ ] create는 `invalidateAll()`로 서버 재요청하고 있는가?
+- [ ] 액션 실패 시 에러 모달 + 롤백이 되는가?
+- [ ] `use:enhance` / `form` prop 방식을 사용하고 있지 않은가?
 - [ ] role/session 검증이 필요한 액션은 server action을 사용하고 있는가?
