@@ -4,10 +4,10 @@ import type { Actions, PageServerLoad } from './$types';
 const PAGE_SIZE = 10;
 
 export const load: PageServerLoad = async ({ locals, url }) => {
-	const page       = Math.max(1, Number(url.searchParams.get('page') ?? '1'));
+	const page = Math.max(1, Number(url.searchParams.get('page') ?? '1'));
 	const showHidden = url.searchParams.get('hidden') === '1';
-	const q          = url.searchParams.get('q')?.trim() ?? '';
-	const role       = locals.session?.role ?? '';
+	const q = url.searchParams.get('q')?.trim() ?? '';
+	const role = locals.session?.role ?? '';
 
 	let query = locals.supabase
 		.from('factories')
@@ -16,7 +16,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		.range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
 
 	if (!showHidden) query = query.is('deleted_at', null);
-	if (q)           query = query.ilike('name', `%${q}%`);
+	if (q) query = query.ilike('name', `%${q}%`);
 
 	const { data: factories, count, error } = await query;
 	if (error) return { factories: [], total: 0, page, PAGE_SIZE, showHidden, q, role };
@@ -28,9 +28,9 @@ export const actions: Actions = {
 	create: async ({ request, locals }) => {
 		if (locals.session?.role !== 'super_admin') return fail(403, { error: '권한이 없습니다.' });
 		const fd = await request.formData();
-		const name    = (fd.get('name')    as string)?.trim();
+		const name = (fd.get('name') as string)?.trim();
 		const address = (fd.get('address') as string)?.trim() || null;
-		const phone   = (fd.get('phone')   as string)?.trim() || null;
+		const phone = (fd.get('phone') as string)?.trim() || null;
 		if (!name) return fail(400, { error: '공장명을 입력해주세요.' });
 		const { error } = await locals.supabase.from('factories').insert({ name, address, phone });
 		if (error) return fail(500, { error: error.message });
@@ -40,10 +40,10 @@ export const actions: Actions = {
 	update: async ({ request, locals }) => {
 		if (locals.session?.role !== 'super_admin') return fail(403, { error: '권한이 없습니다.' });
 		const fd = await request.formData();
-		const id      = fd.get('id')      as string;
-		const name    = (fd.get('name')    as string)?.trim();
+		const id = fd.get('id') as string;
+		const name = (fd.get('name') as string)?.trim();
 		const address = (fd.get('address') as string)?.trim() || null;
-		const phone   = (fd.get('phone')   as string)?.trim() || null;
+		const phone = (fd.get('phone') as string)?.trim() || null;
 		if (!id || !name) return fail(400, { error: '필수 항목 누락' });
 		const { data: updated, error } = await locals.supabase
 			.from('factories')
@@ -83,5 +83,5 @@ export const actions: Actions = {
 			.single();
 		if (error) return fail(500, { error: error.message });
 		return { success: true, factory: updated };
-	},
+	}
 };

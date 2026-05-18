@@ -2,13 +2,19 @@
 @import 'daisyui/daisyui.css';
 
 @keyframes nav-progress-complete {
-	0%   { opacity: 1; }
-	100% { opacity: 0; }
+	0% {
+		opacity: 1;
+	}
+	100% {
+		opacity: 0;
+	}
 }
 
 .nav-progress-bar {
 	position: fixed;
-	top: 0; left: 0; right: 0;
+	top: 0;
+	left: 0;
+	right: 0;
 	z-index: 9999;
 	height: 3px;
 	pointer-events: none;
@@ -16,5 +22,7 @@
 
 .nav-progress-bar .bar {
 	height: 100%;
-	transition: width 0.2s ease, opacity 0.3s ease;
+	transition:
+		width 0.2s ease,
+		opacity 0.3s ease;
 }

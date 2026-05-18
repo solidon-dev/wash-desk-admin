@@ -4,7 +4,9 @@ import type { Snippet } from 'svelte';
 let _current = $state<Snippet | null>(null);
 
 export const modal = {
-	get current() { return _current; },
+	get current() {
+		return _current;
+	},
 
 	open(snippet: Snippet) {
 		_current = snippet;
@@ -12,5 +14,5 @@ export const modal = {
 
 	close() {
 		_current = null;
-	},
+	}
 };

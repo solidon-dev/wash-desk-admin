@@ -12,19 +12,19 @@
 
 ### 컴포넌트 (`src/lib/components/`)
 
-| 파일 | import | 용도 |
-|------|--------|------|
+| 파일                | import                                      | 용도                                             |
+| ------------------- | ------------------------------------------- | ------------------------------------------------ |
 | `ModalShell.svelte` | layout에 이미 마운트됨 — 직접 import 불필요 | 전역 모달 렌더러. `modal.open(snippet)`으로 제어 |
-| `Pagination.svelte` | `import { Pagination } from '$lib'` | 페이지네이션 UI |
-| `SearchBar.svelte` | `import { SearchBar } from '$lib'` | 자동완성 검색바 |
-| `TableCard.svelte` | `import { TableCard } from '$lib'` | 카드 래퍼 레이아웃 |
+| `Pagination.svelte` | `import { Pagination } from '$lib'`         | 페이지네이션 UI                                  |
+| `SearchBar.svelte`  | `import { SearchBar } from '$lib'`          | 자동완성 검색바                                  |
+| `TableCard.svelte`  | `import { TableCard } from '$lib'`          | 카드 래퍼 레이아웃                               |
 
 ### 유틸 (`src/lib/utils/`)
 
-| 파일 | 주요 export | 용도 |
-|------|-------------|------|
-| `listStore.svelte.ts` | `createListStore(getItems)` | 서버 SSR 데이터 기반 낙관적 업데이트 헬퍼. `SvelteMap` overrides로 현재 페이지 아이템 패치 |
-| `phone.ts` | `formatPhone`, `unformatPhone`, `displayPhone` | 전화번호 포맷/파싱 |
+| 파일                  | 주요 export                                    | 용도                                                                                       |
+| --------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `listStore.svelte.ts` | `createListStore(getItems)`                    | 서버 SSR 데이터 기반 낙관적 업데이트 헬퍼. `SvelteMap` overrides로 현재 페이지 아이템 패치 |
+| `phone.ts`            | `formatPhone`, `unformatPhone`, `displayPhone` | 전화번호 포맷/파싱                                                                         |
 
 ### 모달 스토어 (`src/lib/modal.svelte.ts`)
 
@@ -33,64 +33,66 @@
 ```ts
 import { modal } from '$lib';
 
-modal.open(mySnippet);  // snippet을 넘겨 열기
-modal.close();          // 닫기
+modal.open(mySnippet); // snippet을 넘겨 열기
+modal.close(); // 닫기
 ```
 
 **snippet 패턴 (+page.svelte)**
 
 ```svelte
 <script lang="ts">
-  import { modal } from '$lib';
-  let errorMessage = $state('');
+	import { modal } from '$lib';
+	let errorMessage = $state('');
 
-  function showErrorModal(message?: string) {
-    errorMessage = message ?? '업데이트에 실패했습니다. 같은 문제가 반복된다면 관리자에게 문의해 주세요.';
-    modal.open(errorContent);
-  }
+	function showErrorModal(message?: string) {
+		errorMessage =
+			message ?? '업데이트에 실패했습니다. 같은 문제가 반복된다면 관리자에게 문의해 주세요.';
+		modal.open(errorContent);
+	}
 </script>
 
 {#snippet confirmModal()}
-  <div class="modal-box max-w-sm">
-    <h3 class="font-semibold">삭제하시겠습니까?</h3>
-    <div class="modal-action">
-      <button class="btn btn-sm btn-ghost" onclick={modal.close}>취소</button>
-      <button class="btn btn-sm btn-error" onclick={handleDelete}>삭제</button>
-    </div>
-  </div>
+	<div class="modal-box max-w-sm">
+		<h3 class="font-semibold">삭제하시겠습니까?</h3>
+		<div class="modal-action">
+			<button class="btn btn-sm btn-ghost" onclick={modal.close}>취소</button>
+			<button class="btn btn-sm btn-error" onclick={handleDelete}>삭제</button>
+		</div>
+	</div>
 {/snippet}
 
 {#snippet errorContent()}
-  <div class="modal-box max-w-sm">
-    <div class="flex items-start gap-3">
-      <Icon icon="lucide:alert-circle" class="text-error mt-0.5 h-5 w-5 shrink-0" />
-      <div>
-        <h3 class="font-semibold">오류가 발생했습니다</h3>
-        <p class="mt-1 text-sm text-base-content/70">{errorMessage}</p>
-      </div>
-    </div>
-    <div class="modal-action mt-4">
-      <button class="btn btn-sm" onclick={modal.close}>확인</button>
-    </div>
-  </div>
+	<div class="modal-box max-w-sm">
+		<div class="flex items-start gap-3">
+			<Icon icon="lucide:alert-circle" class="text-error mt-0.5 h-5 w-5 shrink-0" />
+			<div>
+				<h3 class="font-semibold">오류가 발생했습니다</h3>
+				<p class="text-base-content/70 mt-1 text-sm">{errorMessage}</p>
+			</div>
+		</div>
+		<div class="modal-action mt-4">
+			<button class="btn btn-sm" onclick={modal.close}>확인</button>
+		</div>
+	</div>
 {/snippet}
 
 <button onclick={() => modal.open(confirmModal)}>삭제</button>
 ```
 
 **규칙:**
+
 - 모달 내용은 `modal-box` div부터 작성한다 (`dialog`, `modal` 래퍼는 ModalShell이 담당)
 - 닫기 버튼은 `onclick={modal.close}`
 - Escape 키 / backdrop 클릭은 ModalShell이 자동 처리
 
 ### Supabase (`src/lib/supabase/`)
 
-| 파일 | 용도 |
-|------|------|
-| `client.ts` | 브라우저용 클라이언트 싱글턴. `import { supabase } from '$lib/supabase/client'` |
-| `server.ts` | SSR용 클라이언트 팩토리. hooks/server에서만 사용 |
-| `database.types.ts` | Supabase CLI 자동생성 타입. **직접 import 금지** — `types.ts` 통해서 사용 |
-| `types.ts` | 모든 테이블/RPC 타입 파사드. `import type { Item, Client, ... } from '$lib/supabase/types'` |
+| 파일                | 용도                                                                                        |
+| ------------------- | ------------------------------------------------------------------------------------------- |
+| `client.ts`         | 브라우저용 클라이언트 싱글턴. `import { supabase } from '$lib/supabase/client'`             |
+| `server.ts`         | SSR용 클라이언트 팩토리. hooks/server에서만 사용                                            |
+| `database.types.ts` | Supabase CLI 자동생성 타입. **직접 import 금지** — `types.ts` 통해서 사용                   |
+| `types.ts`          | 모든 테이블/RPC 타입 파사드. `import type { Item, Client, ... } from '$lib/supabase/types'` |
 
 > ⚠️ `src/lib/types/supabase.ts`는 구버전 레거시 파일이다. import하지 않는다.
 
@@ -106,26 +108,26 @@ modal.close();          // 닫기
 ```ts
 // +page.server.ts
 export const load: PageServerLoad = async ({ locals, url }) => {
-  const { data, error } = await locals.supabase
-    .from('clients')
-    .select('*')
-    .order('created_at', { ascending: false });
+	const { data, error } = await locals.supabase
+		.from('clients')
+		.select('*')
+		.order('created_at', { ascending: false });
 
-  if (error) return { clients: [] };
-  return { clients: data };
+	if (error) return { clients: [] };
+	return { clients: data };
 };
 ```
 
 ```svelte
 <!-- +page.svelte -->
 <script lang="ts">
-  let { data }: PageProps = $props();
+	let { data }: PageProps = $props();
 
-  // ✅ createListStore로 낙관적 업데이트 처리 (페이지네이션 있을 때)
-  const list = createListStore(() => data.clients);
+	// ✅ createListStore로 낙관적 업데이트 처리 (페이지네이션 있을 때)
+	const list = createListStore(() => data.clients);
 
-  // ✅ 파생값은 $derived로
-  const activeClients = $derived(list.items.filter(c => !c.deleted_at));
+	// ✅ 파생값은 $derived로
+	const activeClients = $derived(list.items.filter((c) => !c.deleted_at));
 </script>
 ```
 
@@ -140,7 +142,9 @@ let items = $state([...data.items]);
 
 // ✅ $effect로 초기화 (createListStore가 없는 경우)
 let items = $state<Item[]>([]);
-$effect(() => { items = [...data.items]; });
+$effect(() => {
+	items = [...data.items];
+});
 ```
 
 ---
@@ -154,24 +158,24 @@ $effect(() => { items = [...data.items]; });
 ```ts
 // +page.server.ts
 export const actions: Actions = {
-  update: async ({ request, locals }) => {
-    const myRole = locals.session?.role;
-    if (!myRole || myRole === 'worker') return fail(403, { error: '권한이 없습니다.' });
+	update: async ({ request, locals }) => {
+		const myRole = locals.session?.role;
+		if (!myRole || myRole === 'worker') return fail(403, { error: '권한이 없습니다.' });
 
-    const form = await request.formData();
-    const id   = form.get('id') as string;
-    const name = (form.get('name') as string)?.trim();
+		const form = await request.formData();
+		const id = form.get('id') as string;
+		const name = (form.get('name') as string)?.trim();
 
-    const { data: updated, error } = await locals.supabase
-      .from('clients')
-      .update({ name })
-      .eq('id', id)
-      .select('*')   // ← 반드시 수정된 row 반환
-      .single();
+		const { data: updated, error } = await locals.supabase
+			.from('clients')
+			.update({ name })
+			.eq('id', id)
+			.select('*') // ← 반드시 수정된 row 반환
+			.single();
 
-    if (error) return fail(500, { error: error.message });
-    return { success: true, client: updated };  // ← client 키로 반환
-  },
+		if (error) return fail(500, { error: error.message });
+		return { success: true, client: updated }; // ← client 키로 반환
+	}
 };
 ```
 
@@ -181,26 +185,26 @@ import { submitAction } from '$lib/utils/action';
 
 // row를 반환받는 경우 (update / hide / restore)
 const saved = await submitAction<ClientRow>('update', payload, {
-  responseKey: 'client',   // ← 서버 응답 data에서 꺼낼 키
-  onRollback: () => list.clear(id),
-  onError: showErrorModal,
+	responseKey: 'client', // ← 서버 응답 data에서 꺼낼 키
+	onRollback: () => list.clear(id),
+	onError: showErrorModal
 });
 
 // 성공 여부만 필요한 경우 (create)
 await submitAction('create', payload, {
-  onError: showErrorModal,
-  revalidate: true,  // ← 성공 시 invalidateAll() 자동 호출
+	onError: showErrorModal,
+	revalidate: true // ← 성공 시 invalidateAll() 자동 호출
 });
 ```
 
 **옵션 레퍼런스**
 
-| 옵션 | 타입 | 설명 |
-|------|------|------|
-| `responseKey` | `string` | 서버 응답 `data`에서 꺼낼 키. 지정하면 `T \| null` 반환, 미지정이면 `true \| null` |
-| `onError` | `(msg: string) => void` | 에러 발생 시 콜백. `friendlyError`가 자동 적용됨 |
-| `onRollback` | `() => void` | 실패 시 낙관적 업데이트 롤백 콜백 |
-| `revalidate` | `boolean` | 성공 후 `invalidateAll()` 호출 여부 (기본 `false`) |
+| 옵션          | 타입                    | 설명                                                                               |
+| ------------- | ----------------------- | ---------------------------------------------------------------------------------- |
+| `responseKey` | `string`                | 서버 응답 `data`에서 꺼낼 키. 지정하면 `T \| null` 반환, 미지정이면 `true \| null` |
+| `onError`     | `(msg: string) => void` | 에러 발생 시 콜백. `friendlyError`가 자동 적용됨                                   |
+| `onRollback`  | `() => void`            | 실패 시 낙관적 업데이트 롤백 콜백                                                  |
+| `revalidate`  | `boolean`               | 성공 후 `invalidateAll()` 호출 여부 (기본 `false`)                                 |
 
 ---
 
@@ -208,10 +212,10 @@ await submitAction('create', payload, {
 
 ### 원칙
 
-| 액션 | 방식 | 이유 |
-|------|------|------|
-| update / hide / restore | `list.override()` — 클라이언트 즉시 반영 | id 알고 있음, 변경값 예측 가능 |
-| create | `invalidateAll()` — 서버 재요청 | 서버가 id/created_at/정렬 결정, 예측 불가 |
+| 액션                    | 방식                                     | 이유                                      |
+| ----------------------- | ---------------------------------------- | ----------------------------------------- |
+| update / hide / restore | `list.override()` — 클라이언트 즉시 반영 | id 알고 있음, 변경값 예측 가능            |
+| create                  | `invalidateAll()` — 서버 재요청          | 서버가 id/created_at/정렬 결정, 예측 불가 |
 
 ### createListStore 사용 (페이지네이션 있는 목록)
 
@@ -227,17 +231,17 @@ const list = createListStore(() => data.clients);
 
 ```ts
 async function handleUpdate() {
-  const id   = editingClient.id;
-  const prev = data.clients.find(c => c.id === id);
+	const id = editingClient.id;
+	const prev = data.clients.find((c) => c.id === id);
 
-  // 1. 즉시 UI 반영 + 모달 닫기
-  list.override(id, optimistic);
-  modal.close();
+	// 1. 즉시 UI 반영 + 모달 닫기
+	list.override(id, optimistic);
+	modal.close();
 
-  // 2. 백그라운드 저장
-  const saved = await submitAction('update', payload, () => list.clear(id)); // 실패 → 롤백
-  list.clear(id);
-  if (saved) list.override(id, saved); // 서버 응답으로 정확한 값 교체
+	// 2. 백그라운드 저장
+	const saved = await submitAction('update', payload, () => list.clear(id)); // 실패 → 롤백
+	list.clear(id);
+	if (saved) list.override(id, saved); // 서버 응답으로 정확한 값 교체
 }
 ```
 
@@ -245,9 +249,9 @@ async function handleUpdate() {
 
 ```ts
 async function handleCreate() {
-  modal.close();
-  const ok = await submitAction('create', payload);
-  if (ok) await invalidateAll(); // 서버에서 새 row 포함한 목록 재요청
+	modal.close();
+	const ok = await submitAction('create', payload);
+	if (ok) await invalidateAll(); // 서버에서 새 row 포함한 목록 재요청
 }
 ```
 
@@ -256,43 +260,54 @@ async function handleCreate() {
 `createListStore`는 update/hide/restore 외에 낙관적 추가(addPending), 삭제(remove), 재정렬(override 루프)도 지원한다.
 
 **낙관적 추가 패턴**
+
 ```ts
 const list = createListStore(() => data.items);
 
 async function handleCreate(payload) {
-  const tmpId = `tmp-${Date.now()}`;
-  list.addPending({ id: tmpId, ...optimisticFields });
+	const tmpId = `tmp-${Date.now()}`;
+	list.addPending({ id: tmpId, ...optimisticFields });
 
-  const saved = await submitAction<ItemRow>('create', payload, {
-    responseKey: 'item',
-    onRollback: () => list.removePending(tmpId),
-    onError: showErrorModal,
-  });
-  if (saved) list.replacePending(tmpId, saved);
-  else list.removePending(tmpId);
+	const saved = await submitAction<ItemRow>('create', payload, {
+		responseKey: 'item',
+		onRollback: () => list.removePending(tmpId),
+		onError: showErrorModal
+	});
+	if (saved) list.replacePending(tmpId, saved);
+	else list.removePending(tmpId);
 }
 ```
 
 **낙관적 삭제 패턴**
+
 ```ts
 async function handleDelete(id: string) {
-  list.remove(id);
-  await submitAction('delete', { id }, {
-    onRollback: () => list.restoreRemoved(id),
-    onError: showErrorModal,
-  });
+	list.remove(id);
+	await submitAction(
+		'delete',
+		{ id },
+		{
+			onRollback: () => list.restoreRemoved(id),
+			onError: showErrorModal
+		}
+	);
 }
 ```
 
 **재정렬 패턴**
+
 ```ts
 async function handleReorder(newOrder: ItemRow[]) {
-  newOrder.forEach((item, idx) => list.override(item.id, { ...item, sort_order: idx }));
-  const ok = await submitAction('reorder', { ids: JSON.stringify(newOrder.map(i => i.id)) }, {
-    onRollback: () => newOrder.forEach(item => list.clear(item.id)),
-    onError: showErrorModal,
-  });
-  if (!ok) newOrder.forEach(item => list.clear(item.id));
+	newOrder.forEach((item, idx) => list.override(item.id, { ...item, sort_order: idx }));
+	const ok = await submitAction(
+		'reorder',
+		{ ids: JSON.stringify(newOrder.map((i) => i.id)) },
+		{
+			onRollback: () => newOrder.forEach((item) => list.clear(item.id)),
+			onError: showErrorModal
+		}
+	);
+	if (!ok) newOrder.forEach((item) => list.clear(item.id));
 }
 ```
 
@@ -304,48 +319,51 @@ async function handleReorder(newOrder: ItemRow[]) {
 
 ```svelte
 <script lang="ts">
-  let errorMessage = $state('');
+	let errorMessage = $state('');
 
-  function showErrorModal(message?: string) {
-    errorMessage = message ?? '업데이트에 실패했습니다. 같은 문제가 반복된다면 관리자에게 문의해 주세요.';
-    modal.open(errorContent);
-  }
+	function showErrorModal(message?: string) {
+		errorMessage =
+			message ?? '업데이트에 실패했습니다. 같은 문제가 반복된다면 관리자에게 문의해 주세요.';
+		modal.open(errorContent);
+	}
 </script>
 
 {#snippet errorContent()}
-  <div class="modal-box max-w-sm">
-    <div class="flex items-start gap-3">
-      <Icon icon="lucide:alert-circle" class="text-error mt-0.5 h-5 w-5 shrink-0" />
-      <div>
-        <h3 class="font-semibold">오류가 발생했습니다</h3>
-        <p class="mt-1 text-sm text-base-content/70">{errorMessage}</p>
-      </div>
-    </div>
-    <div class="modal-action mt-4">
-      <button class="btn btn-sm" onclick={modal.close}>확인</button>
-    </div>
-  </div>
+	<div class="modal-box max-w-sm">
+		<div class="flex items-start gap-3">
+			<Icon icon="lucide:alert-circle" class="text-error mt-0.5 h-5 w-5 shrink-0" />
+			<div>
+				<h3 class="font-semibold">오류가 발생했습니다</h3>
+				<p class="text-base-content/70 mt-1 text-sm">{errorMessage}</p>
+			</div>
+		</div>
+		<div class="modal-action mt-4">
+			<button class="btn btn-sm" onclick={modal.close}>확인</button>
+		</div>
+	</div>
 {/snippet}
 ```
 
-| 상황 | 메시지 |
-|------|--------|
-| 기본 | 업데이트에 실패했습니다. 같은 문제가 반복된다면 관리자에게 문의해 주세요. |
-| 권한 오류 | 이 작업을 수행할 권한이 없습니다. |
-| 중복 항목 | 이미 동일한 항목이 존재합니다. |
-| 삭제 실패 | 삭제에 실패했습니다. 잠시 후 다시 시도해 주세요. |
+| 상황      | 메시지                                                                    |
+| --------- | ------------------------------------------------------------------------- |
+| 기본      | 업데이트에 실패했습니다. 같은 문제가 반복된다면 관리자에게 문의해 주세요. |
+| 권한 오류 | 이 작업을 수행할 권한이 없습니다.                                         |
+| 중복 항목 | 이미 동일한 항목이 존재합니다.                                            |
+| 삭제 실패 | 삭제에 실패했습니다. 잠시 후 다시 시도해 주세요.                          |
 
 ---
 
 ## 5. $effect 사용 기준
 
 ### 써도 되는 경우
+
 - 페이지네이션 없는 목록에서 서버 데이터 변경 시 로컬 상태 동기화
 - DOM 직접 조작 (포커스, 스크롤 등)
 - 외부 구독/이벤트 리스너 등록/해제
 - URL 파라미터 변경에 반응해서 로컬 UI 상태 초기화
 
 ### 쓰면 안 되는 경우
+
 - 파생값 계산 → `$derived` 사용
 - 초기 데이터 fetch → `+page.server.ts` `load` 사용
 - `$state` → `$state` 계산 → `$derived` 사용
@@ -353,7 +371,9 @@ async function handleReorder(newOrder: ItemRow[]) {
 ```ts
 // ❌
 let fullName = $state('');
-$effect(() => { fullName = `${firstName} ${lastName}`; });
+$effect(() => {
+	fullName = `${firstName} ${lastName}`;
+});
 
 // ✅
 const fullName = $derived(`${firstName} ${lastName}`);

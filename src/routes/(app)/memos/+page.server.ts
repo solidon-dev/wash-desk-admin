@@ -4,7 +4,7 @@ import type { PageServerLoad, Actions } from './$types';
 const PAGE_SIZE = 50;
 
 export const load: PageServerLoad = async ({ locals, url }) => {
-	const myRole      = locals.session?.role;
+	const myRole = locals.session?.role;
 	const myFactoryId = (locals.session?.factory_id ?? null) as string | null;
 	const page = Math.max(1, Number(url.searchParams.get('page') ?? '1'));
 
@@ -16,12 +16,13 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			.select('id, clients!inner(factory_id)')
 			.eq('clients.factory_id', myFactoryId)
 			.is('deleted_at', null);
-		shipoutIds = (shipouts ?? []).map(s => s.id);
+		shipoutIds = (shipouts ?? []).map((s) => s.id);
 	}
 
 	let query = locals.supabase
 		.from('shipout_memos')
-		.select(`
+		.select(
+			`
 			id,
 			shipout_id,
 			title,
@@ -34,14 +35,17 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 				created_at,
 				clients ( id, name )
 			)
-		`, { count: 'exact' })
+		`,
+			{ count: 'exact' }
+		)
 		.order('created_at', { ascending: false })
 		.range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
 
 	if (shipoutIds !== null) {
-		query = shipoutIds.length > 0
-			? query.in('shipout_id', shipoutIds)
-			: query.eq('shipout_id', 'no-match'); // 소속 공장 거래처가 없으면 빈 결과
+		query =
+			shipoutIds.length > 0
+				? query.in('shipout_id', shipoutIds)
+				: query.eq('shipout_id', 'no-match'); // 소속 공장 거래처가 없으면 빈 결과
 	}
 
 	const { data: memos, error: memosError, count } = await query;
@@ -76,11 +80,8 @@ export const actions: Actions = {
 		const fd = await request.formData();
 		const id = fd.get('id') as string;
 		if (!id) return fail(400, { error: 'id 없음' });
-		const { error } = await locals.supabase
-			.from('shipout_memos')
-			.delete()
-			.eq('id', id);
+		const { error } = await locals.supabase.from('shipout_memos').delete().eq('id', id);
 		if (error) return fail(500, { error: '삭제 실패: ' + error.message });
 		return { success: true };
-	},
+	}
 };

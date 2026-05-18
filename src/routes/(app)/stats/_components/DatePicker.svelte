@@ -1,209 +1,269 @@
 <script lang="ts">
-  import Icon from '@iconify/svelte';
+	import Icon from '@iconify/svelte';
 
-  interface Props {
-    show: boolean;
-    target: 'from' | 'to' | 'single';
-    /** 'date' | 'datetime' */
-    mode?: 'date' | 'datetime';
-    fromDate: string;
-    toDate: string;
-    /** datetime 모드일 때 사용 (ISO or datetime-local 형식) */
-    datetimeValue?: string;
-    onselect: (target: 'from' | 'to' | 'single', ymd: string) => void;
-    ondatetimeselect?: (value: string) => void;
-    onclose: () => void;
-  }
+	interface Props {
+		show: boolean;
+		target: 'from' | 'to' | 'single';
+		/** 'date' | 'datetime' */
+		mode?: 'date' | 'datetime';
+		fromDate: string;
+		toDate: string;
+		/** datetime 모드일 때 사용 (ISO or datetime-local 형식) */
+		datetimeValue?: string;
+		onselect: (target: 'from' | 'to' | 'single', ymd: string) => void;
+		ondatetimeselect?: (value: string) => void;
+		onclose: () => void;
+	}
 
-  let {
-    show, target, mode = 'date',
-    fromDate, toDate, datetimeValue = '',
-    onselect, ondatetimeselect, onclose,
-  }: Props = $props();
+	let {
+		show,
+		target,
+		mode = 'date',
+		fromDate,
+		toDate,
+		datetimeValue = '',
+		onselect,
+		ondatetimeselect,
+		onclose
+	}: Props = $props();
 
-  function pad(n: number) { return String(n).padStart(2, '0'); }
+	function pad(n: number) {
+		return String(n).padStart(2, '0');
+	}
 
-  let pickerYear  = $state(new Date().getFullYear());
-  let pickerMonth = $state(new Date().getMonth());
-  let pickerHour  = $state(new Date().getHours());
-  let pickerMin   = $state(0);
+	let pickerYear = $state(new Date().getFullYear());
+	let pickerMonth = $state(new Date().getMonth());
+	let pickerHour = $state(new Date().getHours());
+	let pickerMin = $state(0);
 
-  $effect(() => {
-    if (!show) return;
-    if (mode === 'datetime' && datetimeValue) {
-      const base = new Date(datetimeValue);
-      pickerYear  = base.getFullYear();
-      pickerMonth = base.getMonth();
-      pickerHour  = base.getHours();
-      pickerMin   = base.getMinutes();
-    } else {
-      const src = target === 'to' ? toDate : fromDate;
-      const base = src ? new Date(src) : new Date();
-      pickerYear  = base.getFullYear();
-      pickerMonth = base.getMonth();
-    }
-  });
+	$effect(() => {
+		if (!show) return;
+		if (mode === 'datetime' && datetimeValue) {
+			const base = new Date(datetimeValue);
+			pickerYear = base.getFullYear();
+			pickerMonth = base.getMonth();
+			pickerHour = base.getHours();
+			pickerMin = base.getMinutes();
+		} else {
+			const src = target === 'to' ? toDate : fromDate;
+			const base = src ? new Date(src) : new Date();
+			pickerYear = base.getFullYear();
+			pickerMonth = base.getMonth();
+		}
+	});
 
-  const MONTH_NAMES = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
-  const DAY_NAMES   = ['일','월','화','수','목','금','토'];
+	const MONTH_NAMES = [
+		'1월',
+		'2월',
+		'3월',
+		'4월',
+		'5월',
+		'6월',
+		'7월',
+		'8월',
+		'9월',
+		'10월',
+		'11월',
+		'12월'
+	];
+	const DAY_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
 
-  function pickerDays(): (number | null)[] {
-    const first = new Date(pickerYear, pickerMonth, 1).getDay();
-    const last  = new Date(pickerYear, pickerMonth + 1, 0).getDate();
-    const cells: (number | null)[] = Array(first).fill(null);
-    for (let d = 1; d <= last; d++) cells.push(d);
-    return cells;
-  }
+	function pickerDays(): (number | null)[] {
+		const first = new Date(pickerYear, pickerMonth, 1).getDay();
+		const last = new Date(pickerYear, pickerMonth + 1, 0).getDate();
+		const cells: (number | null)[] = Array(first).fill(null);
+		for (let d = 1; d <= last; d++) cells.push(d);
+		return cells;
+	}
 
-  function prevMonth() {
-    if (pickerMonth === 0) { pickerMonth = 11; pickerYear -= 1; }
-    else pickerMonth -= 1;
-  }
-  function nextMonth() {
-    if (pickerMonth === 11) { pickerMonth = 0; pickerYear += 1; }
-    else pickerMonth += 1;
-  }
+	function prevMonth() {
+		if (pickerMonth === 0) {
+			pickerMonth = 11;
+			pickerYear -= 1;
+		} else pickerMonth -= 1;
+	}
+	function nextMonth() {
+		if (pickerMonth === 11) {
+			pickerMonth = 0;
+			pickerYear += 1;
+		} else pickerMonth += 1;
+	}
 
-  let pickerSelectedDate = $state('');
-  $effect(() => {
-    if (!show) return;
-    if (mode === 'datetime' && datetimeValue) {
-      const d = new Date(datetimeValue);
-      pickerSelectedDate = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-    } else {
-      pickerSelectedDate = target === 'to' ? toDate : fromDate;
-    }
-  });
+	let pickerSelectedDate = $state('');
+	$effect(() => {
+		if (!show) return;
+		if (mode === 'datetime' && datetimeValue) {
+			const d = new Date(datetimeValue);
+			pickerSelectedDate = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+		} else {
+			pickerSelectedDate = target === 'to' ? toDate : fromDate;
+		}
+	});
 
-  function selectDay(day: number) {
-    const ymd = `${pickerYear}-${pad(pickerMonth + 1)}-${pad(day)}`;
-    if (mode === 'datetime') {
-      pickerSelectedDate = ymd;
-    } else {
-      onselect(target, ymd);
-    }
-  }
+	function selectDay(day: number) {
+		const ymd = `${pickerYear}-${pad(pickerMonth + 1)}-${pad(day)}`;
+		if (mode === 'datetime') {
+			pickerSelectedDate = ymd;
+		} else {
+			onselect(target, ymd);
+		}
+	}
 
-  function confirmDatetime() {
-    const value = `${pickerSelectedDate}T${pad(pickerHour)}:${pad(pickerMin)}`;
-    ondatetimeselect?.(value);
-    onclose();
-  }
+	function confirmDatetime() {
+		const value = `${pickerSelectedDate}T${pad(pickerHour)}:${pad(pickerMin)}`;
+		ondatetimeselect?.(value);
+		onclose();
+	}
 
-  const headerLabel: Record<string, string> = {
-    from: '시작일',
-    to: '종료일',
-    single: '날짜 선택',
-  };
+	const headerLabel: Record<string, string> = {
+		from: '시작일',
+		to: '종료일',
+		single: '날짜 선택'
+	};
 </script>
 
 {#if show}
-  <div
-    class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
-    role="button" tabindex="-1"
-    onclick={onclose}
-    onkeydown={(e) => e.key === 'Escape' && onclose()}
-    aria-label="닫기"
-  >
-    <div
-      class="bg-base-100 rounded-2xl shadow-2xl w-[520px] overflow-hidden"
-      role="dialog" aria-modal="true"
-      onclick={(e) => e.stopPropagation()}
-      onkeydown={(e) => e.stopPropagation()}
-      tabindex="-1"
-    >
-      <div class="px-6 py-5 border-b border-base-200 flex items-center justify-between">
-        <span class="text-xl font-black text-base-content">{headerLabel[target] ?? '날짜 선택'}</span>
-        <button type="button" class="btn btn-ghost btn-md btn-circle" onclick={onclose}>
-          <Icon icon="heroicons:x-mark" class="w-6 h-6" />
-        </button>
-      </div>
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+		role="button"
+		tabindex="-1"
+		onclick={onclose}
+		onkeydown={(e) => e.key === 'Escape' && onclose()}
+		aria-label="닫기"
+	>
+		<div
+			class="bg-base-100 w-[520px] overflow-hidden rounded-2xl shadow-2xl"
+			role="dialog"
+			aria-modal="true"
+			onclick={(e) => e.stopPropagation()}
+			onkeydown={(e) => e.stopPropagation()}
+			tabindex="-1"
+		>
+			<div class="border-base-200 flex items-center justify-between border-b px-6 py-5">
+				<span class="text-base-content text-xl font-black"
+					>{headerLabel[target] ?? '날짜 선택'}</span
+				>
+				<button type="button" class="btn btn-ghost btn-md btn-circle" onclick={onclose}>
+					<Icon icon="heroicons:x-mark" class="h-6 w-6" />
+				</button>
+			</div>
 
-      <div class="px-6 pt-5 pb-2 flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <button type="button" class="btn btn-ghost btn-md btn-square" onclick={() => pickerYear -= 1}>
-            <Icon icon="heroicons:chevron-left" class="w-6 h-6" />
-          </button>
-          <span class="text-2xl font-black w-24 text-center">{pickerYear}년</span>
-          <button type="button" class="btn btn-ghost btn-md btn-square" onclick={() => pickerYear += 1}>
-            <Icon icon="heroicons:chevron-right" class="w-6 h-6" />
-          </button>
-        </div>
-        <div class="flex items-center gap-2">
-          <button type="button" class="btn btn-ghost btn-md btn-square" onclick={prevMonth}>
-            <Icon icon="heroicons:chevron-left" class="w-6 h-6" />
-          </button>
-          <span class="text-2xl font-black w-16 text-center">{MONTH_NAMES[pickerMonth]}</span>
-          <button type="button" class="btn btn-ghost btn-md btn-square" onclick={nextMonth}>
-            <Icon icon="heroicons:chevron-right" class="w-6 h-6" />
-          </button>
-        </div>
-      </div>
+			<div class="flex items-center justify-between px-6 pt-5 pb-2">
+				<div class="flex items-center gap-2">
+					<button
+						type="button"
+						class="btn btn-ghost btn-md btn-square"
+						onclick={() => (pickerYear -= 1)}
+					>
+						<Icon icon="heroicons:chevron-left" class="h-6 w-6" />
+					</button>
+					<span class="w-24 text-center text-2xl font-black">{pickerYear}년</span>
+					<button
+						type="button"
+						class="btn btn-ghost btn-md btn-square"
+						onclick={() => (pickerYear += 1)}
+					>
+						<Icon icon="heroicons:chevron-right" class="h-6 w-6" />
+					</button>
+				</div>
+				<div class="flex items-center gap-2">
+					<button type="button" class="btn btn-ghost btn-md btn-square" onclick={prevMonth}>
+						<Icon icon="heroicons:chevron-left" class="h-6 w-6" />
+					</button>
+					<span class="w-16 text-center text-2xl font-black">{MONTH_NAMES[pickerMonth]}</span>
+					<button type="button" class="btn btn-ghost btn-md btn-square" onclick={nextMonth}>
+						<Icon icon="heroicons:chevron-right" class="h-6 w-6" />
+					</button>
+				</div>
+			</div>
 
-      <div class="grid grid-cols-7 px-4 pb-1">
-        {#each DAY_NAMES as dn, i (dn)}
-          <div class="text-center text-base font-black py-2
-            {i === 0 ? 'text-error' : i === 6 ? 'text-info' : 'text-base-content/30'}">{dn}</div>
-        {/each}
-      </div>
+			<div class="grid grid-cols-7 px-4 pb-1">
+				{#each DAY_NAMES as dn, i (dn)}
+					<div
+						class="py-2 text-center text-base font-black
+            {i === 0 ? 'text-error' : i === 6 ? 'text-info' : 'text-base-content/30'}"
+					>
+						{dn}
+					</div>
+				{/each}
+			</div>
 
-      <div class="grid grid-cols-7 px-4 pb-5 gap-y-1">
-        {#each pickerDays() as cell, i (i)}
-          {#if cell === null}
-            <div></div>
-          {:else}
-            {@const ymd = `${pickerYear}-${pad(pickerMonth + 1)}-${pad(cell)}`}
-            {@const isSelected = mode === 'datetime' ? pickerSelectedDate === ymd : (target === 'to' ? toDate : fromDate) === ymd}
-            {@const isInRange = mode !== 'datetime' && ymd >= fromDate && ymd <= toDate}
-            {@const dow = new Date(pickerYear, pickerMonth, cell).getDay()}
-            <button
-              type="button"
-              class="h-14 w-full rounded-xl text-xl font-black transition-colors
+			<div class="grid grid-cols-7 gap-y-1 px-4 pb-5">
+				{#each pickerDays() as cell, i (i)}
+					{#if cell === null}
+						<div></div>
+					{:else}
+						{@const ymd = `${pickerYear}-${pad(pickerMonth + 1)}-${pad(cell)}`}
+						{@const isSelected =
+							mode === 'datetime'
+								? pickerSelectedDate === ymd
+								: (target === 'to' ? toDate : fromDate) === ymd}
+						{@const isInRange = mode !== 'datetime' && ymd >= fromDate && ymd <= toDate}
+						{@const dow = new Date(pickerYear, pickerMonth, cell).getDay()}
+						<button
+							type="button"
+							class="h-14 w-full rounded-xl text-xl font-black transition-colors
                 {isSelected
-                  ? 'bg-primary text-primary-content'
-                  : isInRange
-                    ? 'bg-primary/20 text-primary'
-                    : dow === 0
-                      ? 'text-error hover:bg-base-200'
-                      : dow === 6
-                        ? 'text-info hover:bg-base-200'
-                        : 'text-base-content hover:bg-base-200'}"
-              onclick={() => selectDay(cell)}
-            >{cell}</button>
-          {/if}
-        {/each}
-      </div>
+								? 'bg-primary text-primary-content'
+								: isInRange
+									? 'bg-primary/20 text-primary'
+									: dow === 0
+										? 'text-error hover:bg-base-200'
+										: dow === 6
+											? 'text-info hover:bg-base-200'
+											: 'text-base-content hover:bg-base-200'}"
+							onclick={() => selectDay(cell)}>{cell}</button
+						>
+					{/if}
+				{/each}
+			</div>
 
-      {#if mode === 'datetime'}
-        <div class="px-6 pb-4 border-t border-base-200 pt-5 flex items-center justify-center gap-4">
-          <div class="flex items-center gap-2">
-            <button type="button" class="btn btn-ghost btn-md btn-square" onclick={() => pickerHour = (pickerHour + 23) % 24}>
-              <Icon icon="heroicons:chevron-left" class="w-6 h-6" />
-            </button>
-            <span class="text-4xl font-black w-16 text-center tabular-nums">{pad(pickerHour)}</span>
-            <button type="button" class="btn btn-ghost btn-md btn-square" onclick={() => pickerHour = (pickerHour + 1) % 24}>
-              <Icon icon="heroicons:chevron-right" class="w-6 h-6" />
-            </button>
-          </div>
-          <span class="text-4xl font-black text-base-content/40">:</span>
-          <div class="flex items-center gap-2">
-            <button type="button" class="btn btn-ghost btn-md btn-square" onclick={() => pickerMin = (pickerMin + 55) % 60}>
-              <Icon icon="heroicons:chevron-left" class="w-6 h-6" />
-            </button>
-            <span class="text-4xl font-black w-16 text-center tabular-nums">{pad(pickerMin)}</span>
-            <button type="button" class="btn btn-ghost btn-md btn-square" onclick={() => pickerMin = (pickerMin + 5) % 60}>
-              <Icon icon="heroicons:chevron-right" class="w-6 h-6" />
-            </button>
-          </div>
-        </div>
-        <div class="px-6 pb-6">
-          <button
-            type="button"
-            class="btn btn-primary w-full h-16 text-xl font-black"
-            onclick={confirmDatetime}
-          >확인</button>
-        </div>
-      {/if}
-    </div>
-  </div>
+			{#if mode === 'datetime'}
+				<div class="border-base-200 flex items-center justify-center gap-4 border-t px-6 pt-5 pb-4">
+					<div class="flex items-center gap-2">
+						<button
+							type="button"
+							class="btn btn-ghost btn-md btn-square"
+							onclick={() => (pickerHour = (pickerHour + 23) % 24)}
+						>
+							<Icon icon="heroicons:chevron-left" class="h-6 w-6" />
+						</button>
+						<span class="w-16 text-center text-4xl font-black tabular-nums">{pad(pickerHour)}</span>
+						<button
+							type="button"
+							class="btn btn-ghost btn-md btn-square"
+							onclick={() => (pickerHour = (pickerHour + 1) % 24)}
+						>
+							<Icon icon="heroicons:chevron-right" class="h-6 w-6" />
+						</button>
+					</div>
+					<span class="text-base-content/40 text-4xl font-black">:</span>
+					<div class="flex items-center gap-2">
+						<button
+							type="button"
+							class="btn btn-ghost btn-md btn-square"
+							onclick={() => (pickerMin = (pickerMin + 55) % 60)}
+						>
+							<Icon icon="heroicons:chevron-left" class="h-6 w-6" />
+						</button>
+						<span class="w-16 text-center text-4xl font-black tabular-nums">{pad(pickerMin)}</span>
+						<button
+							type="button"
+							class="btn btn-ghost btn-md btn-square"
+							onclick={() => (pickerMin = (pickerMin + 5) % 60)}
+						>
+							<Icon icon="heroicons:chevron-right" class="h-6 w-6" />
+						</button>
+					</div>
+				</div>
+				<div class="px-6 pb-6">
+					<button
+						type="button"
+						class="btn btn-primary h-16 w-full text-xl font-black"
+						onclick={confirmDatetime}>확인</button
+					>
+				</div>
+			{/if}
+		</div>
+	</div>
 {/if}

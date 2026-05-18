@@ -2,8 +2,21 @@
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
 	type LaundryCategory = 'towel' | 'sheet' | 'uniform' | 'all';
-	type ShipmentItem = { laundryItemId: string; itemName: string; category: string; quantity: number };
-	type Shipment = { id: string; clientId: string; items: ShipmentItem[]; driverId: string; shippedAt: string; createdAt: string; memo?: string };
+	type ShipmentItem = {
+		laundryItemId: string;
+		itemName: string;
+		category: string;
+		quantity: number;
+	};
+	type Shipment = {
+		id: string;
+		clientId: string;
+		items: ShipmentItem[];
+		driverId: string;
+		shippedAt: string;
+		createdAt: string;
+		memo?: string;
+	};
 
 	const clients = [
 		{ id: 'client-001', name: '그랜드호텔' },
@@ -11,29 +24,105 @@
 		{ id: 'client-003', name: '제주리조트' },
 		{ id: 'client-004', name: '힐사이드호텔' },
 		{ id: 'client-005', name: '선셋펜션' },
-		{ id: 'client-006', name: '블루라군리조트' },
+		{ id: 'client-006', name: '블루라군리조트' }
 	];
 
 	let laundryItems = $state([
-		{ id: 'item-001', clientId: 'client-001', category: 'towel', name: '대형타올', counts: { received: 0, washing: 20, completed: 150, stock: 80, shipped: 500 }, updatedAt: '2025-01-17' },
-		{ id: 'item-002', clientId: 'client-001', category: 'sheet', name: '싱글시트', counts: { received: 0, washing: 10, completed: 80, stock: 40, shipped: 300 }, updatedAt: '2025-01-17' },
-		{ id: 'item-003', clientId: 'client-001', category: 'uniform', name: '직원유니폼', counts: { received: 0, washing: 5, completed: 30, stock: 20, shipped: 100 }, updatedAt: '2025-01-17' },
-		{ id: 'item-004', clientId: 'client-002', category: 'towel', name: '소형타올', counts: { received: 0, washing: 15, completed: 90, stock: 50, shipped: 200 }, updatedAt: '2025-01-16' },
-		{ id: 'item-005', clientId: 'client-002', category: 'sheet', name: '더블시트', counts: { received: 0, washing: 8, completed: 60, stock: 30, shipped: 150 }, updatedAt: '2025-01-16' },
-		{ id: 'item-006', clientId: 'client-003', category: 'towel', name: '바스타올', counts: { received: 0, washing: 25, completed: 200, stock: 100, shipped: 800 }, updatedAt: '2025-01-15' },
+		{
+			id: 'item-001',
+			clientId: 'client-001',
+			category: 'towel',
+			name: '대형타올',
+			counts: { received: 0, washing: 20, completed: 150, stock: 80, shipped: 500 },
+			updatedAt: '2025-01-17'
+		},
+		{
+			id: 'item-002',
+			clientId: 'client-001',
+			category: 'sheet',
+			name: '싱글시트',
+			counts: { received: 0, washing: 10, completed: 80, stock: 40, shipped: 300 },
+			updatedAt: '2025-01-17'
+		},
+		{
+			id: 'item-003',
+			clientId: 'client-001',
+			category: 'uniform',
+			name: '직원유니폼',
+			counts: { received: 0, washing: 5, completed: 30, stock: 20, shipped: 100 },
+			updatedAt: '2025-01-17'
+		},
+		{
+			id: 'item-004',
+			clientId: 'client-002',
+			category: 'towel',
+			name: '소형타올',
+			counts: { received: 0, washing: 15, completed: 90, stock: 50, shipped: 200 },
+			updatedAt: '2025-01-16'
+		},
+		{
+			id: 'item-005',
+			clientId: 'client-002',
+			category: 'sheet',
+			name: '더블시트',
+			counts: { received: 0, washing: 8, completed: 60, stock: 30, shipped: 150 },
+			updatedAt: '2025-01-16'
+		},
+		{
+			id: 'item-006',
+			clientId: 'client-003',
+			category: 'towel',
+			name: '바스타올',
+			counts: { received: 0, washing: 25, completed: 200, stock: 100, shipped: 800 },
+			updatedAt: '2025-01-15'
+		}
 	]);
 
 	let shipments = $state<Shipment[]>([
-		{ id: 'ship-001', clientId: 'client-001', items: [{ laundryItemId: 'item-001', itemName: '대형타올', category: 'towel', quantity: 50 }, { laundryItemId: 'item-002', itemName: '싱글시트', category: 'sheet', quantity: 20 }], driverId: 'driver-001', shippedAt: '2025-01-10T10:00:00', createdAt: '2025-01-10T10:00:00' },
-		{ id: 'ship-002', clientId: 'client-002', items: [{ laundryItemId: 'item-004', itemName: '소형타올', category: 'towel', quantity: 30 }], driverId: 'driver-001', shippedAt: '2025-01-12T14:00:00', createdAt: '2025-01-12T14:00:00' },
-		{ id: 'ship-003', clientId: 'client-001', items: [{ laundryItemId: 'item-001', itemName: '대형타올', category: 'towel', quantity: 40 }, { laundryItemId: 'item-003', itemName: '직원유니폼', category: 'uniform', quantity: 10 }], driverId: 'driver-002', shippedAt: '2025-01-15T09:00:00', createdAt: '2025-01-15T09:00:00' },
-		{ id: 'ship-004', clientId: 'client-003', items: [{ laundryItemId: 'item-006', itemName: '바스타올', category: 'towel', quantity: 80 }], driverId: 'driver-001', shippedAt: '2025-01-16T11:00:00', createdAt: '2025-01-16T11:00:00' },
+		{
+			id: 'ship-001',
+			clientId: 'client-001',
+			items: [
+				{ laundryItemId: 'item-001', itemName: '대형타올', category: 'towel', quantity: 50 },
+				{ laundryItemId: 'item-002', itemName: '싱글시트', category: 'sheet', quantity: 20 }
+			],
+			driverId: 'driver-001',
+			shippedAt: '2025-01-10T10:00:00',
+			createdAt: '2025-01-10T10:00:00'
+		},
+		{
+			id: 'ship-002',
+			clientId: 'client-002',
+			items: [{ laundryItemId: 'item-004', itemName: '소형타올', category: 'towel', quantity: 30 }],
+			driverId: 'driver-001',
+			shippedAt: '2025-01-12T14:00:00',
+			createdAt: '2025-01-12T14:00:00'
+		},
+		{
+			id: 'ship-003',
+			clientId: 'client-001',
+			items: [
+				{ laundryItemId: 'item-001', itemName: '대형타올', category: 'towel', quantity: 40 },
+				{ laundryItemId: 'item-003', itemName: '직원유니폼', category: 'uniform', quantity: 10 }
+			],
+			driverId: 'driver-002',
+			shippedAt: '2025-01-15T09:00:00',
+			createdAt: '2025-01-15T09:00:00'
+		},
+		{
+			id: 'ship-004',
+			clientId: 'client-003',
+			items: [{ laundryItemId: 'item-006', itemName: '바스타올', category: 'towel', quantity: 80 }],
+			driverId: 'driver-001',
+			shippedAt: '2025-01-16T11:00:00',
+			createdAt: '2025-01-16T11:00:00'
+		}
 	]);
 
 	function getShipmentsByDateRange(clientId: string | null, from: string, to: string) {
 		const fromTs = new Date(from).getTime();
 		const toTs = new Date(to).getTime();
-		return shipments.filter(s => {
+		return shipments.filter((s) => {
 			if (clientId && clientId !== 'all' && s.clientId !== clientId) return false;
 			const ts = new Date(s.shippedAt).getTime();
 			return ts >= fromTs && ts <= toTs;
@@ -54,7 +143,12 @@
 		{ key: 'uniform', label: '유니폼' }
 	];
 
-	const CATEGORY_LABELS: Record<string, string> = { towel: '타월', sheet: '시트', uniform: '유니폼', all: '전체' };
+	const CATEGORY_LABELS: Record<string, string> = {
+		towel: '타월',
+		sheet: '시트',
+		uniform: '유니폼',
+		all: '전체'
+	};
 
 	// 필터 적용 + 세탁완료>0 우선 정렬
 	const filteredStatusItems = $derived.by(() => {
@@ -165,15 +259,14 @@
 	<title>입출고 관리 — 세탁 관리자</title>
 </svelte:head>
 
-<div class="space-y-6 px-8 py-6 bg-base-200 min-h-screen">
-
+<div class="bg-base-200 min-h-screen space-y-6 px-8 py-6">
 	<!-- 헤더 -->
 	<div class="flex items-end justify-between">
-		<h2 class="text-2xl font-bold text-base-content">입출고 관리</h2>
+		<h2 class="text-base-content text-2xl font-bold">입출고 관리</h2>
 	</div>
 
 	<!-- 탭 -->
-	<div class="tabs tabs-boxed bg-base-100 shadow-sm w-fit gap-1 p-1">
+	<div class="tabs tabs-boxed bg-base-100 w-fit gap-1 p-1 shadow-sm">
 		<button
 			class="tab tab-lg font-semibold transition-all duration-150
 				{activeTab === 'status' ? 'tab-active' : ''}"
@@ -194,15 +287,10 @@
 	<!-- 탭 1: 현재 세탁완료 현황                               -->
 	<!-- ══════════════════════════════════════════════════════ -->
 	{#if activeTab === 'status'}
-
 		<!-- 필터 -->
 		<div class="flex flex-wrap items-center gap-3">
-
 			<!-- 거래처 select -->
-			<select
-				bind:value={statusClientFilter}
-				class="select select-bordered select-sm"
-			>
+			<select bind:value={statusClientFilter} class="select select-bordered select-sm">
 				<option value="all">전체 거래처</option>
 				{#each clients as client (client.id)}
 					<option value={client.id}>{client.name}</option>
@@ -224,16 +312,16 @@
 		</div>
 
 		<!-- 테이블 카드 -->
-		<div class="card bg-base-100 shadow-sm overflow-hidden">
+		<div class="card bg-base-100 overflow-hidden shadow-sm">
 			{#if filteredStatusItems.length === 0}
 				<div class="card-body items-center py-12">
 					<p class="text-base-content/40 text-sm">조건에 맞는 품목이 없습니다.</p>
 				</div>
 			{:else}
 				<div class="overflow-x-auto">
-					<table class="table table-zebra w-full text-sm">
+					<table class="table-zebra table w-full text-sm">
 						<thead>
-							<tr class="bg-base-200 text-base-content/50 text-xs uppercase tracking-wide">
+							<tr class="bg-base-200 text-base-content/50 text-xs tracking-wide uppercase">
 								<th>거래처</th>
 								<th>카테고리</th>
 								<th>품목명</th>
@@ -246,7 +334,7 @@
 								<!-- 품목 행 -->
 								<tr class="transition-colors {item.counts.completed === 0 ? 'opacity-50' : ''}">
 									<td class="font-medium">
-										{clients.find(c => c.id === item.clientId)?.name ?? '—'}
+										{clients.find((c) => c.id === item.clientId)?.name ?? '—'}
 									</td>
 									<td>
 										{#if item.category === 'towel'}
@@ -268,10 +356,14 @@
 										{/if}
 									</td>
 									<td>{item.name}</td>
-									<td class="text-right font-bold {item.counts.completed > 0 ? 'text-primary' : 'text-base-content/30'}">
+									<td
+										class="text-right font-bold {item.counts.completed > 0
+											? 'text-primary'
+											: 'text-base-content/30'}"
+									>
 										{item.counts.completed.toLocaleString()}
 									</td>
-									<td class="text-right text-base-content/70">
+									<td class="text-base-content/70 text-right">
 										{item.counts.stock.toLocaleString()}
 									</td>
 								</tr>
@@ -279,14 +371,14 @@
 								<!-- 소계 행 (거래처가 바뀔 때) -->
 								{#if isLastOfClient(idx)}
 									{@const sub = clientSubtotals.get(item.clientId)}
-									<tr class="bg-base-200 border-t border-base-300">
-										<td colspan="3" class="text-right text-xs font-bold text-base-content/50">
-											{clients.find(c => c.id === item.clientId)?.name ?? '—'} 소계
+									<tr class="bg-base-200 border-base-300 border-t">
+										<td colspan="3" class="text-base-content/50 text-right text-xs font-bold">
+											{clients.find((c) => c.id === item.clientId)?.name ?? '—'} 소계
 										</td>
-										<td class="text-right text-xs font-bold text-primary">
+										<td class="text-primary text-right text-xs font-bold">
 											{(sub?.completed ?? 0).toLocaleString()}
 										</td>
-										<td class="text-right text-xs font-bold text-base-content/60">
+										<td class="text-base-content/60 text-right text-xs font-bold">
 											{(sub?.stock ?? 0).toLocaleString()}
 										</td>
 									</tr>
@@ -303,7 +395,6 @@
 	<!-- 탭 2: 출고 이력                                        -->
 	<!-- ══════════════════════════════════════════════════════ -->
 	{#if activeTab === 'history'}
-
 		<!-- 필터 -->
 		<div class="card bg-base-100 shadow-sm">
 			<div class="card-body py-4">
@@ -317,7 +408,7 @@
 							class="input input-bordered input-sm"
 						/>
 					</div>
-					<span class="mb-1 text-base-content/40 text-lg font-light">~</span>
+					<span class="text-base-content/40 mb-1 text-lg font-light">~</span>
 					<div class="flex flex-col gap-1">
 						<label for="history-to" class="label label-text text-xs font-semibold">종료일</label>
 						<input
@@ -328,7 +419,8 @@
 						/>
 					</div>
 					<div class="flex flex-col gap-1">
-						<label for="history-client" class="label label-text text-xs font-semibold">거래처</label>
+						<label for="history-client" class="label label-text text-xs font-semibold">거래처</label
+						>
 						<select
 							id="history-client"
 							bind:value={historyClientFilter}
@@ -340,18 +432,13 @@
 							{/each}
 						</select>
 					</div>
-					<button
-						class="btn btn-primary btn-sm mb-0.5"
-						onclick={doQuery}
-					>
-						조회
-					</button>
+					<button class="btn btn-primary btn-sm mb-0.5" onclick={doQuery}> 조회 </button>
 				</div>
 			</div>
 		</div>
 
 		<!-- 요약 통계 카드 3개 -->
-		<div class="stats stats-horizontal shadow-sm bg-base-100 w-full">
+		<div class="stats stats-horizontal bg-base-100 w-full shadow-sm">
 			<div class="stat">
 				<div class="stat-title">총 출고 건수</div>
 				<div class="stat-value text-base-content">{summaryTotalCount}</div>
@@ -367,7 +454,7 @@
 		</div>
 
 		<!-- 결과 테이블 카드 -->
-		<div class="card bg-base-100 shadow-sm overflow-hidden">
+		<div class="card bg-base-100 overflow-hidden shadow-sm">
 			{#if queryResults.length === 0}
 				<div class="card-body items-center py-14">
 					<p class="text-base-content/40 text-sm">해당 기간 출고 이력이 없습니다.</p>
@@ -376,7 +463,7 @@
 				<div class="overflow-x-auto">
 					<table class="table w-full text-sm">
 						<thead>
-							<tr class="bg-base-200 text-base-content/50 text-xs uppercase tracking-wide">
+							<tr class="bg-base-200 text-base-content/50 text-xs tracking-wide uppercase">
 								<th>출고일시</th>
 								<th>거래처</th>
 								<th>품목 내역</th>
@@ -388,17 +475,17 @@
 							{#each queryResults as ship (ship.id)}
 								<!-- 메인 행 -->
 								<tr
-									class="cursor-pointer hover transition-colors
+									class="hover cursor-pointer transition-colors
 										{expandedShipmentIds.has(ship.id) ? 'bg-primary/10' : ''}"
 									onclick={() => toggleExpand(ship.id)}
 								>
-									<td class="whitespace-nowrap text-base-content/70">
+									<td class="text-base-content/70 whitespace-nowrap">
 										{formatDateTime(ship.shippedAt)}
 									</td>
 									<td class="font-medium whitespace-nowrap">
-										{clients.find(c => c.id === ship.clientId)?.name ?? '—'}
+										{clients.find((c) => c.id === ship.clientId)?.name ?? '—'}
 									</td>
-									<td class="max-w-xs text-base-content/70">
+									<td class="text-base-content/70 max-w-xs">
 										<span class="block overflow-hidden text-ellipsis whitespace-nowrap">
 											{shipmentSummary(ship)}
 										</span>
@@ -406,8 +493,8 @@
 									<td class="text-right font-bold">
 										{shipmentTotalQty(ship).toLocaleString()}
 									</td>
-									<td class="max-w-[140px] text-base-content/50">
-										<span class="block overflow-hidden text-ellipsis whitespace-nowrap text-xs">
+									<td class="text-base-content/50 max-w-[140px]">
+										<span class="block overflow-hidden text-xs text-ellipsis whitespace-nowrap">
 											{ship.memo ?? '—'}
 										</span>
 									</td>
@@ -417,13 +504,15 @@
 								{#if expandedShipmentIds.has(ship.id)}
 									<tr class="bg-primary/5">
 										<td colspan="5" class="px-8 py-4">
-											<div class="rounded-xl border border-primary/20 bg-base-100 p-4">
-												<p class="mb-3 text-xs font-bold uppercase tracking-wide text-primary">
+											<div class="border-primary/20 bg-base-100 rounded-xl border p-4">
+												<p class="text-primary mb-3 text-xs font-bold tracking-wide uppercase">
 													출고 상세 내역
 												</p>
 												<div class="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
 													{#each ship.items as item (item.laundryItemId)}
-														<div class="flex items-center justify-between rounded-lg border border-base-200 bg-base-200/50 px-3 py-2">
+														<div
+															class="border-base-200 bg-base-200/50 flex items-center justify-between rounded-lg border px-3 py-2"
+														>
 															<div class="flex items-center gap-2">
 																{#if item.category === 'towel'}
 																	<span class="badge badge-info badge-xs font-semibold">
@@ -444,13 +533,16 @@
 																{/if}
 																<span class="text-sm">{item.itemName}</span>
 															</div>
-															<span class="ml-2 font-bold text-primary">{item.quantity.toLocaleString()}개</span>
+															<span class="text-primary ml-2 font-bold"
+																>{item.quantity.toLocaleString()}개</span
+															>
 														</div>
 													{/each}
 												</div>
 												{#if ship.memo}
-													<p class="mt-3 text-xs text-base-content/50">
-														<span class="font-semibold">메모:</span> {ship.memo}
+													<p class="text-base-content/50 mt-3 text-xs">
+														<span class="font-semibold">메모:</span>
+														{ship.memo}
 													</p>
 												{/if}
 											</div>
@@ -464,5 +556,4 @@
 			{/if}
 		</div>
 	{/if}
-
 </div>

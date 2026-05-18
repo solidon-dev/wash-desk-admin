@@ -17,7 +17,10 @@ export async function login(username: string, password: string): Promise<string 
 	const email = `${username}@mail.com`;
 	console.log('[LOGIN] 시도', { email });
 	const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-	console.log('[LOGIN] signInWithPassword 결과', { user: data?.user?.id ?? null, error: error ? { message: error.message, status: error.status } : null });
+	console.log('[LOGIN] signInWithPassword 결과', {
+		user: data?.user?.id ?? null,
+		error: error ? { message: error.message, status: error.status } : null
+	});
 
 	if (error) return error.message;
 	if (!data.user) return '로그인 실패';
@@ -28,7 +31,10 @@ export async function login(username: string, password: string): Promise<string 
 		.select('role')
 		.eq('id', data.user.id)
 		.single();
-	console.log('[LOGIN] profiles 조회 결과', { role: profile?.role ?? null, error: profileErr ? profileErr.message : null });
+	console.log('[LOGIN] profiles 조회 결과', {
+		role: profile?.role ?? null,
+		error: profileErr ? profileErr.message : null
+	});
 
 	const role = profile?.role;
 	if (role !== 'super_admin' && role !== 'factory_admin') {

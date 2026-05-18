@@ -3,77 +3,77 @@ import type { StatsShipout } from '$lib/api/stats';
 // ─── 인터페이스 ────────────────────────────────────────────────────────────────
 
 export interface CategoryRow {
-	cat:    string;
-	label:  string;
-	qty:    number;
+	cat: string;
+	label: string;
+	qty: number;
 	amount: number;
-	color:  string;
+	color: string;
 }
 
 export interface ItemRow {
-	name:   string;
-	cat:    string;
-	qty:    number;
+	name: string;
+	cat: string;
+	qty: number;
 	amount: number;
 }
 
 export interface ClientRow {
-	id:     string;
-	name:   string;
-	count:  number;
-	qty:    number;
+	id: string;
+	name: string;
+	count: number;
+	qty: number;
 	amount: number;
 }
 
 export interface Stats {
-	count:      number;
-	qty:        number;
-	amount:     number;
+	count: number;
+	qty: number;
+	amount: number;
 	byCategory: CategoryRow[];
-	byItem:     ItemRow[];
-	byClient:   ClientRow[];
+	byItem: ItemRow[];
+	byClient: ClientRow[];
 }
 
 export interface MonthlyRow {
-	month:  number;
-	qty:    number;
+	month: number;
+	qty: number;
 	amount: number;
 }
 
 export interface DailyRow {
-	date:   string; // 'YYYY-MM-DD'
-	qty:    number;
+	date: string; // 'YYYY-MM-DD'
+	qty: number;
 	amount: number;
 }
 
 export interface RangeMonthRow {
-	ym:     string; // 'YYYY-MM'
-	label:  string;
-	qty:    number;
+	ym: string; // 'YYYY-MM'
+	label: string;
+	qty: number;
 	amount: number;
 }
 
 export interface DiffResult {
 	sign: string;
-	pct:  string;
-	cls:  string;
+	pct: string;
+	cls: string;
 }
 
 // ─── 카테고리 메타 ─────────────────────────────────────────────────────────────
 
 // DB categories.name 기준 색상 / 레이블 맵
 export const CATEGORY_COLORS: Record<string, string> = {
-	'타올류':      '#3B82F6',
-	'린넨류':      '#8B5CF6',
-	'침구류':      '#EC4899',
-	'욕실용품':    '#06B6D4',
-	'유니폼':      '#F59E0B',
-	'주방용품':    '#10B981',
+	타올류: '#3B82F6',
+	린넨류: '#8B5CF6',
+	침구류: '#EC4899',
+	욕실용품: '#06B6D4',
+	유니폼: '#F59E0B',
+	주방용품: '#10B981',
 	'스파·사우나': '#6366F1',
-	'테이블웨어':  '#F97316',
-	'커튼·암막':   '#84CC16',
-	'객실용품':    '#EF4444',
-	'기타':        '#9CA3AF',
+	테이블웨어: '#F97316',
+	'커튼·암막': '#84CC16',
+	객실용품: '#EF4444',
+	기타: '#9CA3AF'
 };
 
 export const CATEGORY_KEYS = Object.keys(CATEGORY_COLORS);
@@ -109,7 +109,9 @@ export function inRange(dateStr: string, from: string, to: string): boolean {
 	return d >= from && d <= to;
 }
 
-export function pad2(n: number) { return String(n).padStart(2, '0'); }
+export function pad2(n: number) {
+	return String(n).padStart(2, '0');
+}
 
 export function offsetDate(base: Date, days: number): string {
 	const ms = base.getTime() + days * 86_400_000;
@@ -119,7 +121,7 @@ export function offsetDate(base: Date, days: number): string {
 
 export function daysBetween(from: string, to: string): number {
 	const a = new Date(from + 'T00:00:00').getTime();
-	const b = new Date(to   + 'T00:00:00').getTime();
+	const b = new Date(to + 'T00:00:00').getTime();
 	return Math.round((b - a) / 86_400_000) + 1;
 }
 
@@ -151,17 +153,16 @@ export function calcStats(
 	shipouts: StatsShipout[],
 	from: string,
 	to: string,
-	clientId?: string,
+	clientId?: string
 ): Stats {
 	const filtered = shipouts.filter(
-		(s) =>
-			inRange(s.created_at, from, to) &&
-			(clientId == null || s.client_id === clientId),
+		(s) => inRange(s.created_at, from, to) && (clientId == null || s.client_id === clientId)
 	);
 
-	const catMap:    Record<string, { qty: number; amount: number }> = {};
-	const itemMap:   Record<string, { cat: string; qty: number; amount: number }> = {};
-	const clientMap: Record<string, { name: string; count: number; qty: number; amount: number }> = {};
+	const catMap: Record<string, { qty: number; amount: number }> = {};
+	const itemMap: Record<string, { cat: string; qty: number; amount: number }> = {};
+	const clientMap: Record<string, { name: string; count: number; qty: number; amount: number }> =
+		{};
 
 	let totalQty = 0;
 	let totalAmount = 0;
@@ -174,34 +175,34 @@ export function calcStats(
 
 		for (const item of s.items) {
 			const amount = item.quantity * item.unit_price;
-			const cat    = item.category_name;
+			const cat = item.category_name;
 
-			totalQty    += item.quantity;
+			totalQty += item.quantity;
 			totalAmount += amount;
 
 			if (!catMap[cat]) catMap[cat] = { qty: 0, amount: 0 };
-			catMap[cat].qty    += item.quantity;
+			catMap[cat].qty += item.quantity;
 			catMap[cat].amount += amount;
 
 			if (!itemMap[item.item_name]) itemMap[item.item_name] = { cat, qty: 0, amount: 0 };
-			itemMap[item.item_name].qty    += item.quantity;
+			itemMap[item.item_name].qty += item.quantity;
 			itemMap[item.item_name].amount += amount;
 
-			clientMap[s.client_id].qty    += item.quantity;
+			clientMap[s.client_id].qty += item.quantity;
 			clientMap[s.client_id].amount += amount;
 		}
 	}
 
 	// byCategory: CATEGORY_KEYS 순서 유지, qty > 0인 것만
-	const byCategory: CategoryRow[] = CATEGORY_KEYS.filter(
-		(cat) => catMap[cat]?.qty > 0,
-	).map((cat) => ({
-		cat,
-		label:  cat,
-		qty:    catMap[cat].qty,
-		amount: catMap[cat].amount,
-		color:  CATEGORY_COLORS[cat] ?? '#9CA3AF',
-	}));
+	const byCategory: CategoryRow[] = CATEGORY_KEYS.filter((cat) => catMap[cat]?.qty > 0).map(
+		(cat) => ({
+			cat,
+			label: cat,
+			qty: catMap[cat].qty,
+			amount: catMap[cat].amount,
+			color: CATEGORY_COLORS[cat] ?? '#9CA3AF'
+		})
+	);
 
 	// byItem: qty 내림차순
 	const byItem: ItemRow[] = Object.entries(itemMap)
@@ -213,7 +214,14 @@ export function calcStats(
 		.map(([id, v]) => ({ id, name: v.name, count: v.count, qty: v.qty, amount: v.amount }))
 		.sort((a, b) => b.qty - a.qty);
 
-	return { count: filtered.length, qty: totalQty, amount: totalAmount, byCategory, byItem, byClient };
+	return {
+		count: filtered.length,
+		qty: totalQty,
+		amount: totalAmount,
+		byCategory,
+		byItem,
+		byClient
+	};
 }
 
 /**
@@ -223,14 +231,14 @@ export function calcDaily(
 	shipouts: StatsShipout[],
 	from: string,
 	to: string,
-	clientId?: string,
+	clientId?: string
 ): DailyRow[] {
 	const len = daysBetween(from, to);
 	const fromDate = new Date(from + 'T00:00:00');
 	const rows: DailyRow[] = Array.from({ length: len }, (_, i) => ({
 		date: offsetDate(fromDate, i),
 		qty: 0,
-		amount: 0,
+		amount: 0
 	}));
 	const idx: Record<string, DailyRow> = Object.fromEntries(rows.map((r) => [r.date, r]));
 
@@ -240,7 +248,7 @@ export function calcDaily(
 		const row = idx[d];
 		if (!row) continue;
 		for (const item of s.items) {
-			row.qty    += item.quantity;
+			row.qty += item.quantity;
 			row.amount += item.quantity * item.unit_price;
 		}
 	}
@@ -254,20 +262,31 @@ export function calcRangeMonthly(
 	shipouts: StatsShipout[],
 	from: string,
 	to: string,
-	clientId?: string,
+	clientId?: string
 ): RangeMonthRow[] {
 	const fromY = parseInt(from.slice(0, 4), 10);
 	const fromM = parseInt(from.slice(5, 7), 10);
-	const toY   = parseInt(to.slice(0, 4), 10);
-	const toM   = parseInt(to.slice(5, 7), 10);
+	const toY = parseInt(to.slice(0, 4), 10);
+	const toM = parseInt(to.slice(5, 7), 10);
 
 	const months: RangeMonthRow[] = [];
-	let y = fromY, m = fromM;
+	let y = fromY,
+		m = fromM;
 	while (y < toY || (y === toY && m <= toM)) {
 		const ym = `${y}-${pad2(m)}`;
 		const sameYear = fromY === toY;
-		months.push({ ym, label: sameYear ? `${m}월` : `${String(y).slice(2)}/${pad2(m)}`, qty: 0, amount: 0 });
-		if (m === 12) { m = 1; y += 1; } else { m += 1; }
+		months.push({
+			ym,
+			label: sameYear ? `${m}월` : `${String(y).slice(2)}/${pad2(m)}`,
+			qty: 0,
+			amount: 0
+		});
+		if (m === 12) {
+			m = 1;
+			y += 1;
+		} else {
+			m += 1;
+		}
 	}
 
 	const idx: Record<string, RangeMonthRow> = Object.fromEntries(months.map((r) => [r.ym, r]));
@@ -278,7 +297,7 @@ export function calcRangeMonthly(
 		const row = idx[ym];
 		if (!row) continue;
 		for (const item of s.items) {
-			row.qty    += item.quantity;
+			row.qty += item.quantity;
 			row.amount += item.quantity * item.unit_price;
 		}
 	}
@@ -291,7 +310,7 @@ export function calcRangeMonthly(
 export function calcMonthlyCategoryStack(
 	shipouts: StatsShipout[],
 	year: number,
-	clientId?: string,
+	clientId?: string
 ): Record<string, number[]> {
 	const result: Record<string, number[]> = {};
 	for (const cat of CATEGORY_KEYS) {

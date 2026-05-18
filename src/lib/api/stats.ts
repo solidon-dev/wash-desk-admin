@@ -3,20 +3,20 @@ import { supabase } from '$lib/supabase/client';
 // ─── 타입 ─────────────────────────────────────────────────────────────────────
 
 export interface StatsShipoutItem {
-	item_id:       string;
-	item_name:     string;
-	category_id:   string;
+	item_id: string;
+	item_name: string;
+	category_id: string;
 	category_name: string;
-	quantity:      number;
-	unit_price:    number;
+	quantity: number;
+	unit_price: number;
 }
 
 export interface StatsShipout {
-	id:          string;
-	client_id:   string;
+	id: string;
+	client_id: string;
 	client_name: string;
-	created_at:  string;
-	items:       StatsShipoutItem[];
+	created_at: string;
+	items: StatsShipoutItem[];
 }
 
 export interface StatsData {
@@ -34,15 +34,17 @@ export interface StatsData {
 export async function getStatsData(
 	from: string,
 	to: string,
-	clientId?: string,
+	clientId?: string
 ): Promise<StatsData> {
-	const { data, error } = await (supabase.rpc as unknown as (
-		fn: string,
-		args: Record<string, unknown>,
-	) => ReturnType<typeof supabase.rpc>)('get_stats_data', {
-		p_from:      from,
-		p_to:        to,
-		p_client_id: clientId ?? null,
+	const { data, error } = await (
+		supabase.rpc as unknown as (
+			fn: string,
+			args: Record<string, unknown>
+		) => ReturnType<typeof supabase.rpc>
+	)('get_stats_data', {
+		p_from: from,
+		p_to: to,
+		p_client_id: clientId ?? null
 	});
 
 	if (error) throw error;

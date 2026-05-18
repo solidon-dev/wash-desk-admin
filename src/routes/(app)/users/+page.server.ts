@@ -8,56 +8,57 @@ const PAGE_SIZE = 10;
 
 function getAdminClient() {
 	return createClient(PUBLIC_SUPABASE_URL, PRIVATE_SUPABASE_SERVICE_ROLE_KEY, {
-		auth: { autoRefreshToken: false, persistSession: false },
+		auth: { autoRefreshToken: false, persistSession: false }
 	});
 }
 
 export const load: PageServerLoad = async ({ locals, url }) => {
-	const myRole      = locals.session?.role;
+	const myRole = locals.session?.role;
 	const myFactoryId = locals.session?.factory_id as string | null;
 
-	const page        = Math.max(1, Number(url.searchParams.get('page') ?? '1'));
+	const page = Math.max(1, Number(url.searchParams.get('page') ?? '1'));
 	const showDeleted = url.searchParams.get('hidden') === '1';
-	const q           = url.searchParams.get('q')?.trim() ?? '';
+	const q = url.searchParams.get('q')?.trim() ?? '';
 
 	const admin = getAdminClient();
 
 	// 쿼리 기본 조건
 	let query = locals.supabase
 		.from('profiles')
-		.select('id, full_name, phone, role, factory_id, created_at, deleted_at, factories(id, name)', { count: 'exact' })
+		.select('id, full_name, phone, role, factory_id, created_at, deleted_at, factories(id, name)', {
+			count: 'exact'
+		})
 		.neq('role', 'super_admin')
 		.order('created_at', { ascending: false })
 		.range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
 
 	if (!showDeleted) query = query.is('deleted_at', null);
-	if (q)            query = query.ilike('full_name', `%${q}%`);
-	if (myRole === 'factory_admin' && myFactoryId)
-		query = query.eq('factory_id', myFactoryId);
+	if (q) query = query.ilike('full_name', `%${q}%`);
+	if (myRole === 'factory_admin' && myFactoryId) query = query.eq('factory_id', myFactoryId);
 
 	const [{ data: profiles, count, error }, { data: authList }, { data: allFactories }] =
 		await Promise.all([
 			query,
 			admin.auth.admin.listUsers({ perPage: 1000 }),
-			locals.supabase.from('factories').select('id, name').order('name'),
+			locals.supabase.from('factories').select('id, name').order('name')
 		]);
 
 	if (error) return { users: [], total: 0, page, PAGE_SIZE, showDeleted, q, allFactories: [] };
 
-	const emailMap = new Map(authList?.users.map(u => [u.id, u.email ?? '']) ?? []);
+	const emailMap = new Map(authList?.users.map((u) => [u.id, u.email ?? '']) ?? []);
 
 	return {
-		users: (profiles ?? []).map(u => ({
+		users: (profiles ?? []).map((u) => ({
 			...u,
 			username: (emailMap.get(u.id) ?? '').replace('@mail.com', ''),
-			factory_name: (u.factories as { name: string } | null)?.name ?? null,
+			factory_name: (u.factories as { name: string } | null)?.name ?? null
 		})),
 		total: count ?? 0,
 		page,
 		PAGE_SIZE,
 		showDeleted,
 		q,
-		allFactories: allFactories ?? [],
+		allFactories: allFactories ?? []
 	};
 };
 
@@ -66,26 +67,29 @@ export const actions: Actions = {
 	// super_admin: 모든 공장, 모든 역할 등록 가능
 	// factory_admin: 자기 공장 worker만 등록 가능
 	create: async ({ request, locals }) => {
-		const myRole      = locals.session?.role;
+		const myRole = locals.session?.role;
 		const myFactoryId = locals.session?.factory_id as string | null;
 
 		if (!myRole || myRole === 'worker') return fail(403, { error: '권한이 없습니다.' });
 
-		const form       = await request.formData();
-		const full_name  = (form.get('full_name')  as string)?.trim();
-		const username   = (form.get('username')   as string)?.trim();
-		const password   = (form.get('password')   as string)?.trim();
-		const role       = form.get('role')        as string;
+		const form = await request.formData();
+		const full_name = (form.get('full_name') as string)?.trim();
+		const username = (form.get('username') as string)?.trim();
+		const password = (form.get('password') as string)?.trim();
+		const role = form.get('role') as string;
 		const factory_id = (form.get('factory_id') as string) || null;
-		const phone      = (form.get('phone')      as string)?.trim().replace(/-/g, '') || null;
+		const phone = (form.get('phone') as string)?.trim().replace(/-/g, '') || null;
 
-		if (!full_name || !username || !password) return fail(400, { error: '필수 항목을 모두 입력해주세요.' });
+		if (!full_name || !username || !password)
+			return fail(400, { error: '필수 항목을 모두 입력해주세요.' });
 		if (!factory_id) return fail(400, { error: '공장을 선택해주세요.' });
-		if (phone && !/^01[016789][0-9]{7,8}$/.test(phone)) return fail(400, { error: '연락처 형식이 올바르지 않습니다. (예: 01012345678)' });
+		if (phone && !/^01[016789][0-9]{7,8}$/.test(phone))
+			return fail(400, { error: '연락처 형식이 올바르지 않습니다. (예: 01012345678)' });
 
 		// factory_admin은 자기 공장 worker만
 		if (myRole === 'factory_admin') {
-			if (factory_id !== myFactoryId) return fail(403, { error: '본인 공장 소속만 등록할 수 있습니다.' });
+			if (factory_id !== myFactoryId)
+				return fail(403, { error: '본인 공장 소속만 등록할 수 있습니다.' });
 			if (role !== 'worker') return fail(403, { error: '실무자만 등록할 수 있습니다.' });
 		}
 
@@ -99,14 +103,14 @@ export const actions: Actions = {
 				full_name,
 				role: role ?? 'worker',
 				factory_id,
-				phone,
-			},
+				phone
+			}
 		});
 		if (authErr) {
 			console.error('[CREATE USER] auth.admin.createUser 에러', {
 				message: authErr.message,
 				status: authErr.status,
-				name: authErr.name,
+				name: authErr.name
 			});
 			const msg = authErr.message.includes('already been registered')
 				? '이미 사용 중인 아이디입니다.'
@@ -122,16 +126,17 @@ export const actions: Actions = {
 	// super_admin: 모든 유저, 모든 필드 수정 가능
 	// factory_admin: 자기 공장 소속 유저(본인 포함) 이름/연락처/비밀번호만, 역할·공장 변경 불가
 	update: async ({ request, locals }) => {
-		const myRole      = locals.session?.role;
+		const myRole = locals.session?.role;
 		const myFactoryId = locals.session?.factory_id as string | null;
 
-		if (!myRole || !locals.session?.user?.id || myRole === 'worker') return fail(403, { error: '권한이 없습니다.' });
+		if (!myRole || !locals.session?.user?.id || myRole === 'worker')
+			return fail(403, { error: '권한이 없습니다.' });
 
-		const form       = await request.formData();
-		const targetId   = form.get('id')         as string;
-		const full_name  = (form.get('full_name')  as string)?.trim();
-		const phone      = (form.get('phone')      as string)?.trim().replace(/-/g, '') || null;
-		const role       = form.get('role')        as string | null;
+		const form = await request.formData();
+		const targetId = form.get('id') as string;
+		const full_name = (form.get('full_name') as string)?.trim();
+		const phone = (form.get('phone') as string)?.trim().replace(/-/g, '') || null;
+		const role = form.get('role') as string | null;
 		const factory_id = (form.get('factory_id') as string) || null;
 
 		if (!targetId || !full_name) return fail(400, { error: '필수 항목 누락' });
@@ -151,7 +156,9 @@ export const actions: Actions = {
 				.from('profiles')
 				.update({ full_name, phone })
 				.eq('id', targetId)
-				.select('id, full_name, phone, role, factory_id, created_at, deleted_at, factories(id, name)')
+				.select(
+					'id, full_name, phone, role, factory_id, created_at, deleted_at, factories(id, name)'
+				)
 				.single();
 
 			if (error) return fail(500, { error: error.message });
@@ -159,7 +166,7 @@ export const actions: Actions = {
 			const user = {
 				...updated,
 				username: '',
-				factory_name: (updated.factories as { name: string } | null)?.name ?? null,
+				factory_name: (updated.factories as { name: string } | null)?.name ?? null
 			};
 			return { success: true, user };
 		}
@@ -179,7 +186,7 @@ export const actions: Actions = {
 		const user = {
 			...updated,
 			username: '',
-			factory_name: (updated.factories as { name: string } | null)?.name ?? null,
+			factory_name: (updated.factories as { name: string } | null)?.name ?? null
 		};
 		return { success: true, user };
 	},
@@ -188,13 +195,13 @@ export const actions: Actions = {
 	// super_admin: 누구든
 	// factory_admin: 자기 공장 소속만
 	setPassword: async ({ request, locals }) => {
-		const myRole      = locals.session?.role;
+		const myRole = locals.session?.role;
 		const myFactoryId = locals.session?.factory_id as string | null;
 
 		if (!myRole || myRole === 'worker') return fail(403, { error: '권한이 없습니다.' });
 
-		const form     = await request.formData();
-		const targetId = form.get('id')        as string;
+		const form = await request.formData();
+		const targetId = form.get('id') as string;
 		const password = (form.get('password') as string)?.trim();
 
 		if (!targetId || !password) return fail(400, { error: '필수 항목 누락' });
@@ -223,25 +230,32 @@ export const actions: Actions = {
 		if (locals.session?.role !== 'super_admin') return fail(403, { error: '권한이 없습니다.' });
 
 		const form = await request.formData();
-		const id   = form.get('id') as string;
+		const id = form.get('id') as string;
 		if (!id) return fail(400, { error: 'id 누락' });
 
 		const admin = getAdminClient();
-		const { error: banErr } = await admin.auth.admin.updateUserById(id, { ban_duration: '876600h' });
+		const { error: banErr } = await admin.auth.admin.updateUserById(id, {
+			ban_duration: '876600h'
+		});
 		if (banErr) return fail(500, { error: banErr.message });
 
-		await locals.supabase.from('profiles').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+		await locals.supabase
+			.from('profiles')
+			.update({ deleted_at: new Date().toISOString() })
+			.eq('id', id);
 
 		const { data: updated } = await locals.supabase
 			.from('profiles')
 			.select('id, full_name, phone, role, factory_id, created_at, deleted_at, factories(id, name)')
 			.eq('id', id)
 			.single();
-		const user = updated ? {
-			...updated,
-			username: '',
-			factory_name: (updated.factories as { name: string } | null)?.name ?? null,
-		} : null;
+		const user = updated
+			? {
+					...updated,
+					username: '',
+					factory_name: (updated.factories as { name: string } | null)?.name ?? null
+				}
+			: null;
 		return { success: true, user };
 	},
 
@@ -250,7 +264,7 @@ export const actions: Actions = {
 		if (locals.session?.role !== 'super_admin') return fail(403, { error: '권한이 없습니다.' });
 
 		const form = await request.formData();
-		const id   = form.get('id') as string;
+		const id = form.get('id') as string;
 		if (!id) return fail(400, { error: 'id 누락' });
 
 		const admin = getAdminClient();
@@ -264,11 +278,13 @@ export const actions: Actions = {
 			.select('id, full_name, phone, role, factory_id, created_at, deleted_at, factories(id, name)')
 			.eq('id', id)
 			.single();
-		const user = updated ? {
-			...updated,
-			username: '',
-			factory_name: (updated.factories as { name: string } | null)?.name ?? null,
-		} : null;
+		const user = updated
+			? {
+					...updated,
+					username: '',
+					factory_name: (updated.factories as { name: string } | null)?.name ?? null
+				}
+			: null;
 		return { success: true, user };
-	},
+	}
 };

@@ -17,50 +17,55 @@ import { SvelteMap } from 'svelte/reactivity';
  *   restoreRemoved(id)        — 낙관적 삭제 롤백
  */
 export function createListStore<T extends { id: string }>(getItems: () => T[]) {
-  const overrides = new SvelteMap<string, T>();
-  const pending   = $state<T[]>([]);
-  const removed   = new SvelteMap<string, true>();
+	const overrides = new SvelteMap<string, T>();
+	const pending = $state<T[]>([]);
+	const removed = new SvelteMap<string, true>();
 
-  // items = pending + (서버 row에 override 적용)
-  const items = $derived([
-    ...pending,
-    ...getItems().map(item => overrides.get(item.id) ?? item),
-  ]);
+	// items = pending + (서버 row에 override 적용)
+	const items = $derived([...pending, ...getItems().map((item) => overrides.get(item.id) ?? item)]);
 
-  const itemsWithRemove = $derived(
-    items.filter(i => !removed.has(i.id))
-  );
+	const itemsWithRemove = $derived(items.filter((i) => !removed.has(i.id)));
 
-  // ── 기존 API (유지) ──
-  function override(id: string, patch: T) { overrides.set(id, patch); }
-  function clear(id: string) { overrides.delete(id); }
+	// ── 기존 API (유지) ──
+	function override(id: string, patch: T) {
+		overrides.set(id, patch);
+	}
+	function clear(id: string) {
+		overrides.delete(id);
+	}
 
-  // ── 신규 API ──
-  function addPending(item: T) {
-    pending.push(item);
-  }
+	// ── 신규 API ──
+	function addPending(item: T) {
+		pending.push(item);
+	}
 
-  function replacePending(tmpId: string, real: T) {
-    const idx = pending.findIndex(i => i.id === tmpId);
-    if (idx !== -1) pending.splice(idx, 1, real);
-  }
+	function replacePending(tmpId: string, real: T) {
+		const idx = pending.findIndex((i) => i.id === tmpId);
+		if (idx !== -1) pending.splice(idx, 1, real);
+	}
 
-  function removePending(tmpId: string) {
-    const idx = pending.findIndex(i => i.id === tmpId);
-    if (idx !== -1) pending.splice(idx, 1);
-  }
+	function removePending(tmpId: string) {
+		const idx = pending.findIndex((i) => i.id === tmpId);
+		if (idx !== -1) pending.splice(idx, 1);
+	}
 
-  function remove(id: string) { removed.set(id, true); }
-  function restoreRemoved(id: string) { removed.delete(id); }
+	function remove(id: string) {
+		removed.set(id, true);
+	}
+	function restoreRemoved(id: string) {
+		removed.delete(id);
+	}
 
-  return {
-    get items() { return itemsWithRemove; },
-    override,
-    clear,
-    addPending,
-    replacePending,
-    removePending,
-    remove,
-    restoreRemoved,
-  };
+	return {
+		get items() {
+			return itemsWithRemove;
+		},
+		override,
+		clear,
+		addPending,
+		replacePending,
+		removePending,
+		remove,
+		restoreRemoved
+	};
 }

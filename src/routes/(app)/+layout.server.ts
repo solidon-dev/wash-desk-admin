@@ -19,10 +19,7 @@ export const load: LayoutServerLoad = async ({ locals, url }) => {
 		redirect(302, '/clients');
 	}
 
-	const [
-		{ data: factories },
-		{ count: memoCount },
-	] = await Promise.all([
+	const [{ data: factories }, { count: memoCount }] = await Promise.all([
 		locals.supabase
 			.from('factories')
 			.select('id, name')
@@ -31,7 +28,7 @@ export const load: LayoutServerLoad = async ({ locals, url }) => {
 		locals.supabase
 			.from('shipout_memos')
 			.select('id', { count: 'exact', head: true })
-			.eq('is_read', false),
+			.eq('is_read', false)
 	]);
 
 	return {
@@ -39,6 +36,6 @@ export const load: LayoutServerLoad = async ({ locals, url }) => {
 		role,
 		factory_id: locals.session.factory_id ?? null,
 		factories: factories ?? [],
-		memoCount: memoCount ?? 0,
+		memoCount: memoCount ?? 0
 	};
 };
