@@ -40,14 +40,16 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const { data: clients, error: clientsError } = await clientsQuery;
 	if (clientsError) return { clients: [], categories: [], items: [], itemPrices: [], selectedClientId: null };
 
-	// clientId 없으면 첫 번째 거래처 자동 선택
-	const selectedClientId = url.searchParams.get('clientId') || (clients?.[0]?.id ?? null);
+	// clientId 없으면 URL 없이 진입한 것 — localStorage fallback은 클라이언트가 처리
+	const rawClientId = url.searchParams.get('clientId');
+	const selectedClientId = rawClientId || (clients?.[0]?.id ?? null);
 	if (!selectedClientId)
-		return { clients: clients ?? [], categories: [], items: [], itemPrices: [], selectedClientId: null };
+		return { clients: clients ?? [], categories: [], items: [], itemPrices: [], selectedClientId: null, invalidClientId: false };
 
 	const targetClient = (clients ?? []).find(c => c.id === selectedClientId);
 	if (!targetClient)
-		return { clients: clients ?? [], categories: [], items: [], itemPrices: [], selectedClientId: null };
+		// rawClientId가 있는데 찾을 수 없으면 무효 id → 클라이언트가 localStorage 제거
+		return { clients: clients ?? [], categories: [], items: [], itemPrices: [], selectedClientId: null, invalidClientId: !!rawClientId };
 
 	// categories + items 병렬 조회
 	const [{ data: categories }, { data: items }] = await Promise.all([
@@ -82,6 +84,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		items:           items ?? [],
 		itemPrices,
 		selectedClientId,
+		invalidClientId: false,
 	};
 };
 

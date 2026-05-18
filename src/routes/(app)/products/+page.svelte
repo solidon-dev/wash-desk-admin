@@ -3,6 +3,7 @@
   import { tick } from 'svelte';
   import { flip } from 'svelte/animate';
   import { goto, invalidateAll } from '$app/navigation';
+  import { browser } from '$app/environment';
   import { deserialize } from '$app/forms';
   import SearchBar from '$lib/components/SearchBar.svelte';
   import type { PageProps, PageData } from './$types';
@@ -43,6 +44,29 @@
   }
 
   // ── 거래처 선택 ────────────────────────────────────────────────
+  const LS_KEY = 'products:lastClientId';
+
+  // 무효 id가 내려온 경우 localStorage 제거 후 첫 번째 거래처로 재진입
+  $effect(() => {
+    if (!browser) return;
+    if (data.invalidClientId) {
+      localStorage.removeItem(LS_KEY);
+      const fallback = data.clients[0]?.id;
+      if (fallback) goto(`?clientId=${fallback}`, { replaceState: true });
+    }
+  });
+
+  // URL에 clientId 없이 진입 + localStorage에 저장된 id가 있으면 해당 id로 redirect
+  $effect(() => {
+    if (!browser) return;
+    if (data.selectedClientId !== null) return; // 이미 선택됨
+    if (data.invalidClientId) return;           // 무효 처리 중
+    const saved = localStorage.getItem(LS_KEY);
+    if (saved && data.clients.find(c => c.id === saved)) {
+      goto(`?clientId=${saved}`, { replaceState: true });
+    }
+  });
+
   const selectedClientId = $derived(data.selectedClientId ?? null);
 
   const selectedClient = $derived(
@@ -50,6 +74,7 @@
   );
 
   function selectClient(id: string) {
+    if (browser) localStorage.setItem(LS_KEY, id);
     const url = new URL(window.location.href);
     url.searchParams.set('clientId', id);
     showClientModal = false;
