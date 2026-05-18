@@ -89,51 +89,48 @@
 	const dAmt = $derived(diff(periodStats.amount, prevStats.amount));
 	const dQty = $derived(diff(periodStats.qty, prevStats.qty));
 
+	// ── 라인차트 원본 rows (한 번만 계산) ─────────────────────────────────────
+	const trendRowsCurr = $derived(
+		trendMode === 'daily'
+			? calcDaily(allShipouts, fromDate, toDate, cid)
+			: calcRangeMonthly(allShipouts, fromDate, toDate, cid)
+	);
+	const trendRowsPrev = $derived(
+		trendMode === 'daily'
+			? calcDaily(allShipouts, prev.from, prev.to, cid)
+			: calcRangeMonthly(allShipouts, prev.from, prev.to, cid)
+	);
+
 	// ── 라인차트 데이터 ────────────────────────────────────────────────────────
 	const trendLabels = $derived.by((): string[] => {
 		if (trendMode === 'daily') {
-			const rows = calcDaily(allShipouts, fromDate, toDate, cid);
-			const n = rows.length;
+			const n = trendRowsCurr.length;
 			const step = Math.max(1, Math.floor(n / 8));
-			return rows.map((r, i) => (i % step === 0 ? r.date.slice(5) : ''));
-		} else {
-			const rows = calcRangeMonthly(allShipouts, fromDate, toDate, cid);
-			return rows.map((r) => r.label);
+			return (trendRowsCurr as ReturnType<typeof calcDaily>).map((r, i) =>
+				i % step === 0 ? r.date.slice(5) : ''
+			);
 		}
+		return (trendRowsCurr as ReturnType<typeof calcRangeMonthly>).map((r) => r.label);
 	});
 
-	const trendSeriesCurr = $derived.by((): number[] => {
-		if (trendMode === 'daily') {
-			return calcDaily(allShipouts, fromDate, toDate, cid).map((r) =>
-				metric === 'amount' ? r.amount : r.qty
-			);
-		} else {
-			return calcRangeMonthly(allShipouts, fromDate, toDate, cid).map((r) =>
-				metric === 'amount' ? r.amount : r.qty
-			);
-		}
-	});
-
-	const trendSeriesPrev = $derived.by((): number[] => {
-		if (trendMode === 'daily') {
-			return calcDaily(allShipouts, prev.from, prev.to, cid).map((r) =>
-				metric === 'amount' ? r.amount : r.qty
-			);
-		} else {
-			return calcRangeMonthly(allShipouts, prev.from, prev.to, cid).map((r) =>
-				metric === 'amount' ? r.amount : r.qty
-			);
-		}
-	});
+	const trendSeriesCurr = $derived(
+		trendRowsCurr.map((r) => (metric === 'amount' ? r.amount : r.qty))
+	);
+	const trendSeriesPrev = $derived(
+		trendRowsPrev.map((r) => (metric === 'amount' ? r.amount : r.qty))
+	);
 
 	const trendSeries = $derived([
 		{ label: '현재 기간', color: '#3B82F6', data: trendSeriesCurr },
 		{ label: '직전 기간', color: '#9CA3AF', dash: true, data: trendSeriesPrev }
 	]);
 
-	// ── 스택바 (선택 기간 내 연도별) ──────────────────────────────────────────
-	// 현재 기간 내 월별 범위 스택 데이터
-	const stackMonths = $derived(calcRangeMonthly(allShipouts, fromDate, toDate, cid));
+	// ── 스택바 (trendRowsCurr 재사용) ─────────────────────────────────────────
+	const stackMonths = $derived(
+		trendMode === 'monthly'
+			? (trendRowsCurr as ReturnType<typeof calcRangeMonthly>)
+			: calcRangeMonthly(allShipouts, fromDate, toDate, cid)
+	);
 
 	// 카테고리별 월별 스택 데이터 (범위 기준)
 	const stackCatSeries = $derived.by(() => {

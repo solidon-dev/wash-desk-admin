@@ -56,9 +56,10 @@
 	let ranges = $state<CompareRange[]>([]);
 	let filterClientId = $state(page.url.searchParams.get('clientId') ?? '');
 
-	// clientId URL 동기화
+	// clientId는 $derived로 URL에서 직접 읽기 — $effect 불필요
+	const filterClientIdDerived = $derived(page.url.searchParams.get('clientId') ?? '');
 	$effect(() => {
-		filterClientId = page.url.searchParams.get('clientId') ?? '';
+		filterClientId = filterClientIdDerived;
 	});
 
 	// ─── 초기화 헬퍼 ─────────────────────────────────────────────────────────
