@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { afterNavigate, goto } from '$app/navigation';
-	import { navigating } from '$app/stores';
+	import { afterNavigate, beforeNavigate, goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 
 	// ── 페이지 전환 진행바 (NProgress 스타일) ──────────────────────────────────
@@ -65,14 +64,14 @@
 		}, 100);
 	}
 
-	$effect(() => {
-		if ($navigating) {
-			startProgress();
-		}
-	});
-
 	afterNavigate(() => {
 		completeProgress();
+		window.scrollTo({ top: 0 });
+		sidebarOpen = false;
+	});
+
+	beforeNavigate(() => {
+		startProgress();
 	});
 
 	import Icon from '@iconify/svelte';
@@ -125,11 +124,6 @@
 		await logout();
 		goto('/');
 	}
-
-	afterNavigate(() => {
-		window.scrollTo({ top: 0 });
-		sidebarOpen = false;
-	});
 
 	const navItems = $derived([
 		{ icon: 'lucide:building-2', label: '거래처 관리', path: '/clients', exact: true },
