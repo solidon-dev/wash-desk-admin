@@ -54,12 +54,6 @@
 		{ key: 'uniform', label: '유니폼' }
 	];
 
-	const categoryBadge: Record<string, string> = {
-		towel: 'badge-info',
-		sheet: 'badge-secondary',
-		uniform: 'badge-warning'
-	};
-
 	const CATEGORY_LABELS: Record<string, string> = { towel: '타월', sheet: '시트', uniform: '유니폼', all: '전체' };
 
 	// 필터 적용 + 세탁완료>0 우선 정렬

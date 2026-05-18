@@ -626,7 +626,6 @@
     if (!date || !isValidDate(date)) return;
     const price = getPrice(item.id);
     const prevDate = getPriceDate(item.id);
-    const cliId = selectedClientId;
     patchLocalPrice(item.id, { effective_from: date });
     submitBg('upsertPrice', {
       item_id: item.id,

@@ -59,7 +59,7 @@
   <div class="flex flex-col-reverse justify-between shrink-0 pb-[18px]" style="width:{PL}px">
     {#each tickPcts as f (f)}
       <div class="text-[11px] font-medium text-base-content/50 text-right pr-1.5 leading-none">
-        {#if f === 0}{''}{:else}{Math.round(maxTotal * f) >= 1000 ? `${(Math.round(maxTotal * f)/1000).toFixed(0)}k` : Math.round(maxTotal * f)}{/if}
+        {#if f === 0}&zwnj;{:else}{Math.round(maxTotal * f) >= 1000 ? `${(Math.round(maxTotal * f)/1000).toFixed(0)}k` : Math.round(maxTotal * f)}{/if}
       </div>
     {/each}
   </div>
