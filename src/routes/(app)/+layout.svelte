@@ -10,58 +10,58 @@
 
 	let _rafId = 0;
 	let _timerId: ReturnType<typeof setTimeout> | number = 0;
+	let _navGeneration = 0; // 현재 항번 navigation의 고유 ID
 
 	function startProgress() {
 		cancelAnimationFrame(_rafId);
 		clearTimeout(_timerId);
+		_navGeneration++; // 새 navigation 시작 — 이전 complete 콜백 무효화
 		navProgress = 0;
 		navOpacity = 1;
 		navVisible = true;
 
-		// 1단계: 0 → 80% 빠르게 (400ms)
+		const gen = _navGeneration;
 		const start = performance.now();
 		const phase1Duration = 400;
 
 		function phase1(now: number) {
+			if (gen !== _navGeneration) return; // 뒤늘린 navigation이면 중단
 			const elapsed = now - start;
 			const t = Math.min(elapsed / phase1Duration, 1);
-			// easeOut 커브로 80%까지
 			navProgress = 80 * (1 - Math.pow(1 - t, 3));
 			if (t < 1) {
 				_rafId = requestAnimationFrame(phase1);
 			} else {
-				// 2단계: 80% → 90% 아주 천천히 (크롤링)
-				startCrawl();
+				startCrawl(gen);
 			}
 		}
 		_rafId = requestAnimationFrame(phase1);
 	}
 
-	function startCrawl() {
-		let crawlTarget = 90;
+	function startCrawl(gen: number) {
 		function crawl() {
-			if (navProgress < crawlTarget) {
-				navProgress += (crawlTarget - navProgress) * 0.03;
-			}
+			if (gen !== _navGeneration) return;
+			if (navProgress < 90) navProgress += (90 - navProgress) * 0.03;
 			_rafId = requestAnimationFrame(crawl);
 		}
 		_rafId = requestAnimationFrame(crawl);
 	}
 
 	function completeProgress() {
+		const gen = _navGeneration; // 이 시점의 generation 고정
 		cancelAnimationFrame(_rafId);
 		clearTimeout(_timerId);
-		// 100%로 즉시 확 채움
 		navProgress = 100;
-		// 잠깐 보여주다가 페이드아웃
 		_timerId = setTimeout(() => {
+			if (gen !== _navGeneration) return; // 그 사이 또 navigate 시작되면 콜백 무시
 			navOpacity = 0;
 			_timerId = setTimeout(() => {
+				if (gen !== _navGeneration) return;
 				navVisible = false;
 				navProgress = 0;
 				navOpacity = 1;
 			}, 300);
-		}, 100);
+		}, 150);
 	}
 
 	afterNavigate(() => {
