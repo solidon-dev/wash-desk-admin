@@ -69,8 +69,15 @@
 		const rect = svgEl.getBoundingClientRect();
 		const svgX = ((e.clientX - rect.left) / rect.width) * W;
 		const slot = W / months.length;
-		const idx = Math.min(Math.floor(svgX / slot), months.length - 1);
-		hoverIdx = Math.max(0, idx);
+		// 컨럼 중심기준 ±30% 이내일 때만 표시
+		const rawIdx = Math.floor(svgX / slot);
+		const idx = Math.max(0, Math.min(rawIdx, months.length - 1));
+		const cx = xCenter(idx);
+		if (Math.abs(svgX - cx) > slot * 0.3) {
+			hoverIdx = null;
+		} else {
+			hoverIdx = idx;
+		}
 	}
 
 	function onMouseLeave() {

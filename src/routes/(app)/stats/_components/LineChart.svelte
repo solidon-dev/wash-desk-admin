@@ -70,21 +70,37 @@
 	function onMouseMove(e: MouseEvent) {
 		if (!svgEl || n === 0) return;
 		const rect = svgEl.getBoundingClientRect();
-		// SVG는 preserveAspectRatio="none" → 선형 매핑
 		const svgX = ((e.clientX - rect.left) / rect.width) * W;
-		// 가장 가까운 인덱스 찾기
-		let closest = 0;
+		const svgY = ((e.clientY - rect.top) / rect.height) * H;
+
+		// 포인트 간격의 40% 이내일 때만 스냅
+		const spacing = n > 1 ? (W - PR) / (n - 1) : W;
+		const threshold = spacing * 0.4;
+
+		let closest = -1;
 		let minDist = Infinity;
 		for (let i = 0; i < n; i++) {
-			const d = Math.abs(svgX - xPos(i));
-			if (d < minDist) {
-				minDist = d;
+			// X 거리만으로 먼저 필터, Y도 고려해서 실제 거리 계산
+			const dx = Math.abs(svgX - xPos(i));
+			if (dx > threshold) continue;
+			// 해당 시리즈 중 가장 가까운 Y 포인트까지의 거리
+			let minYDist = Infinity;
+			for (const s of series) {
+				const v = s.data[i] ?? 0;
+				if (v === 0) continue;
+				const dy = Math.abs(svgY - yPos(v));
+				if (dy < minYDist) minYDist = dy;
+			}
+			// Y 임계값: SVG 높이의 25% 이내
+			if (minYDist > H * 0.25) continue;
+			const dist = dx + minYDist * 0.3; // X 우선 가중
+			if (dist < minDist) {
+				minDist = dist;
 				closest = i;
 			}
 		}
-		hoverIdx = closest;
-		// 툴팁 X 위치: SVG 내 xPos를 컨테이너 퍼센트로 변환
-		tooltipX = (xPos(closest) / W) * 100;
+		hoverIdx = closest === -1 ? null : closest;
+		if (closest !== -1) tooltipX = (xPos(closest) / W) * 100;
 	}
 
 	function onMouseLeave() {
