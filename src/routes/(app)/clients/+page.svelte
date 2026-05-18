@@ -1,6 +1,6 @@
 <script lang="ts">
   import { deserialize } from '$app/forms';
-  import { goto, invalidateAll } from '$app/navigation';
+  import { goto } from '$app/navigation';
   import Icon from '@iconify/svelte';
   import { modal, SearchBar, Pagination, TableCard } from '$lib';
   import type { PageData } from './$types';
@@ -49,16 +49,8 @@
   const myFactoryId   = $derived(data.factory_id);
   const factories     = $derived(data.factories);
   const totalPages    = $derived(Math.max(1, Math.ceil(data.total / data.PAGE_SIZE)));
-  const serverClients = $derived(data.clients);
-
-  // ── 낙관적 업데이트용 로컬 상태
+  // ── 로컬 상태 (낙관적 업데이트 — invalidateAll 없이 서버 응답으로 직접 갱신)
   let localClients = $state<ClientRow[]>([...data.clients]);
-  let _suppress    = false;
-
-  $effect(() => {
-    const s = serverClients;
-    if (!_suppress) localClients = [...s];
-  });
 
   // ── 에러 모달 상태
   let errorMessage = $state('');
@@ -128,28 +120,27 @@
     await goto(parts.length ? `?${parts.join('&')}` : '?');
   }
 
-  // ── submitAction (인라인 구현)
+  // ── submitAction — 서버 응답 data를 그대로 반환 (null이면 실패)
   async function submitAction(
     action: string,
     payload: Record<string, string>,
     onRollback?: () => void
-  ): Promise<boolean> {
+  ): Promise<ClientRow | null> {
     const formData = new FormData();
     for (const [k, v] of Object.entries(payload)) formData.append(k, v);
     try {
       const res    = await fetch(`?/${action}`, { method: 'POST', body: formData });
-      const result = deserialize(await res.text());
+      const result = deserialize(await res.text()) as { type: string; data?: { error?: string; client?: ClientRow } };
       if (result.type === 'failure' || result.type === 'error') {
         onRollback?.();
-        const msg = (result as { data?: { error?: string } }).data?.error;
-        showErrorModal(msg);
-        return false;
+        showErrorModal(result.data?.error);
+        return null;
       }
-      return true;
+      return result.data?.client ?? null;
     } catch {
       onRollback?.();
       showErrorModal();
-      return false;
+      return null;
     }
   }
 
@@ -196,11 +187,11 @@
     if (myRole === 'super_admin') payload.factory_id = formFactoryId;
 
     if (editingClient) {
-      // 수정 — 낙관적 업데이트
-      const id      = editingClient.id;
-      payload.id    = id;
-      const prev    = localClients.find(c => c.id === id);
-      const updated: ClientRow = {
+      // 수정 — 낙관적 업데이트 후 서버 응답으로 교체
+      const id   = editingClient.id;
+      payload.id = id;
+      const prev = localClients.find(c => c.id === id);
+      const optimistic: ClientRow = {
         ...(prev ?? editingClient),
         name:                formName.trim(),
         business_number:     formBusinessNo.trim() || null,
@@ -211,17 +202,15 @@
         contract_end_date:   formContractEnd   || null,
         factory_id:          myRole === 'super_admin' ? formFactoryId : (prev?.factory_id ?? editingClient.factory_id),
       };
+      localClients = localClients.map(c => c.id === id ? optimistic : c);
+      modal.close();
 
-      _suppress = true;
-      localClients = localClients.map(c => c.id === id ? updated : c);
-
-      const ok = await submitAction('update', payload, () => {
+      const saved = await submitAction('update', payload, () => {
         localClients = localClients.map(c => c.id === id ? (prev ?? c) : c);
       });
-      _suppress = false;
-      if (ok) { modal.close(); await invalidateAll(); }
+      if (saved) localClients = localClients.map(c => c.id === id ? saved : c);
     } else {
-      // 등록 — tmpId 패턴
+      // 등록 — 모달 닫고 tmpId로 즉시 추가, 서버 응답으로 tmpId 교체
       const tmpId = `tmp-${Date.now()}`;
       const tmpRow: ClientRow = {
         id:                  tmpId,
@@ -236,15 +225,13 @@
         created_at:          new Date().toISOString(),
         deleted_at:          null,
       };
-
-      _suppress = true;
       localClients = [tmpRow, ...localClients];
+      modal.close();
 
-      const ok = await submitAction('create', payload, () => {
+      const created = await submitAction('create', payload, () => {
         localClients = localClients.filter(c => c.id !== tmpId);
       });
-      _suppress = false;
-      if (ok) { modal.close(); await invalidateAll(); }
+      if (created) localClients = localClients.map(c => c.id === tmpId ? created : c);
     }
   }
 
@@ -252,34 +239,30 @@
     if (!editingClient) return;
     const id   = editingClient.id;
     const prev = localClients.find(c => c.id === id);
-
-    _suppress = true;
     localClients = localClients.map(c =>
       c.id === id ? { ...c, deleted_at: new Date().toISOString() } : c
     );
+    modal.close();
 
-    const ok = await submitAction('hide', { id }, () => {
+    const saved = await submitAction('hide', { id }, () => {
       localClients = localClients.map(c => c.id === id ? (prev ?? c) : c);
     });
-    _suppress = false;
-    if (ok) { modal.close(); await invalidateAll(); }
+    if (saved) localClients = localClients.map(c => c.id === id ? saved : c);
   }
 
   async function handleRestore() {
     if (!editingClient) return;
     const id   = editingClient.id;
     const prev = localClients.find(c => c.id === id);
-
-    _suppress = true;
     localClients = localClients.map(c =>
       c.id === id ? { ...c, deleted_at: null } : c
     );
+    modal.close();
 
-    const ok = await submitAction('restore', { id }, () => {
+    const saved = await submitAction('restore', { id }, () => {
       localClients = localClients.map(c => c.id === id ? (prev ?? c) : c);
     });
-    _suppress = false;
-    if (ok) { modal.close(); await invalidateAll(); }
+    if (saved) localClients = localClients.map(c => c.id === id ? saved : c);
   }
 
   // ── 검색 이벤트

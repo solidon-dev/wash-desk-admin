@@ -30,7 +30,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 };
 
 export const actions: Actions = {
-	// ── 거래처 등록
+	// ── 거래처 등록 (새로 생성된 row 전체 반환)
 	create: async ({ request, locals }) => {
 		const myRole      = locals.session?.role;
 		const myFactoryId = locals.session?.factory_id as string | null;
@@ -52,12 +52,14 @@ export const actions: Actions = {
 		if (!name)       return fail(400, { error: '거래처명을 입력해주세요.' });
 		if (!factory_id) return fail(400, { error: '공장을 선택해주세요.' });
 
-		const { error } = await locals.supabase
+		const { data: created, error } = await locals.supabase
 			.from('clients')
-			.insert({ name, business_number, email, manager_name, manager_phone, contract_start_date, contract_end_date, factory_id });
+			.insert({ name, business_number, email, manager_name, manager_phone, contract_start_date, contract_end_date, factory_id })
+			.select('id, factory_id, name, business_number, email, manager_name, manager_phone, contract_start_date, contract_end_date, created_at, deleted_at')
+			.single();
 
 		if (error) return fail(500, { error: error.message });
-		return { success: true };
+		return { success: true, client: created };
 	},
 
 	// ── 거래처 수정
@@ -92,13 +94,15 @@ export const actions: Actions = {
 				return fail(403, { error: '본인 공장 소속 거래처만 수정할 수 있습니다.' });
 		}
 
-		const { error } = await locals.supabase
+		const { data: updated, error } = await locals.supabase
 			.from('clients')
 			.update({ name, business_number, email, manager_name, manager_phone, contract_start_date, contract_end_date, factory_id })
-			.eq('id', id);
+			.eq('id', id)
+			.select('id, factory_id, name, business_number, email, manager_name, manager_phone, contract_start_date, contract_end_date, created_at, deleted_at')
+			.single();
 
 		if (error) return fail(500, { error: error.message });
-		return { success: true };
+		return { success: true, client: updated };
 	},
 
 	// ── 비활성화 (soft delete)
@@ -122,13 +126,15 @@ export const actions: Actions = {
 				return fail(403, { error: '본인 공장 소속 거래처만 비활성화할 수 있습니다.' });
 		}
 
-		const { error } = await locals.supabase
+		const { data: hidden, error } = await locals.supabase
 			.from('clients')
 			.update({ deleted_at: new Date().toISOString() })
-			.eq('id', id);
+			.eq('id', id)
+			.select('id, factory_id, name, business_number, email, manager_name, manager_phone, contract_start_date, contract_end_date, created_at, deleted_at')
+			.single();
 
 		if (error) return fail(500, { error: error.message });
-		return { success: true };
+		return { success: true, client: hidden };
 	},
 
 	// ── 활성화 (복원)
@@ -152,12 +158,14 @@ export const actions: Actions = {
 				return fail(403, { error: '본인 공장 소속 거래처만 활성화할 수 있습니다.' });
 		}
 
-		const { error } = await locals.supabase
+		const { data: restored, error } = await locals.supabase
 			.from('clients')
 			.update({ deleted_at: null })
-			.eq('id', id);
+			.eq('id', id)
+			.select('id, factory_id, name, business_number, email, manager_name, manager_phone, contract_start_date, contract_end_date, created_at, deleted_at')
+			.single();
 
 		if (error) return fail(500, { error: error.message });
-		return { success: true };
+		return { success: true, client: restored };
 	},
 };
